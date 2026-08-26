@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Sin referencias a proyectos ni paquetes: es lo que mantiene al dominio independiente. -->
+
+</Project>

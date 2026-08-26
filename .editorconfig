@@ -1,0 +1,51 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{json,yml,yaml,csproj,props,targets}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.cs]
+# --- Convenciones de C# ---
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_prefer_braces = true:warning
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+dotnet_style_require_accessibility_modifiers = for_non_interface_members:warning
+dotnet_sort_system_directives_first = true
+
+# --- Nombres ---
+dotnet_naming_rule.interfaces_deben_empezar_con_i.severity = error
+dotnet_naming_rule.interfaces_deben_empezar_con_i.symbols = interfaces
+dotnet_naming_rule.interfaces_deben_empezar_con_i.style = prefijo_i
+dotnet_naming_symbols.interfaces.applicable_kinds = interface
+dotnet_naming_style.prefijo_i.required_prefix = I
+dotnet_naming_style.prefijo_i.capitalization = pascal_case
+
+dotnet_naming_rule.campos_privados_con_guion_bajo.severity = warning
+dotnet_naming_rule.campos_privados_con_guion_bajo.symbols = campos_privados
+dotnet_naming_rule.campos_privados_con_guion_bajo.style = prefijo_guion_bajo
+dotnet_naming_symbols.campos_privados.applicable_kinds = field
+dotnet_naming_symbols.campos_privados.applicable_accessibilities = private
+dotnet_naming_style.prefijo_guion_bajo.required_prefix = _
+dotnet_naming_style.prefijo_guion_bajo.capitalization = camel_case
+
+# CA1716: "Error" es palabra reservada en Visual Basic; el backend es solo C#.
+dotnet_diagnostic.CA1716.severity = none
+
+# CA1848: LoggerMessage compilado solo se justifica en rutas muy calientes.
+dotnet_diagnostic.CA1848.severity = none
+
+[tests/**/*.cs]
+# Los nombres de test son frases en castellano, no siguen las convenciones de produccion.
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1052.severity = none
