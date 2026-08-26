@@ -1,13 +1,13 @@
 # FinGrow · Backend
 
-API REST de FinGrow, construida en .NET 8 con Clean Architecture.
+API REST de FinGrow, construida en .NET 10 con Clean Architecture.
 
 Es uno de los tres componentes de la plataforma:
 
 | Repositorio | Stack | Responsabilidad |
 |---|---|---|
 | [FinGrow-FE](https://github.com/NuriaROrquin/FinGrow-FE) | React · Next.js | Interfaz de usuario |
-| **FinGrow-BE** | **.NET 8 · PostgreSQL** | **Reglas de negocio, datos y autenticación** |
+| **FinGrow-BE** | **.NET 10 · PostgreSQL** | **Reglas de negocio, datos y autenticación** |
 | [FinGrow-AI](https://github.com/NuriaROrquin/FinGrow-AI) | Python | OCR de tickets y procesamiento de lenguaje natural |
 
 El backend consume la API de IA por HTTP; el frontend nunca la llama directo.
@@ -16,7 +16,7 @@ El backend consume la API de IA por HTTP; el frontend nunca la llama directo.
 
 ## Requisitos
 
-- [.NET SDK 8.0](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [.NET SDK 10.0](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [Docker](https://docs.docker.com/get-docker/) (opcional, para levantar PostgreSQL)
 
 ## Puesta en marcha

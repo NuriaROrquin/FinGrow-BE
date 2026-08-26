@@ -1,6 +1,5 @@
 namespace FinGrow.ArchitectureTests;
 
-using FluentAssertions;
 using NetArchTest.Rules;
 
 public class LayerReferenceRules
@@ -18,7 +17,7 @@ public class LayerReferenceRules
             .NotHaveDependencyOnAny(ApplicationNamespace, InfrastructureNamespace, ApiNamespace)
             .GetResult();
 
-        result.IsSuccessful.Should().BeTrue("tipos en falta: {0}", FormatFailures(result));
+        result.IsSuccessful.ShouldBeTrue($"tipos en falta: {FormatFailures(result)}");
     }
 
     [Fact]
@@ -29,7 +28,7 @@ public class LayerReferenceRules
             .NotHaveDependencyOnAny(InfrastructureNamespace, ApiNamespace)
             .GetResult();
 
-        result.IsSuccessful.Should().BeTrue("tipos en falta: {0}", FormatFailures(result));
+        result.IsSuccessful.ShouldBeTrue($"tipos en falta: {FormatFailures(result)}");
     }
 
     [Fact]
@@ -40,7 +39,7 @@ public class LayerReferenceRules
             .NotHaveDependencyOn(ApiNamespace)
             .GetResult();
 
-        result.IsSuccessful.Should().BeTrue("tipos en falta: {0}", FormatFailures(result));
+        result.IsSuccessful.ShouldBeTrue($"tipos en falta: {FormatFailures(result)}");
     }
 
     [Fact]
@@ -51,7 +50,7 @@ public class LayerReferenceRules
             .NotHaveDependencyOnAny("Microsoft.EntityFrameworkCore", "Npgsql")
             .GetResult();
 
-        result.IsSuccessful.Should().BeTrue("tipos en falta: {0}", FormatFailures(result));
+        result.IsSuccessful.ShouldBeTrue($"tipos en falta: {FormatFailures(result)}");
     }
 
     [Fact]
@@ -64,7 +63,7 @@ public class LayerReferenceRules
             .NotHaveDependencyOn(InfrastructureNamespace)
             .GetResult();
 
-        result.IsSuccessful.Should().BeTrue("tipos en falta: {0}", FormatFailures(result));
+        result.IsSuccessful.ShouldBeTrue($"tipos en falta: {FormatFailures(result)}");
     }
 
     private static string FormatFailures(TestResult result) =>

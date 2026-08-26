@@ -1,7 +1,6 @@
 namespace FinGrow.Domain.UnitTests;
 
 using FinGrow.Domain.Errors;
-using FluentAssertions;
 
 public class DomainExceptionTests
 {
@@ -10,6 +9,6 @@ public class DomainExceptionTests
     {
         var exception = new DomainException("mensaje de prueba");
 
-        exception.Message.Should().Be("mensaje de prueba");
+        exception.Message.ShouldBe("mensaje de prueba");
     }
 }

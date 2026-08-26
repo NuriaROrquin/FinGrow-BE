@@ -1,6 +1,5 @@
 namespace FinGrow.ArchitectureTests;
 
-using FluentAssertions;
 using NetArchTest.Rules;
 
 public class NamingRules
@@ -15,7 +14,7 @@ public class NamingRules
             .HaveNameStartingWith("I")
             .GetResult();
 
-        result.IsSuccessful.Should().BeTrue();
+        result.IsSuccessful.ShouldBeTrue();
     }
 
     [Fact]
@@ -28,6 +27,6 @@ public class NamingRules
             .NotBePublic()
             .GetResult();
 
-        result.IsSuccessful.Should().BeTrue();
+        result.IsSuccessful.ShouldBeTrue();
     }
 }
