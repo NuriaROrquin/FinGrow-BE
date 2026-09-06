@@ -487,3 +487,6 @@ $RECYCLE.BIN/
 .env
 *.local.json
 appsettings.*.local.json
+
+# Documentacion de trabajo: no se versiona
+docs/
