@@ -49,3 +49,10 @@ dotnet_diagnostic.CA1848.severity = none
 # Los nombres de test son frases en castellano, no siguen las convenciones de produccion.
 dotnet_diagnostic.CA1707.severity = none
 dotnet_diagnostic.CA1052.severity = none
+
+[**/Persistence/Migrations/*.cs]
+# Codigo generado por "dotnet ef migrations". No se edita a mano, asi que no tiene sentido
+# frenar el build por su estilo.
+generated_code = true
+dotnet_diagnostic.IDE0161.severity = none
+dotnet_diagnostic.CA1861.severity = none

@@ -91,8 +91,8 @@ solo con Application; hay un test que lo verifica.
 src/
 ├── FinGrow.Domain/
 │   ├── Common/             Entity, AggregateRoot, ValueObject
-│   ├── Entities/
-│   ├── ValueObjects/
+│   ├── Entities/           Company, Department, Employee, Transaction, Budget, Goal, Investment
+│   ├── ValueObjects/       Money, Email, TaxId
 │   ├── Enums/
 │   ├── Errors/
 │   └── Repositories/       Interfaces, no implementaciones
@@ -119,7 +119,42 @@ tests/
 └── FinGrow.ArchitectureTests/
 ```
 
-Varias carpetas están vacías con un `.gitkeep`: el dominio todavía no está modelado.
+Las carpetas que siguen vacías con un `.gitkeep` corresponden a tareas todavía no hechas:
+repositorios, casos de uso, DTOs, validadores, controllers e integraciones.
+
+---
+
+## Modelo de dominio
+
+Siete entidades y tres value objects. El esquema se crea con la migración `InitialCreate`.
+
+| Tabla | Raíz de agregado | Qué guarda |
+|---|---|---|
+| `companies` | Company | Empresa contratante: razón social, CUIT, credenciales, moneda por defecto |
+| `departments` | (parte de Company) | Departamentos de la empresa; se desactivan, no se borran |
+| `employees` | Employee | La persona que usa la app; pertenece a una empresa y opcionalmente a un departamento |
+| `transactions` | Transaction | Ingresos y gastos, con importe siempre positivo y el signo dado por `type` |
+| `budgets` | Budget | Tope por categoría y período |
+| `goals` | Goal | Metas de ahorro con objetivo, avance y fecha límite |
+| `investments` | Investment | Posiciones del portafolio: capital invertido y valuación actual |
+
+Decisiones que conviene conocer antes de tocar el modelo:
+
+- **Un importe nunca viaja solo.** `Money` es un value object de monto + moneda que se guarda
+  como dos columnas (`amount` / `currency`). Combinar importes de monedas distintas lanza
+  `DomainException`.
+- **Lo gastado de un presupuesto no se persiste.** Se calcula sumando las transacciones del
+  período. Un contador guardado se desincroniza en cuanto alguien edita o borra un movimiento.
+- **Un empleado se relaciona con su departamento por id**, no por nombre como en los mocks del
+  frontend. Renombrar un departamento no toca a nadie.
+- **`ExpenseCategory` es un contrato compartido con FinGrow-AI.** Los diez valores viven también
+  en `FinGrow-AI/app/domain/enums.py` y se guardan en la base con el mismo texto
+  (`ahorro_inversion`, no `AhorroInversion`). Hay un test que falla si las dos listas se separan.
+- **Las reglas críticas están además en la base.** Un gasto con categoría de ingreso, un importe
+  cero o una meta con objetivo y progreso en monedas distintas los rechaza un `CHECK`, no solo el
+  código C#.
+- **Nombres en snake_case.** Se aplican de una sola vez en `OnModelCreating`
+  (`SnakeCaseNamingExtensions`), para poder consultar en psql sin comillas dobles.
 
 ---
 
