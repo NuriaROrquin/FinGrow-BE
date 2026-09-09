@@ -488,3 +488,6 @@ $RECYCLE.BIN/
 *.local.json
 appsettings.*.local.json
 CLAUDE.md
+
+# Documentacion de trabajo: no se versiona
+docs/
