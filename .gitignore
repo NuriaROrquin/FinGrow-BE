@@ -487,3 +487,4 @@ $RECYCLE.BIN/
 .env
 *.local.json
 appsettings.*.local.json
+CLAUDE.md

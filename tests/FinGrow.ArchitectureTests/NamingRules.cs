@@ -29,4 +29,30 @@ public class NamingRules
 
         result.IsSuccessful.ShouldBeTrue();
     }
+
+    [Fact]
+    public void Los_handlers_deben_ser_internal()
+    {
+        var result = Types.InAssembly(AssemblyReference.Application)
+            .That()
+            .HaveNameEndingWith("Handler")
+            .Should()
+            .NotBePublic()
+            .GetResult();
+
+        result.IsSuccessful.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Los_handlers_deben_vivir_en_Features()
+    {
+        var result = Types.InAssembly(AssemblyReference.Application)
+            .That()
+            .HaveNameEndingWith("Handler")
+            .Should()
+            .ResideInNamespaceStartingWith("FinGrow.Application.Features")
+            .GetResult();
+
+        result.IsSuccessful.ShouldBeTrue();
+    }
 }
