@@ -5,7 +5,7 @@ using FinGrow.Domain.Errors;
 public class DomainExceptionTests
 {
     [Fact]
-    public void Una_DomainException_conserva_el_mensaje_que_recibe()
+    public void A_DomainException_keeps_the_message_it_receives()
     {
         var exception = new DomainException("mensaje de prueba");
 

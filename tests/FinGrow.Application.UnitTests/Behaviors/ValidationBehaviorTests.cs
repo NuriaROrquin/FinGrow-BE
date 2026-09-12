@@ -7,41 +7,41 @@ using FluentValidation.Results;
 
 public class ValidationBehaviorTests
 {
-    private sealed record FakeRequest(string Nombre);
+    private sealed record FakeRequest(string Name);
 
     private sealed class FakeValidator : AbstractValidator<FakeRequest>
     {
-        public FakeValidator() => RuleFor(request => request.Nombre).NotEmpty();
+        public FakeValidator() => RuleFor(request => request.Name).NotEmpty();
     }
 
     [Fact]
-    public async Task Un_request_invalido_devuelve_Failure_sin_invocar_al_handler()
+    public async Task An_invalid_request_returns_failure_without_invoking_the_handler()
     {
         var behavior = new ValidationBehavior<FakeRequest, Result>([new FakeValidator()]);
-        var handlerFueInvocado = false;
+        var handlerWasInvoked = false;
 
         var result = await behavior.Handle(
             new FakeRequest(string.Empty),
             _ =>
             {
-                handlerFueInvocado = true;
+                handlerWasInvoked = true;
                 return Task.FromResult(Result.Success());
             },
             CancellationToken.None);
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Type.ShouldBe(ErrorType.Validation);
-        handlerFueInvocado.ShouldBeFalse();
+        handlerWasInvoked.ShouldBeFalse();
     }
 
     [Fact]
-    public async Task Un_request_invalido_con_respuesta_generica_devuelve_Failure_del_tipo_correcto()
+    public async Task An_invalid_request_with_a_generic_response_returns_failure_of_the_correct_type()
     {
         var behavior = new ValidationBehavior<FakeRequest, Result<string>>([new FakeValidator()]);
 
         var result = await behavior.Handle(
             new FakeRequest(string.Empty),
-            _ => Task.FromResult(Result.Success("valor")),
+            _ => Task.FromResult(Result.Success("value")),
             CancellationToken.None);
 
         result.IsFailure.ShouldBeTrue();
@@ -49,39 +49,39 @@ public class ValidationBehaviorTests
     }
 
     [Fact]
-    public async Task Un_request_valido_invoca_al_handler()
+    public async Task A_valid_request_invokes_the_handler()
     {
         var behavior = new ValidationBehavior<FakeRequest, Result>([new FakeValidator()]);
-        var handlerFueInvocado = false;
+        var handlerWasInvoked = false;
 
         var result = await behavior.Handle(
             new FakeRequest("Cande"),
             _ =>
             {
-                handlerFueInvocado = true;
+                handlerWasInvoked = true;
                 return Task.FromResult(Result.Success());
             },
             CancellationToken.None);
 
         result.IsSuccess.ShouldBeTrue();
-        handlerFueInvocado.ShouldBeTrue();
+        handlerWasInvoked.ShouldBeTrue();
     }
 
     [Fact]
-    public async Task Un_request_sin_validadores_registrados_invoca_al_handler_directamente()
+    public async Task A_request_with_no_registered_validators_invokes_the_handler_directly()
     {
         var behavior = new ValidationBehavior<FakeRequest, Result>([]);
-        var handlerFueInvocado = false;
+        var handlerWasInvoked = false;
 
         await behavior.Handle(
             new FakeRequest(string.Empty),
             _ =>
             {
-                handlerFueInvocado = true;
+                handlerWasInvoked = true;
                 return Task.FromResult(Result.Success());
             },
             CancellationToken.None);
 
-        handlerFueInvocado.ShouldBeTrue();
+        handlerWasInvoked.ShouldBeTrue();
     }
 }

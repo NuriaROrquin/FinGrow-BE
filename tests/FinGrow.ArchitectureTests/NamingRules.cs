@@ -5,7 +5,7 @@ using NetArchTest.Rules;
 public class NamingRules
 {
     [Fact]
-    public void Las_interfaces_deben_empezar_con_I()
+    public void Interfaces_must_start_with_I()
     {
         var result = Types.InAssembly(AssemblyReference.Application)
             .That()
@@ -18,7 +18,7 @@ public class NamingRules
     }
 
     [Fact]
-    public void Las_implementaciones_de_Infrastructure_deben_ser_internal()
+    public void Infrastructure_implementations_must_be_internal()
     {
         var result = Types.InAssembly(AssemblyReference.Infrastructure)
             .That()
@@ -31,7 +31,7 @@ public class NamingRules
     }
 
     [Fact]
-    public void Los_handlers_deben_ser_internal()
+    public void Handlers_must_be_internal()
     {
         var result = Types.InAssembly(AssemblyReference.Application)
             .That()
@@ -44,7 +44,7 @@ public class NamingRules
     }
 
     [Fact]
-    public void Los_handlers_deben_vivir_en_Features()
+    public void Handlers_must_live_in_Features()
     {
         var result = Types.InAssembly(AssemblyReference.Application)
             .That()

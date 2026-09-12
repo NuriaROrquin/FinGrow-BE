@@ -26,13 +26,13 @@ public class ExpenseCategoryTests
     ];
 
     [Fact]
-    public void Hay_exactamente_diez_categorias_de_gasto()
+    public void There_are_exactly_ten_expense_categories()
     {
         Enum.GetValues<ExpenseCategory>().Length.ShouldBe(10);
     }
 
     [Fact]
-    public void Las_categorias_coinciden_una_a_una_con_las_de_FinGrow_AI()
+    public void The_categories_match_one_to_one_with_the_ones_in_FinGrow_AI()
     {
         var wireValues = Enum.GetValues<ExpenseCategory>()
             .Select(category => category.ToWireValue())
@@ -45,19 +45,19 @@ public class ExpenseCategoryTests
     [InlineData("alimentos", ExpenseCategory.Alimentos)]
     [InlineData("ahorro_inversion", ExpenseCategory.AhorroInversion)]
     [InlineData("otros", ExpenseCategory.Otros)]
-    public void Una_categoria_se_reconstruye_desde_el_texto_que_manda_la_IA(string wireValue, ExpenseCategory expected)
+    public void A_category_is_reconstructed_from_the_text_sent_by_the_AI(string wireValue, ExpenseCategory expected)
     {
         ExpenseCategoryExtensions.FromWireValue(wireValue).ShouldBe(expected);
     }
 
     [Fact]
-    public void Un_texto_desconocido_no_se_convierte_en_categoria()
+    public void An_unknown_text_does_not_convert_into_a_category()
     {
         Should.Throw<DomainException>(() => ExpenseCategoryExtensions.FromWireValue("criptomonedas"));
     }
 
     [Fact]
-    public void TryFromWireValue_avisa_sin_lanzar_cuando_el_texto_no_existe()
+    public void TryFromWireValue_reports_failure_without_throwing_when_the_text_does_not_exist()
     {
         ExpenseCategoryExtensions.TryFromWireValue("Alimentos", out _).ShouldBeFalse();
     }

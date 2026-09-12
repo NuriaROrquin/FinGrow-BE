@@ -10,13 +10,13 @@ public class CompanyTests
     private static readonly DateTimeOffset Now = new(2026, 3, 15, 10, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public void Una_empresa_nace_activa()
+    public void A_company_is_created_active()
     {
         CreateCompany().IsActive.ShouldBeTrue();
     }
 
     [Fact]
-    public void Un_departamento_se_agrega_al_agregado_de_la_empresa()
+    public void A_department_is_added_to_the_company_aggregate()
     {
         var company = CreateCompany();
 
@@ -28,7 +28,7 @@ public class CompanyTests
     }
 
     [Fact]
-    public void No_se_pueden_tener_dos_departamentos_con_el_mismo_nombre()
+    public void Two_departments_cannot_have_the_same_name()
     {
         var company = CreateCompany();
         company.AddDepartment("Ventas", null, null, Now);
@@ -37,7 +37,7 @@ public class CompanyTests
     }
 
     [Fact]
-    public void Un_departamento_se_desactiva_en_lugar_de_borrarse()
+    public void A_department_is_deactivated_instead_of_deleted()
     {
         var company = CreateCompany();
         var department = company.AddDepartment("Logistica", null, null, Now);
@@ -49,7 +49,7 @@ public class CompanyTests
     }
 
     [Fact]
-    public void Una_empresa_sin_razon_social_no_se_crea()
+    public void A_company_without_a_legal_name_is_not_created()
     {
         Should.Throw<DomainException>(() => Company.Create(
             "   ",

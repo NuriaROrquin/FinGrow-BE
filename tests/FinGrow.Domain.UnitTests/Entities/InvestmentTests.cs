@@ -11,7 +11,7 @@ public class InvestmentTests
     private static readonly DateTimeOffset Now = new(2026, 3, 15, 10, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public void Al_crearse_la_inversion_vale_lo_mismo_que_se_puso()
+    public void When_created_the_investment_is_worth_what_was_put_in()
     {
         var investment = CreateInvestment();
 
@@ -21,7 +21,7 @@ public class InvestmentTests
     }
 
     [Fact]
-    public void El_rendimiento_positivo_se_calcula_sobre_el_capital_invertido()
+    public void Positive_return_is_calculated_on_the_invested_capital()
     {
         var investment = CreateInvestment();
 
@@ -32,7 +32,7 @@ public class InvestmentTests
     }
 
     [Fact]
-    public void Una_inversion_puede_dar_perdida()
+    public void An_investment_can_result_in_a_loss()
     {
         var investment = CreateInvestment();
 
@@ -43,7 +43,7 @@ public class InvestmentTests
     }
 
     [Fact]
-    public void La_valuacion_tiene_que_estar_en_la_misma_moneda_que_el_capital()
+    public void The_valuation_must_be_in_the_same_currency_as_the_capital()
     {
         var investment = CreateInvestment();
 
@@ -52,7 +52,7 @@ public class InvestmentTests
     }
 
     [Fact]
-    public void Agregar_capital_sube_el_invertido_y_el_valor_actual_sin_inventar_rendimiento()
+    public void Adding_capital_increases_the_invested_amount_and_current_value_without_inventing_return()
     {
         var investment = CreateInvestment();
 

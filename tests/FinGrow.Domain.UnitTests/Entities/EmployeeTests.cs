@@ -11,7 +11,7 @@ public class EmployeeTests
     private static readonly DateTimeOffset Now = new(2026, 3, 15, 10, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public void Un_empleado_nace_activo_y_puede_no_tener_departamento_todavia()
+    public void An_employee_is_created_active_and_may_not_have_a_department_yet()
     {
         var employee = CreateEmployee();
 
@@ -20,7 +20,7 @@ public class EmployeeTests
     }
 
     [Fact]
-    public void Un_empleado_siempre_pertenece_a_una_empresa()
+    public void An_employee_always_belongs_to_a_company()
     {
         Should.Throw<DomainException>(() => Employee.Create(
             Guid.Empty,
@@ -35,7 +35,7 @@ public class EmployeeTests
     }
 
     [Fact]
-    public void Reasignar_de_departamento_solo_cambia_el_id()
+    public void Reassigning_the_department_only_changes_the_id()
     {
         var employee = CreateEmployee();
         var departmentId = Guid.CreateVersion7();
@@ -47,7 +47,7 @@ public class EmployeeTests
     }
 
     [Fact]
-    public void Un_empleado_dado_de_baja_no_puede_iniciar_sesion()
+    public void A_deactivated_employee_cannot_log_in()
     {
         var employee = CreateEmployee();
         employee.Deactivate(Now);
@@ -56,7 +56,7 @@ public class EmployeeTests
     }
 
     [Fact]
-    public void El_login_de_un_empleado_activo_queda_registrado()
+    public void The_login_of_an_active_employee_is_recorded()
     {
         var employee = CreateEmployee();
 

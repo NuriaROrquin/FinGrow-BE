@@ -12,7 +12,7 @@ public class TransactionTests
     private static readonly DateOnly Today = new(2026, 3, 15);
 
     [Fact]
-    public void Un_gasto_queda_con_categoria_de_gasto_y_sin_categoria_de_ingreso()
+    public void An_expense_keeps_an_expense_category_and_no_income_category()
     {
         var transaction = RegisterExpense(Money.From(4500m, Currency.ARS));
 
@@ -22,7 +22,7 @@ public class TransactionTests
     }
 
     [Fact]
-    public void Un_ingreso_queda_con_categoria_de_ingreso_y_sin_categoria_de_gasto()
+    public void An_income_keeps_an_income_category_and_no_expense_category()
     {
         var transaction = Transaction.RegisterIncome(
             EmployeeId,
@@ -41,13 +41,13 @@ public class TransactionTests
     }
 
     [Fact]
-    public void Un_movimiento_de_importe_cero_no_se_registra()
+    public void A_transaction_with_a_zero_amount_is_not_registered()
     {
         Should.Throw<DomainException>(() => RegisterExpense(Money.Zero(Currency.ARS)));
     }
 
     [Fact]
-    public void Un_movimiento_sin_descripcion_no_se_registra()
+    public void A_transaction_without_a_description_is_not_registered()
     {
         Should.Throw<DomainException>(() => Transaction.RegisterExpense(
             EmployeeId,
@@ -62,7 +62,7 @@ public class TransactionTests
     }
 
     [Fact]
-    public void Un_movimiento_siempre_pertenece_a_un_empleado()
+    public void A_transaction_always_belongs_to_an_employee()
     {
         Should.Throw<DomainException>(() => Transaction.RegisterExpense(
             Guid.Empty,
@@ -77,7 +77,7 @@ public class TransactionTests
     }
 
     [Fact]
-    public void Un_movimiento_que_carga_el_empleado_a_mano_nace_confirmado()
+    public void A_transaction_entered_manually_by_the_employee_is_created_confirmed()
     {
         var transaction = Transaction.RegisterIncome(
             EmployeeId,
@@ -95,7 +95,7 @@ public class TransactionTests
     }
 
     [Fact]
-    public void Un_movimiento_que_propone_una_integracion_nace_pendiente()
+    public void A_transaction_proposed_by_an_integration_is_created_pending()
     {
         var transaction = RegisterExpense(Money.From(4500m, Currency.ARS));
 
@@ -104,7 +104,7 @@ public class TransactionTests
     }
 
     [Fact]
-    public void Confirmar_una_propuesta_la_deja_lista_para_contar()
+    public void Confirming_a_proposal_makes_it_count()
     {
         var transaction = RegisterExpense(Money.From(4500m, Currency.ARS));
         var confirmedAt = Now.AddMinutes(10);
@@ -116,7 +116,7 @@ public class TransactionTests
     }
 
     [Fact]
-    public void Un_movimiento_ya_confirmado_no_se_vuelve_a_confirmar()
+    public void An_already_confirmed_transaction_cannot_be_confirmed_again()
     {
         var transaction = RegisterExpense(Money.From(4500m, Currency.ARS));
         transaction.Confirm(Now);
@@ -125,7 +125,7 @@ public class TransactionTests
     }
 
     [Fact]
-    public void Un_gasto_se_puede_recategorizar_cuando_el_empleado_corrige_a_la_IA()
+    public void An_expense_can_be_recategorized_when_the_employee_corrects_the_AI()
     {
         var transaction = RegisterExpense(Money.From(4500m, Currency.ARS));
 
@@ -136,7 +136,7 @@ public class TransactionTests
     }
 
     [Fact]
-    public void Un_gasto_no_acepta_una_categoria_de_ingreso()
+    public void An_expense_does_not_accept_an_income_category()
     {
         var transaction = RegisterExpense(Money.From(4500m, Currency.ARS));
 

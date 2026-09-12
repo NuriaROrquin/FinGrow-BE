@@ -11,7 +11,7 @@ public class BudgetTests
     private static readonly DateTimeOffset Now = new(2026, 3, 15, 10, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public void El_periodo_mensual_arranca_el_primero_del_mes_aunque_se_cree_a_mitad()
+    public void The_monthly_period_starts_on_the_first_of_the_month_even_when_created_midway()
     {
         var budget = CreateMonthlyBudget(50000m);
 
@@ -20,7 +20,7 @@ public class BudgetTests
     }
 
     [Fact]
-    public void El_periodo_anual_arranca_el_primero_de_enero()
+    public void The_yearly_period_starts_on_the_first_of_january()
     {
         var budget = Budget.Create(
             EmployeeId,
@@ -41,7 +41,7 @@ public class BudgetTests
     [InlineData(49999, BudgetHealth.Warning)]
     [InlineData(50000, BudgetHealth.Exceeded)]
     [InlineData(60000, BudgetHealth.Exceeded)]
-    public void El_estado_del_presupuesto_sigue_los_umbrales_de_ochenta_y_cien_por_ciento(
+    public void The_budget_status_follows_the_eighty_and_hundred_percent_thresholds(
         decimal spent,
         BudgetHealth expected)
     {
@@ -51,13 +51,13 @@ public class BudgetTests
     }
 
     [Fact]
-    public void Un_presupuesto_con_limite_cero_no_se_crea()
+    public void A_budget_with_a_zero_limit_is_not_created()
     {
         Should.Throw<DomainException>(() => CreateMonthlyBudget(0m));
     }
 
     [Fact]
-    public void No_se_puede_cambiar_la_moneda_de_un_presupuesto_ya_creado()
+    public void The_currency_of_an_already_created_budget_cannot_be_changed()
     {
         var budget = CreateMonthlyBudget(50000m);
 
@@ -65,7 +65,7 @@ public class BudgetTests
     }
 
     [Fact]
-    public void El_presupuesto_cubre_las_fechas_de_su_periodo()
+    public void The_budget_covers_the_dates_within_its_period()
     {
         var budget = CreateMonthlyBudget(50000m);
 

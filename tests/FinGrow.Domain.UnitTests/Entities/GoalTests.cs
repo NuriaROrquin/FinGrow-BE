@@ -12,7 +12,7 @@ public class GoalTests
     private static readonly DateOnly Deadline = new(2026, 12, 31);
 
     [Fact]
-    public void Una_meta_nace_activa_y_en_cero()
+    public void A_goal_is_created_active_and_at_zero()
     {
         var goal = CreateGoal();
 
@@ -22,7 +22,7 @@ public class GoalTests
     }
 
     [Fact]
-    public void El_progreso_suma_los_aportes()
+    public void Progress_accumulates_the_contributions()
     {
         var goal = CreateGoal();
 
@@ -35,7 +35,7 @@ public class GoalTests
     }
 
     [Fact]
-    public void La_meta_se_marca_alcanzada_al_llegar_al_objetivo()
+    public void The_goal_is_marked_achieved_when_it_reaches_the_target()
     {
         var goal = CreateGoal();
         var achievedAt = Now.AddDays(60);
@@ -47,7 +47,7 @@ public class GoalTests
     }
 
     [Fact]
-    public void Pasarse_del_objetivo_no_lleva_el_progreso_arriba_de_cien()
+    public void Exceeding_the_target_does_not_push_progress_above_a_hundred()
     {
         var goal = CreateGoal();
 
@@ -58,7 +58,7 @@ public class GoalTests
     }
 
     [Fact]
-    public void Una_meta_ya_alcanzada_no_acepta_mas_progreso()
+    public void An_already_achieved_goal_does_not_accept_more_progress()
     {
         var goal = CreateGoal();
         goal.AddProgress(Money.From(1000000m, Currency.ARS), Now);
@@ -67,7 +67,7 @@ public class GoalTests
     }
 
     [Fact]
-    public void Una_meta_ya_alcanzada_no_se_cancela()
+    public void An_already_achieved_goal_cannot_be_cancelled()
     {
         var goal = CreateGoal();
         goal.AddProgress(Money.From(1000000m, Currency.ARS), Now);
@@ -76,7 +76,7 @@ public class GoalTests
     }
 
     [Fact]
-    public void Una_meta_con_fecha_limite_pasada_no_se_crea()
+    public void A_goal_with_a_past_deadline_is_not_created()
     {
         Should.Throw<DomainException>(() => Goal.Create(
             EmployeeId,
@@ -87,7 +87,7 @@ public class GoalTests
     }
 
     [Fact]
-    public void Los_dias_restantes_se_cuentan_contra_la_fecha_limite()
+    public void Remaining_days_are_counted_against_the_deadline()
     {
         var goal = CreateGoal();
 

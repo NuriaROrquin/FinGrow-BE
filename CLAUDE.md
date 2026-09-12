@@ -67,6 +67,36 @@ transporte.
 `tests/FinGrow.ArchitectureTests` verifica esas reglas en cada build y falla si alguien las
 rompe. Si uno de esos tests falla, el problema es la dependencia nueva, no el test.
 
+## Patrón de handlers en Application
+
+`AddApplication()` (`src/FinGrow.Application/DependencyInjection.cs`) escanea su propio
+ensamblado y registra automáticamente validadores de FluentValidation y handlers de MediatR
+(fijado en 12.5.0 — la última versión con licencia libre; desde la 13.x es de pago). Un feature
+nuevo bajo `Application/Features/<Feature>/<Caso>/` queda disponible por inyección de
+dependencias sin tocar `Program.cs` ni `AddApplication()`.
+
+- **Los validadores tienen que ser `public`.** `AddValidatorsFromAssembly` no incluye tipos
+  `internal` por defecto: un validador `internal` compila sin error pero nunca se ejecuta.
+- **Los handlers tienen que ser `internal` y vivir bajo `Application.Features`.** Dos reglas en
+  `tests/FinGrow.ArchitectureTests/NamingRules.cs` lo verifican y rompen el build si no se
+  cumple.
+- **La validación corta antes de llegar al handler.** `ValidationBehavior`
+  (`Application/Common/Behaviors/`) es un `IPipelineBehavior` de MediatR que, si FluentValidation
+  encuentra errores, devuelve `Result.Failure`/`Result<T>.Failure` con `ErrorType.Validation` sin
+  invocar al handler.
+- **El mapeo a HTTP vive en Api, no en Application**, para no acoplar Application a ASP.NET
+  Core. `ResultExtensions.ToActionResult()` (`Api/Extensions/`) traduce `Error.Type` a status
+  code: `Validation`→400, `NotFound`→404, `Conflict`→409, `Forbidden`→403, cualquier otro
+  (`Failure`)→500. Un controller nuevo solo necesita
+  `return (await sender.Send(command, ct)).ToActionResult();`.
+- Esto es distinto de `ExceptionHandlingMiddleware`: ese middleware sigue cubriendo únicamente
+  lo inesperado (excepciones no manejadas); `Result.Failure` es el camino para fallos de negocio
+  esperables y nunca debería llegar como excepción.
+
+`Application/Features` todavía está vacío — el patrón se armó antes que el primer feature real,
+a propósito. `tests/FinGrow.Application.UnitTests` y `tests/FinGrow.Api.UnitTests` prueban la
+mecánica (resolución por DI, corte del pipeline, mapeo de status codes) con fixtures propias.
+
 ## Convenciones
 
 - Identificadores en inglés; documentación, comentarios y mensajes de error en castellano. La
@@ -80,6 +110,9 @@ rompe. Si uno de esos tests falla, el problema es la dependencia nueva, no el te
   objects.
 - Reglas de negocio con desenlace esperable devuelven `Result`; las excepciones quedan para
   fallas técnicas.
+- Los nombres de los métodos de test están en inglés, en frases separadas por guion bajo (ver
+  `[tests/**/*.cs]` en `.editorconfig`, que por eso desactiva `CA1707`). No siguen las
+  convenciones de nombres de producción.
 - Las claves primarias son `Guid.CreateVersion7()`, no `Guid.NewGuid()`: son ordenables por
   tiempo y no fragmentan el índice.
 

@@ -46,7 +46,7 @@ dotnet_diagnostic.CA1716.severity = none
 dotnet_diagnostic.CA1848.severity = none
 
 [tests/**/*.cs]
-# Los nombres de test son frases en castellano, no siguen las convenciones de produccion.
+# Los nombres de test son frases en ingles separadas por guion bajo, no siguen las convenciones de produccion.
 dotnet_diagnostic.CA1707.severity = none
 dotnet_diagnostic.CA1052.severity = none
 

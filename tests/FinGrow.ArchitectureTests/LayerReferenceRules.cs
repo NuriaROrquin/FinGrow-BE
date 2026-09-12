@@ -10,7 +10,7 @@ public class LayerReferenceRules
     private const string ApiNamespace = "FinGrow.Api";
 
     [Fact]
-    public void Domain_no_debe_depender_de_ninguna_otra_capa()
+    public void Domain_must_not_depend_on_any_other_layer()
     {
         var result = Types.InAssembly(AssemblyReference.Domain)
             .Should()
@@ -21,7 +21,7 @@ public class LayerReferenceRules
     }
 
     [Fact]
-    public void Application_no_debe_depender_de_Infrastructure_ni_de_la_Api()
+    public void Application_must_not_depend_on_Infrastructure_or_the_Api()
     {
         var result = Types.InAssembly(AssemblyReference.Application)
             .Should()
@@ -32,7 +32,7 @@ public class LayerReferenceRules
     }
 
     [Fact]
-    public void Infrastructure_no_debe_depender_de_la_Api()
+    public void Infrastructure_must_not_depend_on_the_Api()
     {
         var result = Types.InAssembly(AssemblyReference.Infrastructure)
             .Should()
@@ -43,7 +43,7 @@ public class LayerReferenceRules
     }
 
     [Fact]
-    public void Domain_no_debe_depender_de_EntityFramework()
+    public void Domain_must_not_depend_on_EntityFramework()
     {
         var result = Types.InAssembly(AssemblyReference.Domain)
             .Should()
@@ -54,7 +54,7 @@ public class LayerReferenceRules
     }
 
     [Fact]
-    public void Los_controllers_no_deben_usar_tipos_de_Infrastructure()
+    public void Controllers_must_not_use_Infrastructure_types()
     {
         var result = Types.InAssembly(AssemblyReference.Api)
             .That()

@@ -13,15 +13,15 @@ public class ResultExtensionsTests
     [InlineData(ErrorType.Conflict, StatusCodes.Status409Conflict)]
     [InlineData(ErrorType.Forbidden, StatusCodes.Status403Forbidden)]
     [InlineData(ErrorType.Failure, StatusCodes.Status500InternalServerError)]
-    public void Un_Result_fallido_mapea_al_status_code_correcto(ErrorType errorType, int statusCodeEsperado)
+    public void A_failed_Result_maps_to_the_correct_status_code(ErrorType errorType, int expectedStatusCode)
     {
-        var error = new Error("Codigo", "Descripcion", errorType);
+        var error = new Error("Code", "Description", errorType);
         var result = Result.Failure(error);
 
         var actionResult = result.ToActionResult();
 
         var objectResult = actionResult.ShouldBeOfType<ObjectResult>();
-        objectResult.StatusCode.ShouldBe(statusCodeEsperado);
+        objectResult.StatusCode.ShouldBe(expectedStatusCode);
         var problemDetails = objectResult.Value.ShouldBeOfType<ProblemDetails>();
         problemDetails.Detail.ShouldBe(error.Description);
     }
@@ -32,19 +32,19 @@ public class ResultExtensionsTests
     [InlineData(ErrorType.Conflict, StatusCodes.Status409Conflict)]
     [InlineData(ErrorType.Forbidden, StatusCodes.Status403Forbidden)]
     [InlineData(ErrorType.Failure, StatusCodes.Status500InternalServerError)]
-    public void Un_Result_generico_fallido_mapea_al_status_code_correcto(ErrorType errorType, int statusCodeEsperado)
+    public void A_failed_generic_Result_maps_to_the_correct_status_code(ErrorType errorType, int expectedStatusCode)
     {
-        var error = new Error("Codigo", "Descripcion", errorType);
+        var error = new Error("Code", "Description", errorType);
         var result = Result.Failure<string>(error);
 
         var actionResult = result.ToActionResult();
 
         var objectResult = actionResult.ShouldBeOfType<ObjectResult>();
-        objectResult.StatusCode.ShouldBe(statusCodeEsperado);
+        objectResult.StatusCode.ShouldBe(expectedStatusCode);
     }
 
     [Fact]
-    public void Un_Result_exitoso_devuelve_NoContent()
+    public void A_successful_Result_returns_NoContent()
     {
         var result = Result.Success();
 
@@ -54,13 +54,13 @@ public class ResultExtensionsTests
     }
 
     [Fact]
-    public void Un_Result_generico_exitoso_devuelve_Ok_con_el_valor()
+    public void A_successful_generic_Result_returns_Ok_with_the_value()
     {
-        var result = Result.Success("valor");
+        var result = Result.Success("value");
 
         var actionResult = result.ToActionResult();
 
         var okResult = actionResult.ShouldBeOfType<OkObjectResult>();
-        okResult.Value.ShouldBe("valor");
+        okResult.Value.ShouldBe("value");
     }
 }

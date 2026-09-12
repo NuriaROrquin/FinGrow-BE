@@ -97,9 +97,9 @@ src/
 │   ├── Errors/
 │   └── Repositories/       Interfaces, no implementaciones
 ├── FinGrow.Application/
-│   ├── Common/             Result y Error
+│   ├── Common/             Result, Error y el ValidationBehavior de MediatR
 │   ├── Interfaces/         IUnitOfWork, ICurrentUser, IAiService, IDateTimeProvider
-│   ├── Features/           Un subdirectorio por funcionalidad
+│   ├── Features/           Un subdirectorio por funcionalidad (todavía vacío)
 │   ├── DTOs/
 │   └── Validators/
 ├── FinGrow.Infrastructure/
@@ -116,6 +116,8 @@ src/
 
 tests/
 ├── FinGrow.Domain.UnitTests/
+├── FinGrow.Application.UnitTests/
+├── FinGrow.Api.UnitTests/
 └── FinGrow.ArchitectureTests/
 ```
 
@@ -188,6 +190,7 @@ cumplan:
 - Application no depende de Infrastructure ni de Api.
 - Infrastructure no depende de Api.
 - Ningún controller usa tipos de Infrastructure.
+- Los handlers de Application (`*Handler`) son `internal` y viven bajo `Application.Features`.
 
 Si alguien las rompe, el build falla. GitHub Actions los ejecuta en cada push y pull request.
 
