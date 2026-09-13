@@ -31,14 +31,6 @@ dotnet_naming_symbols.interfaces.applicable_kinds = interface
 dotnet_naming_style.prefijo_i.required_prefix = I
 dotnet_naming_style.prefijo_i.capitalization = pascal_case
 
-dotnet_naming_rule.campos_privados_con_guion_bajo.severity = warning
-dotnet_naming_rule.campos_privados_con_guion_bajo.symbols = campos_privados
-dotnet_naming_rule.campos_privados_con_guion_bajo.style = prefijo_guion_bajo
-dotnet_naming_symbols.campos_privados.applicable_kinds = field
-dotnet_naming_symbols.campos_privados.applicable_accessibilities = private
-dotnet_naming_style.prefijo_guion_bajo.required_prefix = _
-dotnet_naming_style.prefijo_guion_bajo.capitalization = camel_case
-
 # CA1716: "Error" es palabra reservada en Visual Basic; el backend es solo C#.
 dotnet_diagnostic.CA1716.severity = none
 
