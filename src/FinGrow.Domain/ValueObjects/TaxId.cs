@@ -11,7 +11,7 @@ public sealed class TaxId : ValueObject
 {
     public const int Length = 11;
 
-    private static readonly int[] Weights = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+    private static readonly int[] Weights = { 5, 4, 3, 2, 7, 6, 5, 4, 3, 2 };
 
     private TaxId()
     {

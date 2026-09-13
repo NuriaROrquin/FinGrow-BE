@@ -35,10 +35,13 @@ Estas son las que no se deducen leyendo el código, y por las que conviene pregu
 "arreglar" algo que parece faltar.
 
 **Un total no se persiste: se deriva de sus partes.** El gastado de un presupuesto se calcula
-sumando las transacciones del período, y no existe como columna. La tentación de agregar un
-`spent` para "evitar el cálculo" es exactamente el bug: un total guardado y sus partes se
-desincronizan en cuanto alguien edita o borra una parte, y después nadie sabe cuál de los dos
-números es el bueno. Lo mismo aplica a `goals` e `investments` una vez hecha T-23.
+sumando las transacciones del período, el acumulado de una meta es la suma de
+`goal_contributions` y el valor actual de una inversión es la última fila de
+`investment_valuations`; ninguno existe como columna. La tentación de agregar un `spent` o un
+`current_amount` para "evitar el cálculo" es exactamente el bug: un total guardado y sus partes
+se desincronizan en cuanto alguien edita o borra una parte, y después nadie sabe cuál de los dos
+números es el bueno. Por eso las colecciones hijas (`Contributions`, `Valuations`, `Limits`)
+se cargan siempre con su agregado (`AutoInclude`).
 
 **`ExpenseCategory` es un contrato con FinGrow-AI.** Los diez valores viven también en
 `FinGrow-AI/app/domain/enums.py` y se guardan en la base con el texto que usa la IA
@@ -110,17 +113,32 @@ mecánica (resolución por DI, corte del pipeline, mapeo de status codes) con fi
   objects.
 - Reglas de negocio con desenlace esperable devuelven `Result`; las excepciones quedan para
   fallas técnicas.
-- Los nombres de los métodos de test están en inglés, en frases separadas por guion bajo (ver
-  `[tests/**/*.cs]` en `.editorconfig`, que por eso desactiva `CA1707`). No siguen las
-  convenciones de nombres de producción.
+- **Los tests van íntegramente en inglés**: nombres de métodos (frases separadas por guion
+  bajo, ver `[tests/**/*.cs]` en `.editorconfig`, que por eso desactiva `CA1707`), clases,
+  fakes, helpers y también las variables locales (`balance`, no `saldo`). Las únicas cosas en
+  castellano dentro de un test son los datos de prueba (`"juan@empresa.com"`) y los valores
+  del contrato con FinGrow-AI (`"alimentos"`). Los nombres de test no siguen las convenciones
+  de nombres de producción.
 - Las claves primarias son `Guid.CreateVersion7()`, no `Guid.NewGuid()`: son ordenables por
   tiempo y no fragmentan el índice.
+- **Las colecciones de un agregado** siguen el patrón de `Company.Departments`: un campo
+  `private readonly List<T> _xxx` inicializado con `= new()`, expuesto como
+  `IReadOnlyCollection<T>` y mapeado con `PropertyAccessMode.Field`. La entidad hija tiene
+  `internal static Create` para que solo el agregado pueda instanciarla.
+- **Sin *collection expressions*** (`[]`, `[a, b]`, `[typeof(X)]`) en ningún lado: `new()`,
+  `new[] { … }`, `Array.Empty<T>()`. Compilan, pero Rider (que es lo que usa el equipo) no las
+  entiende: marca campos como "never assigned" y deja de resolver los métodos encadenados
+  después de una. Los enums con código ISO (`Currency.ARS`) llevan `[SuppressMessage]` para la
+  inspección de nombres de Rider, porque el valor se guarda tal cual en la base.
+- **Comentarios solo donde el código no alcanza.** Un comentario justifica una decisión que no
+  se deduce leyendo (por qué existe una valuación inicial, por qué el índice incluye `period`);
+  no narra lo que hace la línea de abajo ni repite lo que ya dice este archivo o `docs/`. Si
+  al releer un comentario se puede borrar sin perder información, se borra.
 
 ## Trabajo pendiente que afecta al modelo
 
-Tres tablas de T-01 guardan un total que debería derivarse, y hay historias del backlog que lo
-contradicen. Se corrige en **T-23** (SCRUM-107). Antes de tomar HU-21, HU-22, HU-27, HU-32 o
-HU-33, revisá esa tarjeta: cada una arrastra una migración sobre tablas ya construidas.
-
-El detalle completo de las divergencias está en
-[docs/database-schema-target.md](docs/database-schema-target.md).
+Quedan tres divergencias entre lo construido y el DER objetivo: el responsable de un
+departamento como FK (HU-52), la tabla `users` para credenciales, 2FA y preferencias (HU-01,
+HU-04, HU-46, HU-49) y `ai_confidence` más el estado `Discarded` en `transactions` (HU-12,
+HU-15). Cada una arrastra una migración sobre tablas ya construidas: revisá
+[docs/database-schema-target.md](docs/database-schema-target.md) antes de tomar esas historias.

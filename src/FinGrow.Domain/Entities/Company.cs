@@ -13,7 +13,7 @@ public sealed class Company : AggregateRoot
 {
     public const int MaxNameLength = 200;
 
-    private readonly List<Department> _departments = [];
+    private readonly List<Department> _departments = new();
 
     private Company()
     {

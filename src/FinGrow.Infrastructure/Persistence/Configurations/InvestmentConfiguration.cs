@@ -9,12 +9,7 @@ internal sealed class InvestmentConfiguration : IEntityTypeConfiguration<Investm
     public void Configure(EntityTypeBuilder<Investment> builder)
     {
         builder.ToTable("investments", table =>
-        {
-            table.HasCheckConstraint("ck_investments_invested_positive", "invested_amount > 0");
-            table.HasCheckConstraint(
-                "ck_investments_same_currency",
-                "invested_currency = current_value_currency");
-        });
+            table.HasCheckConstraint("ck_investments_invested_positive", "invested_amount > 0"));
 
         builder.HasKey(investment => investment.Id);
 
@@ -28,13 +23,14 @@ internal sealed class InvestmentConfiguration : IEntityTypeConfiguration<Investm
             .IsRequired();
 
         builder.OwnsMoney(investment => investment.InvestedAmount, "invested_amount", "invested_currency");
-        builder.OwnsMoney(investment => investment.CurrentValue, "current_value", "current_value_currency");
 
         builder.Property(investment => investment.PurchasedOn).IsRequired();
-        builder.Property(investment => investment.ValuedAt).IsRequired();
         builder.Property(investment => investment.CreatedAt).IsRequired();
         builder.Property(investment => investment.UpdatedAt).IsRequired();
 
+        builder.Ignore(investment => investment.LatestValuation);
+        builder.Ignore(investment => investment.CurrentValue);
+        builder.Ignore(investment => investment.ValuedOn);
         builder.Ignore(investment => investment.ReturnAmount);
         builder.Ignore(investment => investment.ReturnPercentage);
 
@@ -42,6 +38,16 @@ internal sealed class InvestmentConfiguration : IEntityTypeConfiguration<Investm
             .WithMany()
             .HasForeignKey(investment => investment.EmployeeId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasMany(investment => investment.Valuations)
+            .WithOne()
+            .HasForeignKey(valuation => valuation.InvestmentId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Sin sus valuaciones una inversion no sabe cuanto vale: se cargan siempre con ella.
+        builder.Navigation(investment => investment.Valuations)
+            .UsePropertyAccessMode(PropertyAccessMode.Field)
+            .AutoInclude();
 
         builder.HasIndex(investment => new { investment.EmployeeId, investment.Type });
     }

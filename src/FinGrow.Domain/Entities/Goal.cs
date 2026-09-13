@@ -12,6 +12,8 @@ public sealed class Goal : AggregateRoot
 {
     public const int MaxNameLength = 150;
 
+    private readonly List<GoalContribution> _contributions = new();
+
     private Goal()
     {
     }
@@ -21,7 +23,6 @@ public sealed class Goal : AggregateRoot
         Guid employeeId,
         string name,
         Money targetAmount,
-        Money currentAmount,
         DateOnly deadline,
         DateTimeOffset createdAt)
         : base(id)
@@ -29,7 +30,6 @@ public sealed class Goal : AggregateRoot
         EmployeeId = employeeId;
         Name = name;
         TargetAmount = targetAmount;
-        CurrentAmount = currentAmount;
         Deadline = deadline;
         Status = GoalStatus.Active;
         CreatedAt = createdAt;
@@ -42,8 +42,6 @@ public sealed class Goal : AggregateRoot
 
     public Money TargetAmount { get; private set; } = null!;
 
-    public Money CurrentAmount { get; private set; } = null!;
-
     public DateOnly Deadline { get; private set; }
 
     public GoalStatus Status { get; private set; }
@@ -55,6 +53,8 @@ public sealed class Goal : AggregateRoot
     public DateTimeOffset UpdatedAt { get; private set; }
 
     public Employee Employee { get; private set; } = null!;
+
+    public IReadOnlyCollection<GoalContribution> Contributions => _contributions.AsReadOnly();
 
     public static Goal Create(
         Guid employeeId,
@@ -85,10 +85,13 @@ public sealed class Goal : AggregateRoot
             employeeId,
             EnsureValidName(name),
             targetAmount,
-            Money.Zero(targetAmount.Currency),
             deadline,
             createdAt);
     }
+
+    public Money CurrentAmount => _contributions.Aggregate(
+        Money.Zero(TargetAmount.Currency),
+        (total, contribution) => total.Add(contribution.Amount));
 
     /// <summary>Porcentaje alcanzado, tope 100 aunque el ahorro se pase del objetivo.</summary>
     public decimal ProgressPercentage => Math.Min(100m, CurrentAmount.PercentageOf(TargetAmount));
@@ -100,29 +103,48 @@ public sealed class Goal : AggregateRoot
 
     public int DaysRemaining(DateOnly today) => Deadline.DayNumber - today.DayNumber;
 
-    /// <summary>Suma un aporte y marca la meta como alcanzada si con eso llega al objetivo.</summary>
-    public void AddProgress(Money amount, DateTimeOffset occurredAt)
+    /// <summary>Registra un aporte y marca la meta como alcanzada si con eso llega al objetivo.</summary>
+    public GoalContribution AddContribution(
+        Money amount,
+        DateOnly contributedOn,
+        string? note,
+        DateTimeOffset occurredAt)
     {
         ArgumentNullException.ThrowIfNull(amount);
 
         if (Status != GoalStatus.Active)
         {
-            throw new DomainException("Solo se puede registrar progreso en una meta activa.");
+            throw new DomainException("Solo se puede registrar un aporte en una meta activa.");
         }
 
-        if (amount.IsZero)
+        if (amount.Currency != TargetAmount.Currency)
         {
-            throw new DomainException("El aporte tiene que ser mayor a cero.");
+            throw new DomainException("El aporte tiene que estar en la misma moneda que el objetivo de la meta.");
         }
 
-        CurrentAmount = CurrentAmount.Add(amount);
+        var contribution = GoalContribution.Create(Id, amount, contributedOn, note, occurredAt);
+        _contributions.Add(contribution);
         UpdatedAt = occurredAt;
 
-        if (CurrentAmount.IsAtLeast(TargetAmount))
+        RefreshStatus(occurredAt);
+
+        return contribution;
+    }
+
+    public void RemoveContribution(Guid contributionId, DateTimeOffset occurredAt)
+    {
+        if (Status == GoalStatus.Cancelled)
         {
-            Status = GoalStatus.Achieved;
-            AchievedAt = occurredAt;
+            throw new DomainException("Una meta cancelada no se puede editar.");
         }
+
+        var contribution = _contributions.SingleOrDefault(candidate => candidate.Id == contributionId)
+            ?? throw new DomainException("El aporte no pertenece a esta meta.");
+
+        _contributions.Remove(contribution);
+        UpdatedAt = occurredAt;
+
+        RefreshStatus(occurredAt);
     }
 
     public void UpdateDetails(string name, Money targetAmount, DateOnly deadline, DateTimeOffset updatedAt)
@@ -149,8 +171,7 @@ public sealed class Goal : AggregateRoot
         Deadline = deadline;
         UpdatedAt = updatedAt;
 
-        Status = CurrentAmount.IsAtLeast(TargetAmount) ? GoalStatus.Achieved : GoalStatus.Active;
-        AchievedAt = Status == GoalStatus.Achieved ? AchievedAt ?? updatedAt : null;
+        RefreshStatus(updatedAt);
     }
 
     public void Cancel(DateTimeOffset updatedAt)
@@ -162,6 +183,20 @@ public sealed class Goal : AggregateRoot
 
         Status = GoalStatus.Cancelled;
         UpdatedAt = updatedAt;
+    }
+
+    private void RefreshStatus(DateTimeOffset occurredAt)
+    {
+        if (CurrentAmount.IsAtLeast(TargetAmount))
+        {
+            Status = GoalStatus.Achieved;
+            AchievedAt ??= occurredAt;
+        }
+        else
+        {
+            Status = GoalStatus.Active;
+            AchievedAt = null;
+        }
     }
 
     private static string EnsureValidName(string name)

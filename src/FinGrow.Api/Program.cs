@@ -19,10 +19,10 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<FinGrowDbContext>(name: "database");
 
-const string FrontendCorsPolicy = "FinGrowFrontend";
+const string frontendCorsPolicy = "FinGrowFrontend";
 builder.Services.AddCors(options =>
-    options.AddPolicy(FrontendCorsPolicy, policy => policy
-        .WithOrigins(builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [])
+    options.AddPolicy(frontendCorsPolicy, policy => policy
+        .WithOrigins(builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>())
         .AllowAnyHeader()
         .AllowAnyMethod()
         .AllowCredentials()));
@@ -39,7 +39,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseCors(FrontendCorsPolicy);
+app.UseCors(frontendCorsPolicy);
 app.UseAuthentication();
 app.UseAuthorization();
 
