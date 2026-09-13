@@ -8,17 +8,9 @@ internal sealed class BudgetConfiguration : IEntityTypeConfiguration<Budget>
 {
     public void Configure(EntityTypeBuilder<Budget> builder)
     {
-        builder.ToTable("budgets", table =>
-            table.HasCheckConstraint("ck_budgets_limit_positive", "limit_amount > 0"));
+        builder.ToTable("budgets");
 
         builder.HasKey(budget => budget.Id);
-
-        builder.Property(budget => budget.Category)
-            .HasConversion(new ExpenseCategoryConverter())
-            .HasMaxLength(ExpenseCategoryConverter.MaxLength)
-            .IsRequired();
-
-        builder.OwnsMoney(budget => budget.Limit, "limit_amount", "currency");
 
         builder.Property(budget => budget.Period)
             .HasConversion<string>()
@@ -31,14 +23,25 @@ internal sealed class BudgetConfiguration : IEntityTypeConfiguration<Budget>
 
         // Calculadas a partir de otros campos: viven en el dominio, no en una columna.
         builder.Ignore(budget => budget.PeriodEnd);
+        builder.Ignore(budget => budget.Currency);
 
         builder.HasOne(budget => budget.Employee)
             .WithMany()
             .HasForeignKey(budget => budget.EmployeeId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Un solo presupuesto por categoria y periodo: si no, "cuanto me queda" tiene dos respuestas.
-        builder.HasIndex(budget => new { budget.EmployeeId, budget.Category, budget.PeriodStart })
+        builder.HasMany(budget => budget.Limits)
+            .WithOne()
+            .HasForeignKey(limit => limit.BudgetId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Sin sus topes un presupuesto no dice nada: se cargan siempre con el.
+        builder.Navigation(budget => budget.Limits)
+            .UsePropertyAccessMode(PropertyAccessMode.Field)
+            .AutoInclude();
+
+        // Uno por empleado y periodo. El tipo entra porque el anual y el de enero arrancan el mismo dia.
+        builder.HasIndex(budget => new { budget.EmployeeId, budget.Period, budget.PeriodStart })
             .IsUnique();
     }
 }

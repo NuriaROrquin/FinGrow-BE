@@ -35,17 +35,17 @@ public class MoneyTests
     public void Amounts_in_different_currencies_cannot_be_added()
     {
         var pesos = Money.From(100m, Currency.ARS);
-        var dolares = Money.From(100m, Currency.USD);
+        var dollars = Money.From(100m, Currency.USD);
 
-        Should.Throw<DomainException>(() => pesos.Add(dolares));
+        Should.Throw<DomainException>(() => pesos.Add(dollars));
     }
 
     [Fact]
     public void Subtracting_more_than_available_does_not_leave_a_negative_amount()
     {
-        var saldo = Money.From(100m, Currency.ARS);
+        var balance = Money.From(100m, Currency.ARS);
 
-        Should.Throw<DomainException>(() => saldo.Subtract(Money.From(150m, Currency.ARS)));
+        Should.Throw<DomainException>(() => balance.Subtract(Money.From(150m, Currency.ARS)));
     }
 
     [Fact]

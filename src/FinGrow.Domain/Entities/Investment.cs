@@ -12,6 +12,8 @@ public sealed class Investment : AggregateRoot
 {
     public const int MaxAssetNameLength = 120;
 
+    private readonly List<InvestmentValuation> _valuations = new();
+
     private Investment()
     {
     }
@@ -22,9 +24,7 @@ public sealed class Investment : AggregateRoot
         string assetName,
         InvestmentType type,
         Money investedAmount,
-        Money currentValue,
         DateOnly purchasedOn,
-        DateTimeOffset valuedAt,
         DateTimeOffset createdAt)
         : base(id)
     {
@@ -32,9 +32,7 @@ public sealed class Investment : AggregateRoot
         AssetName = assetName;
         Type = type;
         InvestedAmount = investedAmount;
-        CurrentValue = currentValue;
         PurchasedOn = purchasedOn;
-        ValuedAt = valuedAt;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
     }
@@ -49,18 +47,15 @@ public sealed class Investment : AggregateRoot
     /// <summary>Capital invertido, el numero contra el que se mide el rendimiento.</summary>
     public Money InvestedAmount { get; private set; } = null!;
 
-    public Money CurrentValue { get; private set; } = null!;
-
     public DateOnly PurchasedOn { get; private set; }
-
-    /// <summary>Cuando se cargo la ultima valuacion. Sin esto un rendimiento no se puede interpretar.</summary>
-    public DateTimeOffset ValuedAt { get; private set; }
 
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
 
     public Employee Employee { get; private set; } = null!;
+
+    public IReadOnlyCollection<InvestmentValuation> Valuations => _valuations.AsReadOnly();
 
     public static Investment Create(
         Guid employeeId,
@@ -82,17 +77,34 @@ public sealed class Investment : AggregateRoot
             throw new DomainException("El capital invertido tiene que ser mayor a cero.");
         }
 
-        return new Investment(
+        var investment = new Investment(
             Guid.CreateVersion7(),
             employeeId,
             EnsureValidAssetName(assetName),
             type,
             investedAmount,
+            purchasedOn,
+            createdAt);
+
+        // El dia de la compra vale lo que costo: asi siempre hay un ultimo valor conocido (HU-32).
+        investment._valuations.Add(InvestmentValuation.Create(
+            investment.Id,
             investedAmount,
             purchasedOn,
-            createdAt,
-            createdAt);
+            ValuationSource.Manual,
+            createdAt));
+
+        return investment;
     }
+
+    public InvestmentValuation LatestValuation => _valuations
+        .OrderByDescending(valuation => valuation.ValuedOn)
+        .ThenByDescending(valuation => valuation.CreatedAt)
+        .First();
+
+    public Money CurrentValue => LatestValuation.Value;
+
+    public DateOnly ValuedOn => LatestValuation.ValuedOn;
 
     /// <summary>Ganancia o perdida en unidades de la moneda. Negativo es un resultado valido.</summary>
     public decimal ReturnAmount => CurrentValue.DifferenceWith(InvestedAmount);
@@ -102,21 +114,32 @@ public sealed class Investment : AggregateRoot
         ? 0m
         : decimal.Round(ReturnAmount / InvestedAmount.Amount * 100m, 2, MidpointRounding.ToEven);
 
-    public void UpdateValuation(Money currentValue, DateTimeOffset valuedAt)
+    public InvestmentValuation RecordValuation(
+        Money value,
+        DateOnly valuedOn,
+        ValuationSource source,
+        DateTimeOffset recordedAt)
     {
-        ArgumentNullException.ThrowIfNull(currentValue);
+        ArgumentNullException.ThrowIfNull(value);
 
-        if (currentValue.Currency != InvestedAmount.Currency)
+        if (value.Currency != InvestedAmount.Currency)
         {
             throw new DomainException("La valuacion tiene que estar en la misma moneda que el capital invertido.");
         }
 
-        CurrentValue = currentValue;
-        ValuedAt = valuedAt;
-        UpdatedAt = valuedAt;
+        if (valuedOn < PurchasedOn)
+        {
+            throw new DomainException("Una inversion no puede valuarse antes de haberse comprado.");
+        }
+
+        var valuation = InvestmentValuation.Create(Id, value, valuedOn, source, recordedAt);
+        _valuations.Add(valuation);
+        UpdatedAt = recordedAt;
+
+        return valuation;
     }
 
-    public void AddCapital(Money amount, DateTimeOffset updatedAt)
+    public void AddCapital(Money amount, DateOnly addedOn, DateTimeOffset updatedAt)
     {
         ArgumentNullException.ThrowIfNull(amount);
 
@@ -125,8 +148,20 @@ public sealed class Investment : AggregateRoot
             throw new DomainException("El capital agregado tiene que ser mayor a cero.");
         }
 
+        if (addedOn < PurchasedOn)
+        {
+            throw new DomainException("No se puede agregar capital antes de la compra.");
+        }
+
+        var valueAfterContribution = CurrentValue.Add(amount);
+
         InvestedAmount = InvestedAmount.Add(amount);
-        CurrentValue = CurrentValue.Add(amount);
+        _valuations.Add(InvestmentValuation.Create(
+            Id,
+            valueAfterContribution,
+            addedOn,
+            ValuationSource.Manual,
+            updatedAt));
         UpdatedAt = updatedAt;
     }
 
