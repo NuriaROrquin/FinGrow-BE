@@ -1,7 +1,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-COPY global.json Directory.Build.props Directory.Packages.props ./
+COPY global.json .editorconfig Directory.Build.props Directory.Packages.props ./
 COPY src/FinGrow.Domain/*.csproj src/FinGrow.Domain/
 COPY src/FinGrow.Application/*.csproj src/FinGrow.Application/
 COPY src/FinGrow.Infrastructure/*.csproj src/FinGrow.Infrastructure/
