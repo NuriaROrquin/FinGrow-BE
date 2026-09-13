@@ -124,9 +124,12 @@ mecánica (resolución por DI, corte del pipeline, mapeo de status codes) con fi
 - **Las colecciones de un agregado** siguen el patrón de `Company.Departments`: un campo
   `private readonly List<T> _xxx` inicializado con `= new()`, expuesto como
   `IReadOnlyCollection<T>` y mapeado con `PropertyAccessMode.Field`. La entidad hija tiene
-  `internal static Create` para que solo el agregado pueda instanciarla. No usar `= []` en
-  el inicializador: Rider (que es lo que usa el equipo) no lo reconoce como asignación y marca
-  el campo como "never assigned", aunque el compilador esté conforme.
+  `internal static Create` para que solo el agregado pueda instanciarla.
+- **Sin *collection expressions*** (`[]`, `[a, b]`, `[typeof(X)]`) en ningún lado: `new()`,
+  `new[] { … }`, `Array.Empty<T>()`. Compilan, pero Rider (que es lo que usa el equipo) no las
+  entiende: marca campos como "never assigned" y deja de resolver los métodos encadenados
+  después de una. Los enums con código ISO (`Currency.ARS`) llevan `[SuppressMessage]` para la
+  inspección de nombres de Rider, porque el valor se guarda tal cual en la base.
 - **Comentarios solo donde el código no alcanza.** Un comentario justifica una decisión que no
   se deduce leyendo (por qué existe una valuación inicial, por qué el índice incluye `period`);
   no narra lo que hace la línea de abajo ni repite lo que ya dice este archivo o `docs/`. Si
