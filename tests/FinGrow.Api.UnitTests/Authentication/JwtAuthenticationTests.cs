@@ -70,6 +70,7 @@ public class JwtAuthenticationTests : IClassFixture<JwtAuthenticationTests.Secur
             builder.ConfigureAppConfiguration((_, configuration) =>
                 configuration.AddInMemoryCollection(new Dictionary<string, string?>
                 {
+                    ["Database:MigrateOnStartup"] = "false",
                     ["Jwt:SecretKey"] = "unit-test-secret-key-at-least-32-characters-long",
                     ["AiService:ApiKey"] = "unit-test-ai-api-key",
                 }));
