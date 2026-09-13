@@ -61,6 +61,7 @@ public static class DependencyInjection
 
                 client.BaseAddress = new Uri(options.BaseUrl);
                 client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+                client.DefaultRequestHeaders.Add(AiServiceOptions.ApiKeyHeader, options.ApiKey);
             })
             .AddPolicyHandler(GetRetryPolicy());
 
