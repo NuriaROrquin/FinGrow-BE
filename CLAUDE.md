@@ -96,9 +96,16 @@ dependencias sin tocar `Program.cs` ni `AddApplication()`.
   lo inesperado (excepciones no manejadas); `Result.Failure` es el camino para fallos de negocio
   esperables y nunca debería llegar como excepción.
 
-`Application/Features` todavía está vacío — el patrón se armó antes que el primer feature real,
-a propósito. `tests/FinGrow.Application.UnitTests` y `tests/FinGrow.Api.UnitTests` prueban la
-mecánica (resolución por DI, corte del pipeline, mapeo de status codes) con fixtures propias.
+El primer feature real es `Application/Features/Integrations/WhatsApp` (T-25): sirve de
+referencia de cómo queda un caso de uso completo, con repositorios en `Domain/Repositories`
+implementados en `Infrastructure/Persistence/Repositories`. `tests/FinGrow.Application.UnitTests`
+prueba los handlers con fakes en memoria (`Fakes/InMemoryFakes.cs`) y `tests/FinGrow.Api.UnitTests`
+el borde HTTP reemplazando los repositorios en `ConfigureTestServices`.
+
+**El webhook de WhatsApp es público y se protege con la firma de Twilio**, no con JWT.
+`ValidateTwilioSignatureAttribute` (`Api/Twilio/`) corta antes del handler; el controller no
+tiene lógica: parsear el form es `TwilioInboundMessage` y responder es `TwiMlResult`. Un número
+que no está en `employee_integrations` solo puede mandar su código de vinculación.
 
 ## Convenciones
 

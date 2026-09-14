@@ -1,10 +1,14 @@
 namespace FinGrow.Infrastructure;
 
+using System.Net.Http.Headers;
 using System.Text;
 using FinGrow.Application.Interfaces;
+using FinGrow.Domain.Repositories;
 using FinGrow.Infrastructure.Ai;
 using FinGrow.Infrastructure.Identity;
+using FinGrow.Infrastructure.Integrations.Twilio;
 using FinGrow.Infrastructure.Persistence;
+using FinGrow.Infrastructure.Persistence.Repositories;
 using FinGrow.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +27,7 @@ public static class DependencyInjection
         services.AddPersistence(configuration);
         services.AddAiService(configuration);
         services.AddJwtAuthentication(configuration);
+        services.AddTwilio(configuration);
 
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, CurrentUser>();
@@ -45,6 +50,10 @@ public static class DependencyInjection
 
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<FinGrowDbContext>());
 
+        services.AddScoped<IEmployeeRepository, EmployeeRepository>();
+        services.AddScoped<IEmployeeIntegrationRepository, EmployeeIntegrationRepository>();
+        services.AddScoped<IIntegrationLinkCodeRepository, IntegrationLinkCodeRepository>();
+
         return services;
     }
 
@@ -62,6 +71,28 @@ public static class DependencyInjection
                 client.BaseAddress = new Uri(options.BaseUrl);
                 client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
                 client.DefaultRequestHeaders.Add(AiServiceOptions.ApiKeyHeader, options.ApiKey);
+            })
+            .AddPolicyHandler(GetRetryPolicy());
+
+        return services;
+    }
+
+    private static IServiceCollection AddTwilio(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<TwilioOptions>()
+            .Bind(configuration.GetSection(TwilioOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddSingleton<ITwilioRequestValidator, TwilioRequestValidator>();
+
+        services.AddHttpClient<ITwilioMediaClient, TwilioMediaClient>((provider, client) =>
+            {
+                var options = provider.GetRequiredService<IOptions<TwilioOptions>>().Value;
+                var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{options.AccountSid}:{options.AuthToken}"));
+
+                client.Timeout = TimeSpan.FromSeconds(options.MediaTimeoutSeconds);
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", credentials);
             })
             .AddPolicyHandler(GetRetryPolicy());
 

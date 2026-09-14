@@ -37,6 +37,8 @@ public class MigrateOnStartupTests
             ["Jwt:SecretKey"] = "unit-test-secret-key-at-least-32-characters-long",
             ["Jwt:Issuer"] = "FinGrow",
             ["Jwt:Audience"] = "FinGrow",
+            ["Twilio:AccountSid"] = "ACunit-test",
+            ["Twilio:AuthToken"] = "unit-test-twilio-auth-token",
         });
         builder.Services.AddInfrastructure(builder.Configuration);
 
