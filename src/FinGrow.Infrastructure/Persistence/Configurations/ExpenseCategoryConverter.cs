@@ -16,7 +16,20 @@ internal sealed class ExpenseCategoryConverter : ValueConverter<ExpenseCategory,
     public ExpenseCategoryConverter()
         : base(
             category => category.ToWireValue(),
-            value => ExpenseCategoryExtensions.FromWireValue(value))
+            value => FromDatabaseValue(value))
     {
+    }
+
+    private static ExpenseCategory FromDatabaseValue(string value)
+    {
+        if (ExpenseCategoryExtensions.TryFromWireValue(value, out var category))
+        {
+            return category;
+        }
+
+        return Enum.TryParse<ExpenseCategory>(value, ignoreCase: true, out category)
+            && Enum.IsDefined(category)
+            ? category
+            : ExpenseCategoryExtensions.FromWireValue(value);
     }
 }

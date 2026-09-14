@@ -38,11 +38,14 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
+
 app.UseCors(FrontendCorsPolicy);
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapControllers();
 app.MapHealthChecks("/health");
 

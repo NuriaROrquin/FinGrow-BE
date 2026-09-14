@@ -4,6 +4,7 @@ using FinGrow.Application.Interfaces;
 using FinGrow.Infrastructure.Ai;
 using FinGrow.Infrastructure.Identity;
 using FinGrow.Infrastructure.Persistence;
+using FinGrow.Infrastructure.Persistence.Repositories;
 using FinGrow.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -38,6 +39,7 @@ public static class DependencyInjection
                 npgsql.MigrationsAssembly(typeof(FinGrowDbContext).Assembly.FullName)));
 
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<FinGrowDbContext>());
+        services.AddScoped<ITransactionReadRepository, TransactionReadRepository>();
 
         return services;
     }
