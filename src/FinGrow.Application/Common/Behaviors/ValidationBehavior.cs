@@ -9,7 +9,7 @@ internal sealed class ValidationBehavior<TRequest, TResponse> : IPipelineBehavio
     where TResponse : Result
 {
     private static readonly MethodInfo GenericFailureMethod = typeof(Result)
-        .GetMethod(nameof(Result.Failure), 1, [typeof(Error)])!;
+        .GetMethod(nameof(Result.Failure), 1, new[] { typeof(Error) })!;
 
     private readonly IEnumerable<IValidator<TRequest>> _validators;
 
@@ -51,6 +51,6 @@ internal sealed class ValidationBehavior<TRequest, TResponse> : IPipelineBehavio
         var valueType = typeof(TResponse).GetGenericArguments()[0];
         var failureMethod = GenericFailureMethod.MakeGenericMethod(valueType);
 
-        return (TResponse)failureMethod.Invoke(null, [error])!;
+        return (TResponse)failureMethod.Invoke(null, new object[] { error })!;
     }
 }

@@ -9,13 +9,7 @@ internal sealed class GoalConfiguration : IEntityTypeConfiguration<Goal>
     public void Configure(EntityTypeBuilder<Goal> builder)
     {
         builder.ToTable("goals", table =>
-        {
-            table.HasCheckConstraint("ck_goals_target_positive", "target_amount > 0");
-
-            // Objetivo y progreso son dos importes distintos de la misma meta: si quedaran en
-            // monedas diferentes, el porcentaje de avance dejaria de significar algo.
-            table.HasCheckConstraint("ck_goals_same_currency", "target_currency = current_currency");
-        });
+            table.HasCheckConstraint("ck_goals_target_positive", "target_amount > 0"));
 
         builder.HasKey(goal => goal.Id);
 
@@ -24,7 +18,6 @@ internal sealed class GoalConfiguration : IEntityTypeConfiguration<Goal>
             .IsRequired();
 
         builder.OwnsMoney(goal => goal.TargetAmount, "target_amount", "target_currency");
-        builder.OwnsMoney(goal => goal.CurrentAmount, "current_amount", "current_currency");
 
         builder.Property(goal => goal.Deadline).IsRequired();
 
@@ -36,6 +29,7 @@ internal sealed class GoalConfiguration : IEntityTypeConfiguration<Goal>
         builder.Property(goal => goal.CreatedAt).IsRequired();
         builder.Property(goal => goal.UpdatedAt).IsRequired();
 
+        builder.Ignore(goal => goal.CurrentAmount);
         builder.Ignore(goal => goal.ProgressPercentage);
         builder.Ignore(goal => goal.RemainingAmount);
 
@@ -43,6 +37,16 @@ internal sealed class GoalConfiguration : IEntityTypeConfiguration<Goal>
             .WithMany()
             .HasForeignKey(goal => goal.EmployeeId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasMany(goal => goal.Contributions)
+            .WithOne()
+            .HasForeignKey(contribution => contribution.GoalId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Sin sus aportes una meta no sabe cuanto lleva: se cargan siempre con ella.
+        builder.Navigation(goal => goal.Contributions)
+            .UsePropertyAccessMode(PropertyAccessMode.Field)
+            .AutoInclude();
 
         builder.HasIndex(goal => new { goal.EmployeeId, goal.Status });
     }

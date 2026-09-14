@@ -21,9 +21,15 @@ public sealed class FinGrowDbContext : DbContext, IUnitOfWork
 
     public DbSet<Budget> Budgets => Set<Budget>();
 
+    public DbSet<BudgetCategoryLimit> BudgetCategoryLimits => Set<BudgetCategoryLimit>();
+
     public DbSet<Goal> Goals => Set<Goal>();
 
+    public DbSet<GoalContribution> GoalContributions => Set<GoalContribution>();
+
     public DbSet<Investment> Investments => Set<Investment>();
+
+    public DbSet<InvestmentValuation> InvestmentValuations => Set<InvestmentValuation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

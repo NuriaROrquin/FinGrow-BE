@@ -12,7 +12,7 @@ using FinGrow.Domain.Errors;
 public class ExpenseCategoryTests
 {
     private static readonly string[] WireValuesInPython =
-    [
+    {
         "alimentos",
         "transporte",
         "vivienda",
@@ -23,7 +23,7 @@ public class ExpenseCategoryTests
         "indumentaria",
         "ahorro_inversion",
         "otros"
-    ];
+    };
 
     [Fact]
     public void There_are_exactly_ten_expense_categories()

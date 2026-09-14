@@ -47,7 +47,9 @@ variables de entorno usando `__` como separador de sección.
 | Clave | Variable de entorno | Descripción |
 |---|---|---|
 | `ConnectionStrings:Database` | `ConnectionStrings__Database` | Cadena de conexión a PostgreSQL |
+| `Database:MigrateOnStartup` | `Database__MigrateOnStartup` | Aplica las migraciones pendientes al arrancar (default `true`). Poner en `false` si las migraciones se corren desde un paso de deploy separado |
 | `AiService:BaseUrl` | `AiService__BaseUrl` | URL base de FinGrow-AI |
+| `AiService:ApiKey` | `AiService__ApiKey` | Secreto compartido con FinGrow-AI; viaja en el header `X-API-Key` y tiene que ser el mismo valor que `API_KEY` en ese servicio |
 | `AiService:TimeoutSeconds` | `AiService__TimeoutSeconds` | Timeout de las llamadas a IA (default 30) |
 | `Cors:AllowedOrigins` | `Cors__AllowedOrigins__0` | Orígenes habilitados para el frontend |
 
@@ -55,7 +57,13 @@ Los secretos no se commitean. En desarrollo local:
 
 ```bash
 dotnet user-secrets set "ConnectionStrings:Database" "<cadena>" --project src/FinGrow.Api
+dotnet user-secrets set "Jwt:SecretKey" "<clave de al menos 32 caracteres>" --project src/FinGrow.Api
+dotnet user-secrets set "AiService:ApiKey" "<secreto compartido con FinGrow-AI>" --project src/FinGrow.Api
 ```
+
+Si `Jwt:SecretKey` o `AiService:ApiKey` faltan, la API no arranca y el log dice cuál es. En
+desarrollo `AiService:ApiKey` puede ser cualquier texto: FinGrow-AI con `API_KEY` vacía no lo
+valida. En producción los dos servicios tienen que compartir el mismo valor.
 
 ---
 
@@ -170,7 +178,9 @@ dotnet build FinGrow.sln
 dotnet test FinGrow.sln
 ```
 
-Migraciones de base de datos:
+Migraciones de base de datos. La API aplica las pendientes al arrancar
+(`Database:MigrateOnStartup`), así que `database update` solo hace falta para migrar sin
+levantar la API:
 
 ```bash
 dotnet ef migrations add <Nombre> --project src/FinGrow.Infrastructure --startup-project src/FinGrow.Api

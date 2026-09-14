@@ -1,0 +1,15 @@
+# Salidas de compilación del host: el restore y el publish se hacen dentro de la imagen.
+**/bin/
+**/obj/
+**/TestResults/
+
+# Herramientas y metadatos que no forman parte de la API.
+.git/
+.idea/
+.vs/
+.vscode/
+.claude/
+docs/
+tests/
+*.md
+*.user
