@@ -1,3 +1,6 @@
+using FinGrow.Domain.Repositories;
+using FinGrow.Infrastructure.Persistence.Repositories;
+
 namespace FinGrow.Infrastructure;
 
 using System.Text;
@@ -29,6 +32,7 @@ public static class DependencyInjection
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<ITokenService, JwtTokenService>();
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
+        services.AddScoped<IEmployeeRepository, EmployeeRepository>();
 
         return services;
     }
