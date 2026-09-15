@@ -6,6 +6,7 @@ using FinGrow.Domain.Enums;
 public interface ITransactionReadRepository
 {
     Task<TransactionPage> GetPageAsync(
+        Guid employeeId,
         int pageNumber,
         int pageSize,
         string? search,

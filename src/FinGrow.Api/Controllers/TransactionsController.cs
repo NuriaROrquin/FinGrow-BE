@@ -3,6 +3,7 @@ namespace FinGrow.Api.Controllers;
 using FinGrow.Api.Extensions;
 using FinGrow.Application.Features.Transactions.GetHistory;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
@@ -10,6 +11,7 @@ using Microsoft.AspNetCore.Mvc;
 public sealed class TransactionsController : ControllerBase
 {
     [HttpGet]
+    [Authorize]
     public async Task<IActionResult> GetHistory(
         [FromServices] ISender sender,
         [FromQuery] int pageNumber = 1,

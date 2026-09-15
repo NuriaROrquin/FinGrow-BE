@@ -20,6 +20,8 @@ public sealed record TransactionHistoryItem(
     string Currency,
     string Category,
     string Description,
+    string PaymentMethod,
+    string Type,
     string Source);
 
 public sealed record TransactionHistoryResponse(
@@ -35,14 +37,26 @@ internal sealed class GetTransactionHistoryQueryHandler
     : IRequestHandler<GetTransactionHistoryQuery, Result<TransactionHistoryResponse>>
 {
     private readonly ITransactionReadRepository _transactionReadRepository;
+    private readonly ICurrentUser _currentUser;
 
-    public GetTransactionHistoryQueryHandler(ITransactionReadRepository transactionReadRepository) =>
+    public GetTransactionHistoryQueryHandler(
+        ITransactionReadRepository transactionReadRepository,
+        ICurrentUser currentUser)
+    {
         _transactionReadRepository = transactionReadRepository;
+        _currentUser = currentUser;
+    }
 
     public async Task<Result<TransactionHistoryResponse>> Handle(
         GetTransactionHistoryQuery request,
         CancellationToken cancellationToken)
     {
+        if (!_currentUser.UserId.HasValue)
+        {
+            return Result.Failure<TransactionHistoryResponse>(
+                Error.Forbidden("Transactions.UserRequired", "No se pudo identificar al usuario autenticado."));
+        }
+
         var type = request.Type?.Trim().ToLowerInvariant() switch
         {
             null or "" => null,
@@ -52,6 +66,7 @@ internal sealed class GetTransactionHistoryQueryHandler
         };
 
         var page = await _transactionReadRepository.GetPageAsync(
+            _currentUser.UserId.Value,
             request.PageNumber,
             request.PageSize,
             request.Search,
@@ -66,6 +81,8 @@ internal sealed class GetTransactionHistoryQueryHandler
                 transaction.Amount.Currency.ToString(),
                 GetCategory(transaction),
                 transaction.Description,
+                transaction.PaymentMethod.ToString(),
+                transaction.Type.ToString(),
                 transaction.Source.ToString()))
             .ToList();
 

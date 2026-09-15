@@ -12,6 +12,7 @@ internal sealed class TransactionReadRepository : ITransactionReadRepository
     public TransactionReadRepository(FinGrowDbContext dbContext) => _dbContext = dbContext;
 
     public async Task<TransactionPage> GetPageAsync(
+        Guid employeeId,
         int pageNumber,
         int pageSize,
         string? search,
@@ -19,7 +20,8 @@ internal sealed class TransactionReadRepository : ITransactionReadRepository
         CancellationToken cancellationToken = default)
     {
         var filteredQuery = _dbContext.Transactions
-            .AsNoTracking();
+            .AsNoTracking()
+            .Where(transaction => transaction.EmployeeId == employeeId);
 
         if (!string.IsNullOrWhiteSpace(search))
         {
