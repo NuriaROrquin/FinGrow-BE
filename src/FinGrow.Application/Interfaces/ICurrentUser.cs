@@ -6,5 +6,11 @@ public interface ICurrentUser
 
     Guid? CompanyId { get; }
 
+    string? FullName { get; }
+
+    string? Role { get; }
+
+    DateTimeOffset? ExpiresAt { get; }
+
     bool IsAuthenticated { get; }
 }
