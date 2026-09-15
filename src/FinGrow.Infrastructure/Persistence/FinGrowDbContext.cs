@@ -31,6 +31,10 @@ public sealed class FinGrowDbContext : DbContext, IUnitOfWork
 
     public DbSet<InvestmentValuation> InvestmentValuations => Set<InvestmentValuation>();
 
+    public DbSet<EmployeeIntegration> EmployeeIntegrations => Set<EmployeeIntegration>();
+
+    public DbSet<IntegrationLinkCode> IntegrationLinkCodes => Set<IntegrationLinkCode>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());

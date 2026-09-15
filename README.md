@@ -47,15 +47,50 @@ variables de entorno usando `__` como separador de sección.
 | Clave | Variable de entorno | Descripción |
 |---|---|---|
 | `ConnectionStrings:Database` | `ConnectionStrings__Database` | Cadena de conexión a PostgreSQL |
+| `Database:MigrateOnStartup` | `Database__MigrateOnStartup` | Aplica las migraciones pendientes al arrancar (default `true`). Poner en `false` si las migraciones se corren desde un paso de deploy separado |
 | `AiService:BaseUrl` | `AiService__BaseUrl` | URL base de FinGrow-AI |
+| `AiService:ApiKey` | `AiService__ApiKey` | Secreto compartido con FinGrow-AI; viaja en el header `X-API-Key` y tiene que ser el mismo valor que `API_KEY` en ese servicio |
 | `AiService:TimeoutSeconds` | `AiService__TimeoutSeconds` | Timeout de las llamadas a IA (default 30) |
+| `Twilio:AccountSid` | `Twilio__AccountSid` | Account SID de la cuenta de Twilio; autentica la descarga de adjuntos |
+| `Twilio:AuthToken` | `Twilio__AuthToken` | Auth Token de Twilio; valida la firma de cada webhook y autentica la descarga de adjuntos |
+| `Twilio:PublicBaseUrl` | `Twilio__PublicBaseUrl` | URL pública de la API tal como está cargada en Twilio (ej. `https://api.fingrow.app`). Solo hace falta detrás de un proxy o un túnel; en local se deja vacía |
 | `Cors:AllowedOrigins` | `Cors__AllowedOrigins__0` | Orígenes habilitados para el frontend |
 
 Los secretos no se commitean. En desarrollo local:
 
 ```bash
 dotnet user-secrets set "ConnectionStrings:Database" "<cadena>" --project src/FinGrow.Api
+dotnet user-secrets set "Jwt:SecretKey" "<clave de al menos 32 caracteres>" --project src/FinGrow.Api
+dotnet user-secrets set "AiService:ApiKey" "<secreto compartido con FinGrow-AI>" --project src/FinGrow.Api
+dotnet user-secrets set "Twilio:AccountSid" "<Account SID de Twilio>" --project src/FinGrow.Api
+dotnet user-secrets set "Twilio:AuthToken" "<Auth Token de Twilio>" --project src/FinGrow.Api
 ```
+
+Si `Jwt:SecretKey`, `AiService:ApiKey` o las credenciales de Twilio faltan, la API no arranca y
+el log dice cuál es. En
+desarrollo `AiService:ApiKey` puede ser cualquier texto: FinGrow-AI con `API_KEY` vacía no lo
+valida. En producción los dos servicios tienen que compartir el mismo valor.
+
+### WhatsApp (Twilio)
+
+Los mensajes de WhatsApp entran por `POST /api/webhooks/whatsapp`. El endpoint es público
+—lo llama Twilio, no el frontend— y rechaza con 403 cualquier request cuya cabecera
+`X-Twilio-Signature` no coincida con el Auth Token configurado.
+
+Para probar con el sandbox de WhatsApp de Twilio (no hace falta número aprobado):
+
+1. En la consola de Twilio, *Messaging → Try it out → Send a WhatsApp message*, mandá desde tu
+   teléfono el `join <palabra>` que muestra el sandbox al número `+1 415 523 8886`.
+2. En *Sandbox settings*, cargá en **"When a message comes in"** la URL pública de la API más
+   `/api/webhooks/whatsapp`, método `POST`. Los demás campos quedan vacíos. En local, `ngrok http
+   8080` (o el puerto que uses) te da esa URL; ponela también en `Twilio:PublicBaseUrl` si la
+   API no ve el mismo host que llamó Twilio.
+3. Copiá el Account SID y el Auth Token de la consola a la configuración (ver arriba).
+
+Un número tiene que vincularse antes de que sus mensajes cuenten: el empleado logueado pide un
+código con `POST /api/integrations/whatsapp/link-code`, lo manda por el chat dentro de los 10
+minutos y la API le contesta que quedó vinculado. Desde ahí cada mensaje de ese número se
+resuelve a ese empleado. Un número sin vincular solo recibe las instrucciones para hacerlo.
 
 ---
 
@@ -99,17 +134,18 @@ src/
 ├── FinGrow.Application/
 │   ├── Common/             Result, Error y el ValidationBehavior de MediatR
 │   ├── Interfaces/         IUnitOfWork, ICurrentUser, IAiService, IDateTimeProvider
-│   ├── Features/           Un subdirectorio por funcionalidad (todavía vacío)
+│   ├── Features/           Un subdirectorio por funcionalidad (Integrations/WhatsApp)
 │   ├── DTOs/
 │   └── Validators/
 ├── FinGrow.Infrastructure/
 │   ├── Persistence/        DbContext, Configurations, Repositories, Migrations
 │   ├── Identity/           Resolución del usuario autenticado
 │   ├── Ai/                 Cliente HTTP hacia FinGrow-AI
-│   ├── Integrations/       Telegram, Gmail
+│   ├── Integrations/       Twilio (firma de webhooks y descarga de adjuntos); Telegram y Gmail después
 │   └── Services/
 └── FinGrow.Api/
     ├── Controllers/
+    ├── Twilio/             Filtro de firma, parseo del form y respuesta TwiML del webhook
     ├── Middleware/         Manejo global de errores → ProblemDetails
     ├── Extensions/
     └── Program.cs
@@ -170,7 +206,9 @@ dotnet build FinGrow.sln
 dotnet test FinGrow.sln
 ```
 
-Migraciones de base de datos:
+Migraciones de base de datos. La API aplica las pendientes al arrancar
+(`Database:MigrateOnStartup`), así que `database update` solo hace falta para migrar sin
+levantar la API:
 
 ```bash
 dotnet ef migrations add <Nombre> --project src/FinGrow.Infrastructure --startup-project src/FinGrow.Api

@@ -26,6 +26,12 @@ services:
       ASPNETCORE_HTTP_PORTS: 8080
       ConnectionStrings__Database: "Host=db;Port=5432;Database=fingrow;Username=fingrow;Password=fingrow"
       AiService__BaseUrl: "http://ai:8000"
+      # Secreto compartido con FinGrow-AI (variable API_KEY del otro lado). En local la IA
+      # arranca con API_KEY vacia y no lo valida, por eso alcanza con un valor de relleno.
+      AiService__ApiKey: "dev-ai-api-key"
+      Twilio__AccountSid: "${TWILIO_ACCOUNT_SID:-}"
+      Twilio__AuthToken: "${TWILIO_AUTH_TOKEN:-}"
+      Twilio__PublicBaseUrl: "${TWILIO_PUBLIC_BASE_URL:-}"
       Cors__AllowedOrigins__0: "http://localhost:3000"
     ports:
       - "8080:8080"
