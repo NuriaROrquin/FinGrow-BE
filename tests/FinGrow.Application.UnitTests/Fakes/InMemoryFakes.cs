@@ -4,6 +4,7 @@ using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.Repositories;
+using FinGrow.Domain.ValueObjects;
 
 public sealed class FakeEmployeeRepository : IEmployeeRepository
 {
@@ -11,6 +12,9 @@ public sealed class FakeEmployeeRepository : IEmployeeRepository
 
     public Task<Employee?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Employees.FirstOrDefault(employee => employee.Id == id));
+
+    public Task<Employee?> GetByEmailAsync(Email email, CancellationToken cancellationToken) =>
+        Task.FromResult(Employees.FirstOrDefault(employee => employee.Email == email));
 }
 
 public sealed class FakeEmployeeIntegrationRepository : IEmployeeIntegrationRepository
@@ -84,4 +88,16 @@ public sealed class FakeCurrentUser : ICurrentUser
     public Guid? CompanyId { get; set; }
 
     public bool IsAuthenticated => UserId is not null;
+}
+
+public sealed class FakePasswordHasher : IPasswordHasher
+{
+    public string Hash(string password) => password;
+
+    public bool Verify(string password, string hash) => password == hash;
+}
+
+public sealed class FakeTokenService : ITokenService
+{
+    public string GenerateToken(Guid userId, Guid companyId, string role) => $"token-for-{userId}";
 }
