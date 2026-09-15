@@ -2,9 +2,11 @@ namespace FinGrow.Infrastructure;
 
 using System.Text;
 using FinGrow.Application.Interfaces;
+using FinGrow.Domain.Repositories.Transactions;
 using FinGrow.Infrastructure.Ai;
 using FinGrow.Infrastructure.Identity;
 using FinGrow.Infrastructure.Persistence;
+using FinGrow.Infrastructure.Persistence.Repositories.Transactions;
 using FinGrow.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -44,6 +46,7 @@ public static class DependencyInjection
                 npgsql.MigrationsAssembly(typeof(FinGrowDbContext).Assembly.FullName)));
 
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<FinGrowDbContext>());
+        services.AddScoped<ITransactionRepository, TransactionRepository>();
 
         return services;
     }
