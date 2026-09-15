@@ -10,7 +10,7 @@ using MediatR;
 internal sealed class LoginEmployeeCommandHandler : IRequestHandler<LoginEmployeeCommand, Result<LoginResponse>>
 {
     private static readonly Error CredencialesInvalidas =
-        Error.Failure("Auth.CredencialesInvalidas", "El email o la contraseña son incorrectos.");
+        Error.Unauthorized("Auth.CredencialesInvalidas", "El email o la contraseña son incorrectos.");
 
     private readonly IEmployeeRepository _employeeRepository;
     private readonly IPasswordHasher _passwordHasher;
@@ -59,7 +59,7 @@ internal sealed class LoginEmployeeCommandHandler : IRequestHandler<LoginEmploye
         employee.RegisterLogin(_dateTimeProvider.UtcNow);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var token = _tokenService.GenerateToken(employee.Id, employee.CompanyId, "Employee");
+        var token = _tokenService.GenerateToken(employee.Id, employee.CompanyId, "Empleado");
 
         return Result.Success(new LoginResponse(employee.Id, employee.FullName, token));
     }
