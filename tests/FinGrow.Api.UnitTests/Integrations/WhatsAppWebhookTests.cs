@@ -170,6 +170,9 @@ public class WhatsAppWebhookTests
 
         public Task<Employee?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
             Task.FromResult(_employee.Id == id ? _employee : null);
+
+        public Task<Employee?> GetByEmailAsync(Email email, CancellationToken cancellationToken) =>
+            Task.FromResult(_employee.Email == email ? _employee : null);
     }
 
     private sealed class InMemoryEmployeeIntegrationRepository : IEmployeeIntegrationRepository
