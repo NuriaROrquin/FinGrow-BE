@@ -45,12 +45,11 @@ internal sealed partial class ReceiveWhatsAppMessageHandler
         ReceiveWhatsAppMessageCommand request,
         CancellationToken cancellationToken)
     {
-        var phoneNumber = WhatsAppAddress.ToPhoneNumber(request.From);
         var integration = await _integrations.FindByExternalAccountAsync(
-            IntegrationProvider.WhatsApp, phoneNumber, cancellationToken);
+            IntegrationProvider.WhatsApp, request.PhoneNumber, cancellationToken);
 
         var reply = integration is null
-            ? await TryLinkAsync(phoneNumber, request.Body, cancellationToken)
+            ? await TryLinkAsync(request.PhoneNumber, request.Body, cancellationToken)
             : await HandleLinkedMessageAsync(integration, request, cancellationToken);
 
         return Result.Success(reply);

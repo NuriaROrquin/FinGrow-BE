@@ -7,7 +7,7 @@ internal static class TwilioInboundMessage
 {
     public static ReceiveWhatsAppMessageCommand ToCommand(IFormCollection form) =>
         new(
-            form["From"].ToString(),
+            TwilioWhatsAppAddress.ToPhoneNumber(form["From"].ToString()),
             form["Body"].ToString(),
             form["MessageSid"].ToString(),
             ReadMedia(form));
