@@ -1,10 +1,6 @@
 namespace FinGrow.Api.UnitTests.Integrations;
 
-using System.Diagnostics.CodeAnalysis;
 using System.Net;
-using System.Security.Cryptography;
-using System.Text;
-using FinGrow.Api.Twilio;
 using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
@@ -16,115 +12,56 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-public class WhatsAppWebhookTests
+public class MercadoPagoOAuthCallbackTests
 {
-    private const string AuthToken = "unit-test-twilio-auth-token";
-    private const string WebhookPath = "/api/webhooks/whatsapp";
-    private const string Phone = "+5491112345678";
-    private const string Code = "ABCD2345";
+    private const string CallbackPath = "/api/integrations/mercadopago/oauth/callback";
+    private const string ReturnUrl = "https://app.test/dashboard/settings";
+    private const string State = "ABCD2345";
 
     [Fact]
-    public void The_signature_validator_reproduces_the_example_from_the_twilio_docs()
+    public async Task A_valid_callback_links_the_account_and_sends_the_browser_back_to_the_frontend()
     {
-        var form = new Dictionary<string, string>
-        {
-            ["CallSid"] = "CA1234567890ABCDE",
-            ["Caller"] = "+12349013030",
-            ["Digits"] = "1234",
-            ["From"] = "+12349013030",
-            ["To"] = "+18005551212",
-        };
-        using var factory = new WebhookWebApplicationFactory("12345");
-        var validator = factory.Services.GetRequiredService<ITwilioRequestValidator>();
+        using var factory = new OAuthWebApplicationFactory();
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        factory.LinkCodes.Add(IntegrationLinkCode.Create(factory.Employee.Id, IntegrationProvider.MercadoPago, State, DateTimeOffset.UtcNow));
 
-        validator.IsValid("https://mycompany.com/myapp.php?foo=1&bar=2", form, "0/KCTR6DLpKmkAf8muzZqo1nDgQ=").ShouldBeTrue();
-        validator.IsValid("https://mycompany.com/myapp.php?foo=1&bar=2", form, "0/KCTR6DLpKmkAf8muzZqo1nDgX=").ShouldBeFalse();
-        validator.IsValid("https://mycompany.com/myapp.php?foo=1&bar=2", form, null).ShouldBeFalse();
+        var response = await client.GetAsync(new Uri($"{CallbackPath}?code=TG-123&state={State}", UriKind.Relative));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Redirect);
+        response.Headers.Location.ShouldBe(new Uri($"{ReturnUrl}?mercadopago=linked"));
+        var integration = factory.Integrations.ShouldHaveSingleItem();
+        integration.ExternalAccountId.ShouldBe("228085066");
+        integration.Grant.ShouldNotBeNull();
+        factory.OAuth.ExchangedCodes.ShouldHaveSingleItem().ShouldBe("TG-123");
     }
 
     [Fact]
-    public async Task A_request_without_a_valid_signature_is_rejected_and_links_nothing()
+    public async Task A_callback_with_an_unknown_state_reports_the_error_to_the_frontend_without_calling_mercado_pago()
     {
-        using var factory = new WebhookWebApplicationFactory();
-        var client = factory.CreateClient();
-        factory.LinkCodes.Add(IntegrationLinkCode.Create(factory.Employee.Id, IntegrationProvider.WhatsApp, Code, DateTimeOffset.UtcNow));
-        var form = InboundMessage(Code);
+        using var factory = new OAuthWebApplicationFactory();
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        using var content = new FormUrlEncodedContent(form);
-        content.Headers.Add(ValidateTwilioSignatureAttribute.SignatureHeader, "not-a-signature");
-        var response = await client.PostAsync(new Uri(WebhookPath, UriKind.Relative), content);
+        var response = await client.GetAsync(new Uri($"{CallbackPath}?code=TG-123&state=ZZZZ9999", UriKind.Relative));
 
-        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        response.StatusCode.ShouldBe(HttpStatusCode.Redirect);
+        response.Headers.Location.ShouldBe(new Uri($"{ReturnUrl}?mercadopago=error&reason=Integrations.MercadoPago.InvalidState"));
         factory.Integrations.ShouldBeEmpty();
+        factory.OAuth.ExchangedCodes.ShouldBeEmpty();
     }
 
     [Fact]
-    public async Task A_signed_message_with_a_valid_code_links_the_number_and_answers_with_twiml()
+    public async Task Starting_a_link_requires_a_session()
     {
-        using var factory = new WebhookWebApplicationFactory();
+        using var factory = new OAuthWebApplicationFactory();
         var client = factory.CreateClient();
-        factory.LinkCodes.Add(IntegrationLinkCode.Create(factory.Employee.Id, IntegrationProvider.WhatsApp, Code, DateTimeOffset.UtcNow));
-        var form = InboundMessage(Code);
 
-        var response = await PostSignedAsync(client, form);
+        var response = await client.PostAsync(new Uri("/api/integrations/mercadopago/oauth/start", UriKind.Relative), content: null);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        response.Content.Headers.ContentType!.MediaType.ShouldBe("application/xml");
-        var body = await response.Content.ReadAsStringAsync();
-        body.ShouldStartWith("<?xml");
-        body.ShouldContain("<Response><Message>Listo, Juan Perez");
-        factory.Integrations.ShouldHaveSingleItem().ExternalAccountId.ShouldBe(Phone);
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
-    [Fact]
-    public async Task A_signed_message_from_an_unlinked_number_gets_the_linking_instructions()
+    private sealed class OAuthWebApplicationFactory : WebApplicationFactory<Program>
     {
-        using var factory = new WebhookWebApplicationFactory();
-        var client = factory.CreateClient();
-        var form = InboundMessage("hola");
-        form["From"] = "whatsapp:+5491100000000";
-
-        var response = await PostSignedAsync(client, form);
-
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var body = await response.Content.ReadAsStringAsync();
-        body.ShouldContain("todavía no está vinculado");
-    }
-
-    private static Dictionary<string, string> InboundMessage(string body) => new(StringComparer.Ordinal)
-    {
-        ["MessageSid"] = "SM0123456789abcdef",
-        ["AccountSid"] = "ACunit-test",
-        ["From"] = "whatsapp:" + Phone,
-        ["To"] = "whatsapp:+14155238886",
-        ["Body"] = body,
-        ["NumMedia"] = "0",
-    };
-
-    private static async Task<HttpResponseMessage> PostSignedAsync(HttpClient client, Dictionary<string, string> form)
-    {
-        var url = new Uri(client.BaseAddress!, WebhookPath).ToString();
-        using var content = new FormUrlEncodedContent(form);
-        content.Headers.Add(ValidateTwilioSignatureAttribute.SignatureHeader, Sign(url, form));
-
-        return await client.PostAsync(new Uri(WebhookPath, UriKind.Relative), content);
-    }
-
-    [SuppressMessage("Security", "CA5350:Do Not Use Weak Cryptographic Algorithms", Justification = "Es el algoritmo de Twilio.")]
-    private static string Sign(string url, Dictionary<string, string> form)
-    {
-        var payload = url + string.Concat(form.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => pair.Key + pair.Value));
-        var hash = HMACSHA1.HashData(Encoding.UTF8.GetBytes(AuthToken), Encoding.UTF8.GetBytes(payload));
-
-        return Convert.ToBase64String(hash);
-    }
-
-    private sealed class WebhookWebApplicationFactory : WebApplicationFactory<Program>
-    {
-        private readonly string _authToken;
-
-        public WebhookWebApplicationFactory(string authToken = AuthToken) => _authToken = authToken;
-
         public Employee Employee { get; } = Employee.Create(
             Guid.CreateVersion7(),
             departmentId: null,
@@ -140,6 +77,8 @@ public class WhatsAppWebhookTests
 
         public List<IntegrationLinkCode> LinkCodes { get; } = new();
 
+        public RecordingMercadoPagoOAuthClient OAuth { get; } = new();
+
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.ConfigureAppConfiguration((_, configuration) =>
@@ -149,12 +88,13 @@ public class WhatsAppWebhookTests
                     ["Jwt:SecretKey"] = "unit-test-secret-key-at-least-32-characters-long",
                     ["AiService:ApiKey"] = "unit-test-ai-api-key",
                     ["Twilio:AccountSid"] = "ACunit-test",
-                    ["Twilio:AuthToken"] = _authToken,
+                    ["Twilio:AuthToken"] = "unit-test-twilio-auth-token",
                     ["Telegram:BotToken"] = "unit-test-telegram-bot-token",
                     ["Telegram:WebhookSecret"] = "unit-test-telegram-secret",
                     ["MercadoPago:ClientId"] = "unit-test-mp-client-id",
                     ["MercadoPago:ClientSecret"] = "unit-test-mp-client-secret",
                     ["MercadoPago:RedirectUri"] = "https://api.test/api/integrations/mercadopago/oauth/callback",
+                    ["MercadoPago:FrontendReturnUrl"] = ReturnUrl,
                     ["TokenEncryption:Key"] = "dW5pdC10ZXN0LXRva2VuLWVuY3J5cHRpb24ta2V5ISE=",
                 }));
 
@@ -164,8 +104,26 @@ public class WhatsAppWebhookTests
                 services.AddScoped<IEmployeeIntegrationRepository>(_ => new InMemoryEmployeeIntegrationRepository(Integrations));
                 services.AddScoped<IIntegrationLinkCodeRepository>(_ => new InMemoryIntegrationLinkCodeRepository(LinkCodes));
                 services.AddScoped<IUnitOfWork, NoOpUnitOfWork>();
+                services.AddSingleton<IMercadoPagoOAuthClient>(OAuth);
             });
         }
+    }
+
+    private sealed class RecordingMercadoPagoOAuthClient : IMercadoPagoOAuthClient
+    {
+        public List<string> ExchangedCodes { get; } = new();
+
+        public Uri BuildAuthorizationUrl(string state) => new($"https://auth.mercadopago.test/authorization?state={state}");
+
+        public Task<MercadoPagoTokens> ExchangeCodeAsync(string code, CancellationToken cancellationToken = default)
+        {
+            ExchangedCodes.Add(code);
+
+            return Task.FromResult(new MercadoPagoTokens("access-token", "refresh-token", TimeSpan.FromDays(180), "228085066"));
+        }
+
+        public Task<MercadoPagoTokens> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class InMemoryEmployeeRepository : IEmployeeRepository

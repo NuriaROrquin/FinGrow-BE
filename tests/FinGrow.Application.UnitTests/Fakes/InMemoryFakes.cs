@@ -147,3 +147,31 @@ public sealed class FakeTokenService : ITokenService
     public AuthToken GenerateToken(Guid userId, Guid companyId, string role, string fullName) =>
         new($"token-for-{userId}", ExpiresAt);
 }
+
+public sealed class FakeMercadoPagoOAuthClient : IMercadoPagoOAuthClient
+{
+    public static readonly Uri AuthorizationBase = new("https://auth.mercadopago.test/authorization");
+
+    public MercadoPagoTokens Tokens { get; set; } = new("access-token", "refresh-token", TimeSpan.FromDays(180), "228085066");
+
+    public bool Unreachable { get; set; }
+
+    public List<string> ExchangedCodes { get; } = new();
+
+    public Uri BuildAuthorizationUrl(string state) => new(AuthorizationBase, $"?state={state}");
+
+    public Task<MercadoPagoTokens> ExchangeCodeAsync(string code, CancellationToken cancellationToken = default)
+    {
+        if (Unreachable)
+        {
+            throw new HttpRequestException("Mercado Pago unreachable");
+        }
+
+        ExchangedCodes.Add(code);
+
+        return Task.FromResult(Tokens);
+    }
+
+    public Task<MercadoPagoTokens> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Tokens);
+}

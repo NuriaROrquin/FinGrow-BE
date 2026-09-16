@@ -16,6 +16,7 @@ public static class DependencyInjection
         services.AddValidatorsFromAssembly(assembly);
         services.AddMediatR(configuration => configuration.RegisterServicesFromAssembly(assembly));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+        services.AddScoped<LinkCodeIssuer>();
         services.AddScoped<LinkCodeRedeemer>();
 
         return services;

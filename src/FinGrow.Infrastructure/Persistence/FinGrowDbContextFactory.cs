@@ -1,5 +1,6 @@
 namespace FinGrow.Infrastructure.Persistence;
 
+using FinGrow.Infrastructure.Persistence.Protection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
@@ -15,6 +16,6 @@ public sealed class FinGrowDbContextFactory : IDesignTimeDbContextFactory<FinGro
             .UseNpgsql(connectionString, npgsql => npgsql.MigrationsAssembly(typeof(FinGrowDbContext).Assembly.FullName))
             .Options;
 
-        return new FinGrowDbContext(options);
+        return new FinGrowDbContext(options, new AesGcmSecretProtector(new byte[TokenEncryptionOptions.KeyBytes]));
     }
 }

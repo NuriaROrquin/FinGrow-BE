@@ -4,6 +4,7 @@ using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.Repositories;
+using FinGrow.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
 
 internal enum LinkOutcome
@@ -47,11 +48,29 @@ internal sealed partial class LinkCodeRedeemer
         _logger = logger;
     }
 
+    public async Task<bool> IsRedeemableAsync(
+        IntegrationProvider provider,
+        string text,
+        CancellationToken cancellationToken)
+    {
+        var code = IntegrationLinkCode.Normalize(text);
+
+        if (code.Length != IntegrationLinkCode.Length)
+        {
+            return false;
+        }
+
+        var linkCode = await _linkCodes.FindByHashAsync(provider, IntegrationLinkCode.Hash(code), cancellationToken);
+
+        return linkCode is not null && linkCode.IsUsable(_clock.UtcNow);
+    }
+
     public async Task<LinkAttempt> TryLinkAsync(
         IntegrationProvider provider,
         string externalAccountId,
         string text,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        OAuthGrant? grant = null)
     {
         var code = IntegrationLinkCode.Normalize(text);
 
@@ -77,15 +96,21 @@ internal sealed partial class LinkCodeRedeemer
 
         linkCode.Redeem(now);
 
-        var existing = await _integrations.FindByEmployeeAsync(employee.Id, provider, cancellationToken);
+        var integration = await _integrations.FindByEmployeeAsync(employee.Id, provider, cancellationToken);
 
-        if (existing is null)
+        if (integration is null)
         {
-            _integrations.Add(EmployeeIntegration.Create(employee.Id, provider, externalAccountId, now));
+            integration = EmployeeIntegration.Create(employee.Id, provider, externalAccountId, now);
+            _integrations.Add(integration);
         }
         else
         {
-            existing.Relink(externalAccountId, now);
+            integration.Relink(externalAccountId, now);
+        }
+
+        if (grant is not null)
+        {
+            integration.Authorize(grant, now);
         }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);

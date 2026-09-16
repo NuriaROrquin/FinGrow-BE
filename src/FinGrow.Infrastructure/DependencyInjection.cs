@@ -6,9 +6,11 @@ using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Repositories;
 using FinGrow.Infrastructure.Ai;
 using FinGrow.Infrastructure.Identity;
+using FinGrow.Infrastructure.Integrations.MercadoPago;
 using FinGrow.Infrastructure.Integrations.Telegram;
 using FinGrow.Infrastructure.Integrations.Twilio;
 using FinGrow.Infrastructure.Persistence;
+using FinGrow.Infrastructure.Persistence.Protection;
 using FinGrow.Infrastructure.Persistence.Repositories;
 using FinGrow.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -30,6 +32,7 @@ public static class DependencyInjection
         services.AddJwtAuthentication(configuration);
         services.AddTwilio(configuration);
         services.AddTelegram(configuration);
+        services.AddMercadoPago(configuration);
 
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, CurrentUser>();
@@ -46,6 +49,13 @@ public static class DependencyInjection
         var connectionString = configuration.GetConnectionString("Database")
             ?? throw new InvalidOperationException(
                 "Falta la cadena de conexion 'ConnectionStrings:Database' en la configuracion.");
+
+        services.AddOptions<TokenEncryptionOptions>()
+            .Bind(configuration.GetSection(TokenEncryptionOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddSingleton<ISecretProtector, AesGcmSecretProtector>();
 
         services.AddDbContext<FinGrowDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
@@ -119,6 +129,25 @@ public static class DependencyInjection
                 var options = provider.GetRequiredService<IOptions<TelegramOptions>>().Value;
 
                 client.BaseAddress = new Uri($"https://api.telegram.org/bot{options.BotToken}/");
+                client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+            })
+            .AddPolicyHandler(GetRetryPolicy());
+
+        return services;
+    }
+
+    private static IServiceCollection AddMercadoPago(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<MercadoPagoOptions>()
+            .Bind(configuration.GetSection(MercadoPagoOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddHttpClient<IMercadoPagoOAuthClient, MercadoPagoOAuthClient>((provider, client) =>
+            {
+                var options = provider.GetRequiredService<IOptions<MercadoPagoOptions>>().Value;
+
+                client.BaseAddress = new Uri(options.ApiBaseUrl);
                 client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
             })
             .AddPolicyHandler(GetRetryPolicy());

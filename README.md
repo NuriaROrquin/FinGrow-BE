@@ -57,6 +57,12 @@ variables de entorno usando `__` como separador de sección.
 | `Telegram:BotToken` | `Telegram__BotToken` | Token del bot que entrega @BotFather; autentica las respuestas que la API manda por la Bot API |
 | `Telegram:WebhookSecret` | `Telegram__WebhookSecret` | Secreto elegido por nosotros al registrar el webhook (1 a 256 caracteres: letras, números, `_` y `-`); Telegram lo devuelve en cada update y la API rechaza con 403 el que no coincida |
 | `Telegram:TimeoutSeconds` | `Telegram__TimeoutSeconds` | Timeout de las llamadas a la Bot API (default 30) |
+| `MercadoPago:ClientId` | `MercadoPago__ClientId` | Client ID de la aplicación creada en [Mercado Pago Developers](https://www.mercadopago.com.ar/developers/panel/app) |
+| `MercadoPago:ClientSecret` | `MercadoPago__ClientSecret` | Client Secret de esa aplicación; autentica el canje y la renovación de tokens OAuth |
+| `MercadoPago:RedirectUri` | `MercadoPago__RedirectUri` | URL pública de `GET /api/integrations/mercadopago/oauth/callback`, idéntica a la cargada en la aplicación de Mercado Pago. MP no acepta `localhost`: en local se usa un túnel (ngrok) |
+| `MercadoPago:FrontendReturnUrl` | `MercadoPago__FrontendReturnUrl` | Página del frontend a la que vuelve el navegador al terminar la vinculación; recibe `?mercadopago=linked` o `?mercadopago=error&reason=...` (default `http://localhost:3000/dashboard/settings`) |
+| `MercadoPago:TimeoutSeconds` | `MercadoPago__TimeoutSeconds` | Timeout de las llamadas a la API de Mercado Pago (default 30) |
+| `TokenEncryption:Key` | `TokenEncryption__Key` | Clave AES-256 en base64 (`openssl rand -base64 32`) con la que se cifran en la base los tokens OAuth de las integraciones. Cambiarla deja ilegibles los tokens ya guardados |
 | `Cors:AllowedOrigins` | `Cors__AllowedOrigins__0` | Orígenes habilitados para el frontend |
 
 Los secretos no se commitean. En desarrollo local:

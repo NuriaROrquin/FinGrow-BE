@@ -3,6 +3,7 @@ namespace FinGrow.Domain.UnitTests.Entities;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.Errors;
+using FinGrow.Domain.ValueObjects;
 
 public class EmployeeIntegrationTests
 {
@@ -43,5 +44,53 @@ public class EmployeeIntegrationTests
         integration.ExternalAccountId.ShouldBe("+5491199999999");
         integration.LinkedAt.ShouldBe(Now.AddDays(1));
         integration.UpdatedAt.ShouldBe(Now.AddDays(1));
+    }
+
+    [Fact]
+    public void An_oauth_provider_can_store_its_grant()
+    {
+        var integration = EmployeeIntegration.Create(EmployeeId, IntegrationProvider.MercadoPago, "228085066", Now);
+        var grant = OAuthGrant.From("access", "refresh", Now.AddDays(180));
+
+        integration.Authorize(grant, Now.AddMinutes(1));
+
+        integration.Grant.ShouldBe(grant);
+        integration.UpdatedAt.ShouldBe(Now.AddMinutes(1));
+    }
+
+    [Fact]
+    public void A_chat_provider_never_holds_a_grant()
+    {
+        var integration = EmployeeIntegration.Create(EmployeeId, IntegrationProvider.Telegram, "12345", Now);
+
+        Should.Throw<DomainException>(() =>
+            integration.Authorize(OAuthGrant.From("access", "refresh", Now.AddDays(180)), Now));
+    }
+
+    [Fact]
+    public void A_grant_needs_both_tokens()
+    {
+        Should.Throw<DomainException>(() => OAuthGrant.From(" ", "refresh", Now));
+        Should.Throw<DomainException>(() => OAuthGrant.From("access", "", Now));
+    }
+
+    [Fact]
+    public void A_grant_knows_when_it_is_about_to_expire()
+    {
+        var grant = OAuthGrant.From("access", "refresh", Now.AddDays(2));
+
+        grant.ExpiresWithin(TimeSpan.FromDays(1), Now).ShouldBeFalse();
+        grant.ExpiresWithin(TimeSpan.FromDays(3), Now).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Marking_a_sync_records_when_it_happened()
+    {
+        var integration = EmployeeIntegration.Create(EmployeeId, IntegrationProvider.MercadoPago, "228085066", Now);
+
+        integration.MarkSynced(Now.AddHours(1));
+
+        integration.LastSyncedAt.ShouldBe(Now.AddHours(1));
+        integration.UpdatedAt.ShouldBe(Now.AddHours(1));
     }
 }
