@@ -1,14 +1,14 @@
-namespace FinGrow.Application.Features.Integrations.WhatsApp.GenerateWhatsAppLinkCode;
+namespace FinGrow.Application.Features.Integrations.Linking;
 
 using FinGrow.Application.Common;
 using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.Repositories;
-using MediatR;
 
-internal sealed class GenerateWhatsAppLinkCodeHandler
-    : IRequestHandler<GenerateWhatsAppLinkCodeCommand, Result<WhatsAppLinkCodeResponse>>
+internal sealed record IssuedLinkCode(string Code, DateTimeOffset ExpiresAt);
+
+internal sealed class LinkCodeIssuer
 {
     private readonly ICurrentUser _currentUser;
     private readonly IEmployeeRepository _employees;
@@ -16,7 +16,7 @@ internal sealed class GenerateWhatsAppLinkCodeHandler
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _clock;
 
-    public GenerateWhatsAppLinkCodeHandler(
+    public LinkCodeIssuer(
         ICurrentUser currentUser,
         IEmployeeRepository employees,
         IIntegrationLinkCodeRepository linkCodes,
@@ -30,30 +30,30 @@ internal sealed class GenerateWhatsAppLinkCodeHandler
         _clock = clock;
     }
 
-    public async Task<Result<WhatsAppLinkCodeResponse>> Handle(
-        GenerateWhatsAppLinkCodeCommand request,
+    public async Task<Result<IssuedLinkCode>> IssueForCurrentEmployeeAsync(
+        IntegrationProvider provider,
         CancellationToken cancellationToken)
     {
         if (_currentUser.UserId is not { } employeeId)
         {
-            return Result.Failure<WhatsAppLinkCodeResponse>(
-                Error.Forbidden("Integrations.Unauthenticated", "Hay que iniciar sesion para vincular WhatsApp."));
+            return Result.Failure<IssuedLinkCode>(
+                Error.Forbidden("Integrations.Unauthenticated", $"Hay que iniciar sesion para vincular {provider}."));
         }
 
         var employee = await _employees.GetByIdAsync(employeeId, cancellationToken);
 
         if (employee is null || !employee.IsActive)
         {
-            return Result.Failure<WhatsAppLinkCodeResponse>(
-                Error.Forbidden("Integrations.NotAnEmployee", "Solo un empleado activo puede vincular WhatsApp."));
+            return Result.Failure<IssuedLinkCode>(
+                Error.Forbidden("Integrations.NotAnEmployee", $"Solo un empleado activo puede vincular {provider}."));
         }
 
         var code = IntegrationLinkCode.GenerateCode();
-        var linkCode = IntegrationLinkCode.Create(employee.Id, IntegrationProvider.WhatsApp, code, _clock.UtcNow);
+        var linkCode = IntegrationLinkCode.Create(employee.Id, provider, code, _clock.UtcNow);
 
         _linkCodes.Add(linkCode);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(new WhatsAppLinkCodeResponse(code, linkCode.ExpiresAt));
+        return Result.Success(new IssuedLinkCode(code, linkCode.ExpiresAt));
     }
 }

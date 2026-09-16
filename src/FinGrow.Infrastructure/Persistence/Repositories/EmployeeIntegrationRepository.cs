@@ -27,5 +27,15 @@ internal sealed class EmployeeIntegrationRepository : IEmployeeIntegrationReposi
             integration => integration.EmployeeId == employeeId && integration.Provider == provider,
             cancellationToken);
 
+    public async Task<IReadOnlyList<EmployeeIntegration>> ListAuthorizedAsync(
+        IntegrationProvider provider,
+        CancellationToken cancellationToken = default) =>
+        await _dbContext.EmployeeIntegrations
+            .Where(integration => integration.Provider == provider && integration.Grant != null)
+            .OrderBy(integration => integration.LastSyncedAt)
+            .ToListAsync(cancellationToken);
+
     public void Add(EmployeeIntegration integration) => _dbContext.EmployeeIntegrations.Add(integration);
+
+    public void Remove(EmployeeIntegration integration) => _dbContext.EmployeeIntegrations.Remove(integration);
 }

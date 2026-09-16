@@ -15,5 +15,11 @@ public interface IEmployeeIntegrationRepository
         IntegrationProvider provider,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<EmployeeIntegration>> ListAuthorizedAsync(
+        IntegrationProvider provider,
+        CancellationToken cancellationToken = default);
+
     void Add(EmployeeIntegration integration);
+
+    void Remove(EmployeeIntegration integration);
 }

@@ -312,6 +312,10 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("external_account_id");
 
+                    b.Property<DateTimeOffset?>("LastSyncedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_synced_at");
+
                     b.Property<DateTimeOffset>("LinkedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("linked_at");
@@ -736,6 +740,39 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_employee_integrations_employees_employee_id");
+
+                    b.OwnsOne("FinGrow.Domain.ValueObjects.OAuthGrant", "Grant", b1 =>
+                        {
+                            b1.Property<Guid>("EmployeeIntegrationId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("AccessToken")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasColumnName("oauth_access_token")
+                                .HasAnnotation("FinGrow:Encrypted", true);
+
+                            b1.Property<DateTimeOffset>("ExpiresAt")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("oauth_expires_at");
+
+                            b1.Property<string>("RefreshToken")
+                                .HasColumnType("text")
+                                .HasColumnName("oauth_refresh_token")
+                                .HasAnnotation("FinGrow:Encrypted", true);
+
+                            b1.HasKey("EmployeeIntegrationId")
+                                .HasName("pk_employee_integrations");
+
+                            b1.ToTable("employee_integrations");
+
+                            b1.WithOwner()
+                                .HasForeignKey("EmployeeIntegrationId")
+                                .HasConstraintName("fk_employee_integrations_employee_integrations_id");
+                        });
+
+                    b.Navigation("Grant");
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.Goal", b =>

@@ -1,13 +1,14 @@
-namespace FinGrow.Application.UnitTests.Features.Integrations.WhatsApp;
+namespace FinGrow.Application.UnitTests.Features.Integrations;
 
 using FinGrow.Application.Common;
-using FinGrow.Application.Features.Integrations.WhatsApp.GenerateWhatsAppLinkCode;
+using FinGrow.Application.Features.Integrations.GenerateLinkCode;
+using FinGrow.Application.Features.Integrations.Linking;
 using FinGrow.Application.UnitTests.Fakes;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.ValueObjects;
 
-public class GenerateWhatsAppLinkCodeHandlerTests
+public class GenerateLinkCodeHandlerTests
 {
     private static readonly DateTimeOffset Now = new(2026, 3, 15, 10, 0, 0, TimeSpan.Zero);
 
@@ -17,29 +18,42 @@ public class GenerateWhatsAppLinkCodeHandlerTests
     private readonly FakeCurrentUser _currentUser = new();
     private readonly Employee _employee = CreateEmployee();
 
-    public GenerateWhatsAppLinkCodeHandlerTests() => _employees.Employees.Add(_employee);
+    public GenerateLinkCodeHandlerTests() => _employees.Employees.Add(_employee);
 
-    [Fact]
-    public async Task The_logged_in_employee_receives_a_code_whose_hash_is_persisted()
+    [Theory]
+    [InlineData(IntegrationProvider.WhatsApp)]
+    [InlineData(IntegrationProvider.Telegram)]
+    public async Task The_logged_in_employee_receives_a_code_whose_hash_is_persisted_for_that_provider(IntegrationProvider provider)
     {
         _currentUser.UserId = _employee.Id;
 
-        var result = await Handle();
+        var result = await Handle(provider);
 
         result.IsSuccess.ShouldBeTrue();
         result.Value.Code.Length.ShouldBe(IntegrationLinkCode.Length);
         result.Value.ExpiresAt.ShouldBe(Now.Add(IntegrationLinkCode.Lifetime));
         var stored = _linkCodes.LinkCodes.ShouldHaveSingleItem();
         stored.EmployeeId.ShouldBe(_employee.Id);
-        stored.Provider.ShouldBe(IntegrationProvider.WhatsApp);
+        stored.Provider.ShouldBe(provider);
         stored.CodeHash.ShouldBe(IntegrationLinkCode.Hash(result.Value.Code));
         _unitOfWork.SaveCount.ShouldBe(1);
     }
 
     [Fact]
+    public void Only_chat_providers_link_with_a_code()
+    {
+        var validator = new GenerateLinkCodeValidator();
+
+        validator.Validate(new GenerateLinkCodeCommand(IntegrationProvider.Telegram)).IsValid.ShouldBeTrue();
+        validator.Validate(new GenerateLinkCodeCommand(IntegrationProvider.WhatsApp)).IsValid.ShouldBeTrue();
+        validator.Validate(new GenerateLinkCodeCommand(IntegrationProvider.Gmail)).IsValid.ShouldBeFalse();
+        validator.Validate(new GenerateLinkCodeCommand(IntegrationProvider.MercadoPago)).IsValid.ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task An_anonymous_request_is_forbidden()
     {
-        var result = await Handle();
+        var result = await Handle(IntegrationProvider.WhatsApp);
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Type.ShouldBe(ErrorType.Forbidden);
@@ -51,18 +65,18 @@ public class GenerateWhatsAppLinkCodeHandlerTests
     {
         _currentUser.UserId = Guid.CreateVersion7();
 
-        var result = await Handle();
+        var result = await Handle(IntegrationProvider.Telegram);
 
         result.Error.Type.ShouldBe(ErrorType.Forbidden);
         _linkCodes.LinkCodes.ShouldBeEmpty();
     }
 
-    private Task<Result<WhatsAppLinkCodeResponse>> Handle()
+    private Task<Result<LinkCodeResponse>> Handle(IntegrationProvider provider)
     {
-        var handler = new GenerateWhatsAppLinkCodeHandler(
-            _currentUser, _employees, _linkCodes, _unitOfWork, new FakeDateTimeProvider(Now));
+        var handler = new GenerateLinkCodeHandler(new LinkCodeIssuer(
+            _currentUser, _employees, _linkCodes, _unitOfWork, new FakeDateTimeProvider(Now)));
 
-        return handler.Handle(new GenerateWhatsAppLinkCodeCommand(), CancellationToken.None);
+        return handler.Handle(new GenerateLinkCodeCommand(provider), CancellationToken.None);
     }
 
     private static Employee CreateEmployee() => Employee.Create(

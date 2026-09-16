@@ -1,6 +1,3 @@
-using FinGrow.Domain.Repositories;
-using FinGrow.Infrastructure.Persistence.Repositories;
-
 namespace FinGrow.Infrastructure;
 
 using System.Net.Http.Headers;
@@ -9,8 +6,11 @@ using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Repositories;
 using FinGrow.Infrastructure.Ai;
 using FinGrow.Infrastructure.Identity;
+using FinGrow.Infrastructure.Integrations.MercadoPago;
+using FinGrow.Infrastructure.Integrations.Telegram;
 using FinGrow.Infrastructure.Integrations.Twilio;
 using FinGrow.Infrastructure.Persistence;
+using FinGrow.Infrastructure.Persistence.Protection;
 using FinGrow.Infrastructure.Persistence.Repositories;
 using FinGrow.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -31,6 +31,8 @@ public static class DependencyInjection
         services.AddAiService(configuration);
         services.AddJwtAuthentication(configuration);
         services.AddTwilio(configuration);
+        services.AddTelegram(configuration);
+        services.AddMercadoPago(configuration);
 
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, CurrentUser>();
@@ -52,11 +54,21 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException(
                 "Falta la cadena de conexion 'ConnectionStrings:Database' en la configuracion.");
 
+        services.AddOptions<TokenEncryptionOptions>()
+            .Bind(configuration.GetSection(TokenEncryptionOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddSingleton<ISecretProtector, AesGcmSecretProtector>();
+
         services.AddDbContext<FinGrowDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsAssembly(typeof(FinGrowDbContext).Assembly.FullName)));
 
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<FinGrowDbContext>());
+        services.AddScoped<ITransactionRepository, TransactionRepository>();
+
+        services.AddScoped<DatabaseSeeder>();
 
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
         services.AddScoped<IEmployeeIntegrationRepository, EmployeeIntegrationRepository>();
@@ -105,6 +117,53 @@ public static class DependencyInjection
             .AddPolicyHandler(GetRetryPolicy());
 
         return services;
+    }
+
+    private static IServiceCollection AddTelegram(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<TelegramOptions>()
+            .Bind(configuration.GetSection(TelegramOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddSingleton<ITelegramWebhookValidator, TelegramWebhookValidator>();
+
+        services.AddHttpClient<ITelegramBotClient, TelegramBotClient>((provider, client) =>
+            {
+                var options = provider.GetRequiredService<IOptions<TelegramOptions>>().Value;
+
+                client.BaseAddress = new Uri($"https://api.telegram.org/bot{options.BotToken}/");
+                client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+            })
+            .AddPolicyHandler(GetRetryPolicy());
+
+        return services;
+    }
+
+    private static IServiceCollection AddMercadoPago(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<MercadoPagoOptions>()
+            .Bind(configuration.GetSection(MercadoPagoOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddHttpClient<IMercadoPagoOAuthClient, MercadoPagoOAuthClient>(ConfigureMercadoPagoClient)
+            .AddPolicyHandler(GetRetryPolicy());
+
+        services.AddHttpClient<IMercadoPagoPaymentsClient, MercadoPagoPaymentsClient>(ConfigureMercadoPagoClient)
+            .AddPolicyHandler(GetRetryPolicy());
+
+        services.AddHostedService<MercadoPagoSyncWorker>();
+
+        return services;
+    }
+
+    private static void ConfigureMercadoPagoClient(IServiceProvider provider, HttpClient client)
+    {
+        var options = provider.GetRequiredService<IOptions<MercadoPagoOptions>>().Value;
+
+        client.BaseAddress = new Uri(options.ApiBaseUrl);
+        client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
     }
 
     private static AsyncRetryPolicy<HttpResponseMessage> GetRetryPolicy() =>

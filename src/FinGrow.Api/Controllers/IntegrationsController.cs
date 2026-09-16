@@ -2,13 +2,16 @@ namespace FinGrow.Api.Controllers;
 
 using FinGrow.Api.Extensions;
 using FinGrow.Application.Common;
-using FinGrow.Application.Features.Integrations.WhatsApp.GenerateWhatsAppLinkCode;
+using FinGrow.Application.Features.Integrations.GenerateLinkCode;
+using FinGrow.Application.Features.Integrations.GetIntegration;
+using FinGrow.Application.Features.Integrations.UnlinkIntegration;
+using FinGrow.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
-[Route("api/integrations")]
+[Route("api/integrations/{provider}")]
 [Authorize(Roles = Rol.Empleado)]
 public sealed class IntegrationsController : ControllerBase
 {
@@ -16,8 +19,19 @@ public sealed class IntegrationsController : ControllerBase
 
     public IntegrationsController(ISender sender) => _sender = sender;
 
-    [HttpPost("whatsapp/link-code")]
-    [ProducesResponseType<WhatsAppLinkCodeResponse>(StatusCodes.Status200OK)]
-    public async Task<IActionResult> GenerateWhatsAppLinkCode(CancellationToken cancellationToken) =>
-        (await _sender.Send(new GenerateWhatsAppLinkCodeCommand(), cancellationToken)).ToActionResult();
+    [HttpGet]
+    [ProducesResponseType<IntegrationResponse>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> Get(IntegrationProvider provider, CancellationToken cancellationToken) =>
+        (await _sender.Send(new GetIntegrationQuery(provider), cancellationToken)).ToActionResult();
+
+    [HttpDelete]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Unlink(IntegrationProvider provider, CancellationToken cancellationToken) =>
+        (await _sender.Send(new UnlinkIntegrationCommand(provider), cancellationToken)).ToActionResult();
+
+    [HttpPost("link-code")]
+    [ProducesResponseType<LinkCodeResponse>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GenerateLinkCode(IntegrationProvider provider, CancellationToken cancellationToken) =>
+        (await _sender.Send(new GenerateLinkCodeCommand(provider), cancellationToken)).ToActionResult();
 }
