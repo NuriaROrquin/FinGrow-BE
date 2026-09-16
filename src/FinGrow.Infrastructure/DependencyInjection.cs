@@ -36,6 +36,10 @@ public static class DependencyInjection
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<ITokenService, JwtTokenService>();
+        services.AddScoped<IEmployeeRepository, EmployeeRepository>();
+        services.AddScoped<ICompanyRepository, CompanyRepository>();
+        services.AddScoped<IEmployeeIntegrationRepository, EmployeeIntegrationRepository>();
+        services.AddScoped<IIntegrationLinkCodeRepository, IntegrationLinkCodeRepository>();
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
 
