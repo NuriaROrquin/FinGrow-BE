@@ -1,6 +1,7 @@
 namespace FinGrow.Api.Controllers;
 
 using FinGrow.Api.Extensions;
+using FinGrow.Application.Common;
 using FinGrow.Application.Features.Integrations.WhatsApp.GenerateWhatsAppLinkCode;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -8,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
 [Route("api/integrations")]
-[Authorize]
+[Authorize(Roles = Rol.Empleado)]
 public sealed class IntegrationsController : ControllerBase
 {
     private readonly ISender _sender;
