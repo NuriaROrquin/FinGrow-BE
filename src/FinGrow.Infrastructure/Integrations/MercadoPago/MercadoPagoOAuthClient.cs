@@ -49,7 +49,15 @@ internal sealed class MercadoPagoOAuthClient : IMercadoPagoOAuthClient
     {
         using var response = await _httpClient.PostAsJsonAsync("oauth/token", request, cancellationToken);
 
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            throw new HttpRequestException(
+                $"Mercado Pago respondio {(int)response.StatusCode} al pedir el token ({request.GrantType}): {body}",
+                inner: null,
+                response.StatusCode);
+        }
 
         var payload = await response.Content.ReadFromJsonAsync<TokenResponse>(cancellationToken)
             ?? throw new HttpRequestException("Mercado Pago devolvio una respuesta vacia al pedir el token.");
