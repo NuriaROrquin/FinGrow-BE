@@ -1,6 +1,3 @@
-using FinGrow.Domain.Repositories;
-using FinGrow.Infrastructure.Persistence.Repositories;
-
 namespace FinGrow.Infrastructure;
 
 using System.Net.Http.Headers;
@@ -53,7 +50,7 @@ public static class DependencyInjection
                 npgsql.MigrationsAssembly(typeof(FinGrowDbContext).Assembly.FullName)));
 
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<FinGrowDbContext>());
-
+        services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
         services.AddScoped<IEmployeeIntegrationRepository, EmployeeIntegrationRepository>();
         services.AddScoped<IIntegrationLinkCodeRepository, IntegrationLinkCodeRepository>();
