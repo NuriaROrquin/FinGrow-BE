@@ -1,6 +1,7 @@
 namespace FinGrow.Application.UnitTests.Features.Integrations.WhatsApp;
 
 using FinGrow.Application.Common;
+using FinGrow.Application.Features.Integrations.Linking;
 using FinGrow.Application.Features.Integrations.WhatsApp.ReceiveWhatsAppMessage;
 using FinGrow.Application.UnitTests.Fakes;
 using FinGrow.Domain.Entities;
@@ -133,14 +134,10 @@ public class ReceiveWhatsAppMessageHandlerTests
 
     private Task<Result<WhatsAppReply>> Handle(string from, string body, params WhatsAppInboundMedia[] media)
     {
+        var linker = new LinkCodeRedeemer(
+            _integrations, _linkCodes, _employees, _unitOfWork, _clock, NullLogger<LinkCodeRedeemer>.Instance);
         var handler = new ReceiveWhatsAppMessageHandler(
-            _integrations,
-            _linkCodes,
-            _employees,
-            _media,
-            _unitOfWork,
-            _clock,
-            NullLogger<ReceiveWhatsAppMessageHandler>.Instance);
+            _integrations, linker, _media, NullLogger<ReceiveWhatsAppMessageHandler>.Instance);
 
         return handler.Handle(new ReceiveWhatsAppMessageCommand(from, body, "SM123", media), CancellationToken.None);
     }
