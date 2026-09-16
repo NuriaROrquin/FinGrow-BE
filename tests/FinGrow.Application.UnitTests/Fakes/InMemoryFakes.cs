@@ -55,6 +55,24 @@ public sealed class FakeIntegrationLinkCodeRepository : IIntegrationLinkCodeRepo
     public void Add(IntegrationLinkCode linkCode) => LinkCodes.Add(linkCode);
 }
 
+public sealed class FakeTelegramBotClient : ITelegramBotClient
+{
+    public List<(long ChatId, string Text)> Sent { get; } = new();
+
+    public bool Unreachable { get; set; }
+
+    public Task SendMessageAsync(long chatId, string text, CancellationToken cancellationToken = default)
+    {
+        if (Unreachable)
+        {
+            throw new HttpRequestException("api.telegram.org no responde");
+        }
+
+        Sent.Add((chatId, text));
+        return Task.CompletedTask;
+    }
+}
+
 public sealed class FakeTwilioMediaClient : ITwilioMediaClient
 {
     public List<Uri> Downloaded { get; } = new();
