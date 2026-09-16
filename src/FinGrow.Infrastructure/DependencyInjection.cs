@@ -51,6 +51,9 @@ public static class DependencyInjection
 
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<FinGrowDbContext>());
         services.AddScoped<ITransactionRepository, TransactionRepository>();
+
+        services.AddScoped<DatabaseSeeder>();
+
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
         services.AddScoped<IEmployeeIntegrationRepository, EmployeeIntegrationRepository>();
         services.AddScoped<IIntegrationLinkCodeRepository, IntegrationLinkCodeRepository>();

@@ -34,6 +34,7 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 await app.MigrateDatabaseAsync();
+await app.SeedDatabaseAsync();
 
 app.UseExceptionHandling();
 app.UseSerilogRequestLogging();
