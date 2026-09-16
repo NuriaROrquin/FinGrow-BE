@@ -1,6 +1,7 @@
 namespace FinGrow.Infrastructure.Persistence.Repositories;
 
 using FinGrow.Domain.Entities;
+using FinGrow.Domain.Enums;
 using FinGrow.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,4 +18,27 @@ internal sealed class TransactionRepository(FinGrowDbContext dbContext) : ITrans
             .OrderByDescending(transaction => transaction.OccurredOn)
             .ThenByDescending(transaction => transaction.CreatedAt)
             .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlySet<string>> ListExistingExternalReferencesAsync(
+        Guid employeeId,
+        TransactionSource source,
+        IReadOnlyCollection<string> externalReferences,
+        CancellationToken cancellationToken = default)
+    {
+        if (externalReferences.Count == 0)
+        {
+            return new HashSet<string>(StringComparer.Ordinal);
+        }
+
+        var found = await dbContext.Transactions
+            .Where(transaction =>
+                transaction.EmployeeId == employeeId
+                && transaction.Source == source
+                && transaction.ExternalReference != null
+                && externalReferences.Contains(transaction.ExternalReference))
+            .Select(transaction => transaction.ExternalReference!)
+            .ToListAsync(cancellationToken);
+
+        return found.ToHashSet(StringComparer.Ordinal);
+    }
 }

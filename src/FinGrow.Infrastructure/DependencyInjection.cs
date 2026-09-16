@@ -143,16 +143,23 @@ public static class DependencyInjection
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
-        services.AddHttpClient<IMercadoPagoOAuthClient, MercadoPagoOAuthClient>((provider, client) =>
-            {
-                var options = provider.GetRequiredService<IOptions<MercadoPagoOptions>>().Value;
-
-                client.BaseAddress = new Uri(options.ApiBaseUrl);
-                client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
-            })
+        services.AddHttpClient<IMercadoPagoOAuthClient, MercadoPagoOAuthClient>(ConfigureMercadoPagoClient)
             .AddPolicyHandler(GetRetryPolicy());
 
+        services.AddHttpClient<IMercadoPagoPaymentsClient, MercadoPagoPaymentsClient>(ConfigureMercadoPagoClient)
+            .AddPolicyHandler(GetRetryPolicy());
+
+        services.AddHostedService<MercadoPagoSyncWorker>();
+
         return services;
+    }
+
+    private static void ConfigureMercadoPagoClient(IServiceProvider provider, HttpClient client)
+    {
+        var options = provider.GetRequiredService<IOptions<MercadoPagoOptions>>().Value;
+
+        client.BaseAddress = new Uri(options.ApiBaseUrl);
+        client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
     }
 
     private static AsyncRetryPolicy<HttpResponseMessage> GetRetryPolicy() =>

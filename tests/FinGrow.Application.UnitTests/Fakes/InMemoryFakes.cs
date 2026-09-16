@@ -36,6 +36,10 @@ public sealed class FakeEmployeeIntegrationRepository : IEmployeeIntegrationRepo
         Task.FromResult(Integrations.FirstOrDefault(integration =>
             integration.EmployeeId == employeeId && integration.Provider == provider));
 
+    public Task<IReadOnlyList<EmployeeIntegration>> ListAuthorizedAsync(IntegrationProvider provider, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<EmployeeIntegration>>(
+            Integrations.Where(integration => integration.Provider == provider && integration.Grant is not null).ToList());
+
     public void Add(EmployeeIntegration integration) => Integrations.Add(integration);
 
     public void Remove(EmployeeIntegration integration) => Integrations.Remove(integration);
@@ -63,6 +67,12 @@ public sealed class FakeTransactionRepository : ITransactionRepository
 
     public Task<Transaction?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Transactions.FirstOrDefault(transaction => transaction.Id == id));
+
+    public Task<IReadOnlySet<string>> ListExistingExternalReferencesAsync(Guid employeeId, TransactionSource source, IReadOnlyCollection<string> externalReferences, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlySet<string>>(Transactions
+            .Where(transaction => transaction.EmployeeId == employeeId && transaction.Source == source && transaction.ExternalReference is not null && externalReferences.Contains(transaction.ExternalReference))
+            .Select(transaction => transaction.ExternalReference!)
+            .ToHashSet(StringComparer.Ordinal));
 
     public Task<IReadOnlyList<Transaction>> ListByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Transaction>>(Transactions
@@ -174,4 +184,46 @@ public sealed class FakeMercadoPagoOAuthClient : IMercadoPagoOAuthClient
 
     public Task<MercadoPagoTokens> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default) =>
         Task.FromResult(Tokens);
+}
+
+public sealed class FakeMercadoPagoPaymentsClient : IMercadoPagoPaymentsClient
+{
+    public List<MercadoPagoPayment> Payments { get; } = new();
+
+    public List<(DateTimeOffset From, DateTimeOffset To, int Offset)> Searches { get; } = new();
+
+    public int PageSize { get; set; } = 50;
+
+    public Task<MercadoPagoPaymentsPage> SearchUpdatedBetweenAsync(string accessToken, DateTimeOffset from, DateTimeOffset to, int offset, CancellationToken cancellationToken = default)
+    {
+        Searches.Add((from, to, offset));
+
+        return Task.FromResult(new MercadoPagoPaymentsPage(Payments.Skip(offset).Take(PageSize).ToList(), Payments.Count));
+    }
+}
+
+public sealed class FakeAiService : IAiService
+{
+    public Dictionary<string, ExpenseCategory> CategoriesByDescription { get; } = new(StringComparer.Ordinal);
+
+    public bool Unreachable { get; set; }
+
+    public List<ExpenseToCategorize> Received { get; } = new();
+
+    public Task<bool> IsHealthyAsync(CancellationToken cancellationToken = default) => Task.FromResult(!Unreachable);
+
+    public Task<IReadOnlyList<CategorizedExpense>> CategorizeExpensesAsync(IReadOnlyList<ExpenseToCategorize> expenses, CancellationToken cancellationToken = default)
+    {
+        if (Unreachable)
+        {
+            throw new HttpRequestException("FinGrow-AI unreachable");
+        }
+
+        Received.AddRange(expenses);
+
+        return Task.FromResult<IReadOnlyList<CategorizedExpense>>(expenses
+            .Where(expense => CategoriesByDescription.ContainsKey(expense.Description))
+            .Select(expense => new CategorizedExpense(expense.Id, CategoriesByDescription[expense.Description], 0.9))
+            .ToList());
+    }
 }

@@ -24,4 +24,10 @@ public sealed class MercadoPagoOptions
 
     [Range(1, 300)]
     public int TimeoutSeconds { get; init; } = 30;
+
+    [Range(1, 1440)]
+    public int SyncIntervalMinutes { get; init; } = 60;
+
+    [Range(0, 3600)]
+    public int SyncInitialDelaySeconds { get; init; } = 30;
 }

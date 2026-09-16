@@ -206,6 +206,9 @@ public class TelegramWebhookTests
         public Task<EmployeeIntegration?> FindByEmployeeAsync(Guid employeeId, IntegrationProvider provider, CancellationToken cancellationToken = default) =>
             Task.FromResult(_integrations.FirstOrDefault(integration => integration.EmployeeId == employeeId && integration.Provider == provider));
 
+        public Task<IReadOnlyList<EmployeeIntegration>> ListAuthorizedAsync(IntegrationProvider provider, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<EmployeeIntegration>>(_integrations.Where(integration => integration.Provider == provider && integration.Grant is not null).ToList());
+
         public void Add(EmployeeIntegration integration) => _integrations.Add(integration);
 
         public void Remove(EmployeeIntegration integration) => _integrations.Remove(integration);

@@ -62,6 +62,8 @@ variables de entorno usando `__` como separador de sección.
 | `MercadoPago:RedirectUri` | `MercadoPago__RedirectUri` | URL pública de `GET /api/integrations/mercadopago/oauth/callback`, idéntica a la cargada en la aplicación de Mercado Pago. MP no acepta `localhost`: en local se usa un túnel (ngrok) |
 | `MercadoPago:FrontendReturnUrl` | `MercadoPago__FrontendReturnUrl` | Página del frontend a la que vuelve el navegador al terminar la vinculación; recibe `?mercadopago=linked` o `?mercadopago=error&reason=...` (default `http://localhost:3000/dashboard/settings`) |
 | `MercadoPago:TimeoutSeconds` | `MercadoPago__TimeoutSeconds` | Timeout de las llamadas a la API de Mercado Pago (default 30) |
+| `MercadoPago:SyncIntervalMinutes` | `MercadoPago__SyncIntervalMinutes` | Cada cuántos minutos el job recorre las cuentas vinculadas y trae los movimientos nuevos (default 60). Mercado Pago no avisa por webhook lo que un usuario paga: solo lo que cobra, por eso se consulta |
+| `MercadoPago:SyncInitialDelaySeconds` | `MercadoPago__SyncInitialDelaySeconds` | Espera antes de la primera sincronización al arrancar (default 30) |
 | `TokenEncryption:Key` | `TokenEncryption__Key` | Clave AES-256 en base64 (`openssl rand -base64 32`) con la que se cifran en la base los tokens OAuth de las integraciones. Cambiarla deja ilegibles los tokens ya guardados |
 | `Cors:AllowedOrigins` | `Cors__AllowedOrigins__0` | Orígenes habilitados para el frontend |
 

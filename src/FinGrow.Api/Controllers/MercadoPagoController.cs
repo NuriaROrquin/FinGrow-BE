@@ -4,6 +4,7 @@ using FinGrow.Api.Extensions;
 using FinGrow.Api.MercadoPago;
 using FinGrow.Application.Features.Integrations.MercadoPago.CompleteMercadoPagoLink;
 using FinGrow.Application.Features.Integrations.MercadoPago.StartMercadoPagoLink;
+using FinGrow.Application.Features.Integrations.MercadoPago.Sync;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,8 +12,8 @@ using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 
 [ApiController]
-[Route("api/integrations/mercadopago/oauth")]
-public sealed class MercadoPagoOAuthController : ControllerBase
+[Route("api/integrations/mercadopago")]
+public sealed class MercadoPagoController : ControllerBase
 {
     internal const string ResultQueryKey = "mercadopago";
     internal const string LinkedResult = "linked";
@@ -21,20 +22,20 @@ public sealed class MercadoPagoOAuthController : ControllerBase
     private readonly ISender _sender;
     private readonly MercadoPagoReturnOptions _options;
 
-    public MercadoPagoOAuthController(ISender sender, IOptions<MercadoPagoReturnOptions> options)
+    public MercadoPagoController(ISender sender, IOptions<MercadoPagoReturnOptions> options)
     {
         _sender = sender;
         _options = options.Value;
     }
 
-    [HttpPost("start")]
+    [HttpPost("oauth/start")]
     [Authorize]
     [ProducesResponseType<StartMercadoPagoLinkResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Start(CancellationToken cancellationToken) =>
         (await _sender.Send(new StartMercadoPagoLinkCommand(), cancellationToken)).ToActionResult();
 
-    [HttpGet("callback")]
+    [HttpGet("oauth/callback")]
     [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status302Found)]
     public async Task<IActionResult> Callback(
@@ -51,4 +52,11 @@ public sealed class MercadoPagoOAuthController : ControllerBase
 
         return Redirect(QueryHelpers.AddQueryString(_options.FrontendReturnUrl, query));
     }
+
+    [HttpPost("sync")]
+    [Authorize]
+    [ProducesResponseType<MercadoPagoSyncSummary>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Sync(CancellationToken cancellationToken) =>
+        (await _sender.Send(new SyncMyMercadoPagoCommand(), cancellationToken)).ToActionResult();
 }
