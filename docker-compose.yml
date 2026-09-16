@@ -34,6 +34,11 @@ services:
       Twilio__PublicBaseUrl: "${TWILIO_PUBLIC_BASE_URL:-}"
       Telegram__BotToken: "${TELEGRAM_BOT_TOKEN:-}"
       Telegram__WebhookSecret: "${TELEGRAM_WEBHOOK_SECRET:-}"
+      MercadoPago__ClientId: "${MERCADOPAGO_CLIENT_ID:-}"
+      MercadoPago__ClientSecret: "${MERCADOPAGO_CLIENT_SECRET:-}"
+      MercadoPago__RedirectUri: "${MERCADOPAGO_REDIRECT_URI:-}"
+      MercadoPago__FrontendReturnUrl: "${MERCADOPAGO_FRONTEND_RETURN_URL:-http://localhost:3000/dashboard/settings}"
+      TokenEncryption__Key: "${TOKEN_ENCRYPTION_KEY:-}"
       Cors__AllowedOrigins__0: "http://localhost:3000"
     ports:
       - "8080:8080"

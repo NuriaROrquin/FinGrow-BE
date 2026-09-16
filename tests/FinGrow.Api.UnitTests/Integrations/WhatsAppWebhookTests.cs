@@ -152,6 +152,10 @@ public class WhatsAppWebhookTests
                     ["Twilio:AuthToken"] = _authToken,
                     ["Telegram:BotToken"] = "unit-test-telegram-bot-token",
                     ["Telegram:WebhookSecret"] = "unit-test-telegram-secret",
+                    ["MercadoPago:ClientId"] = "unit-test-mp-client-id",
+                    ["MercadoPago:ClientSecret"] = "unit-test-mp-client-secret",
+                    ["MercadoPago:RedirectUri"] = "https://api.test/api/integrations/mercadopago/oauth/callback",
+                    ["TokenEncryption:Key"] = "dW5pdC10ZXN0LXRva2VuLWVuY3J5cHRpb24ta2V5ISE=",
                 }));
 
             builder.ConfigureTestServices(services =>
@@ -188,6 +192,9 @@ public class WhatsAppWebhookTests
 
         public Task<EmployeeIntegration?> FindByEmployeeAsync(Guid employeeId, IntegrationProvider provider, CancellationToken cancellationToken = default) =>
             Task.FromResult(_integrations.FirstOrDefault(integration => integration.EmployeeId == employeeId && integration.Provider == provider));
+
+        public Task<IReadOnlyList<EmployeeIntegration>> ListAuthorizedAsync(IntegrationProvider provider, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<EmployeeIntegration>>(_integrations.Where(integration => integration.Provider == provider && integration.Grant is not null).ToList());
 
         public void Add(EmployeeIntegration integration) => _integrations.Add(integration);
 

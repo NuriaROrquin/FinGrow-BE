@@ -2,6 +2,7 @@ namespace FinGrow.Application.UnitTests.Features.Integrations;
 
 using FinGrow.Application.Common;
 using FinGrow.Application.Features.Integrations.GenerateLinkCode;
+using FinGrow.Application.Features.Integrations.Linking;
 using FinGrow.Application.UnitTests.Fakes;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
@@ -72,8 +73,8 @@ public class GenerateLinkCodeHandlerTests
 
     private Task<Result<LinkCodeResponse>> Handle(IntegrationProvider provider)
     {
-        var handler = new GenerateLinkCodeHandler(
-            _currentUser, _employees, _linkCodes, _unitOfWork, new FakeDateTimeProvider(Now));
+        var handler = new GenerateLinkCodeHandler(new LinkCodeIssuer(
+            _currentUser, _employees, _linkCodes, _unitOfWork, new FakeDateTimeProvider(Now)));
 
         return handler.Handle(new GenerateLinkCodeCommand(provider), CancellationToken.None);
     }

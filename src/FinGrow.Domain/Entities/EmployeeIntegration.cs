@@ -3,6 +3,7 @@ namespace FinGrow.Domain.Entities;
 using FinGrow.Domain.Common;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.Errors;
+using FinGrow.Domain.ValueObjects;
 
 public sealed class EmployeeIntegration : AggregateRoot
 {
@@ -36,6 +37,10 @@ public sealed class EmployeeIntegration : AggregateRoot
 
     public DateTimeOffset LinkedAt { get; private set; }
 
+    public OAuthGrant? Grant { get; private set; }
+
+    public DateTimeOffset? LastSyncedAt { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -64,6 +69,25 @@ public sealed class EmployeeIntegration : AggregateRoot
         ExternalAccountId = EnsureValidExternalAccountId(externalAccountId);
         LinkedAt = linkedAt;
         UpdatedAt = linkedAt;
+    }
+
+    public void Authorize(OAuthGrant grant, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(grant);
+
+        if (!Provider.LinksWithOAuth())
+        {
+            throw new DomainException($"{Provider} no se vincula por OAuth.");
+        }
+
+        Grant = grant;
+        UpdatedAt = now;
+    }
+
+    public void MarkSynced(DateTimeOffset syncedAt)
+    {
+        LastSyncedAt = syncedAt;
+        UpdatedAt = syncedAt;
     }
 
     private static string EnsureValidExternalAccountId(string externalAccountId)
