@@ -291,6 +291,55 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                     b.ToTable("employees", (string)null);
                 });
 
+            modelBuilder.Entity("FinGrow.Domain.Entities.EmployeeIntegration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("employee_id");
+
+                    b.Property<string>("ExternalAccountId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("external_account_id");
+
+                    b.Property<DateTimeOffset>("LinkedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("linked_at");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("provider");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_employee_integrations");
+
+                    b.HasIndex("EmployeeId", "Provider")
+                        .IsUnique()
+                        .HasDatabaseName("ix_employee_integrations_employee_id_provider");
+
+                    b.HasIndex("Provider", "ExternalAccountId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_employee_integrations_provider_external_account_id");
+
+                    b.ToTable("employee_integrations", (string)null);
+                });
+
             modelBuilder.Entity("FinGrow.Domain.Entities.Goal", b =>
                 {
                     b.Property<Guid>("Id")
@@ -376,6 +425,54 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_goal_contributions_amount_positive", "amount > 0");
                         });
+                });
+
+            modelBuilder.Entity("FinGrow.Domain.Entities.IntegrationLinkCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("code_hash");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("employee_id");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("provider");
+
+                    b.Property<DateTimeOffset?>("UsedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("used_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_integration_link_codes");
+
+                    b.HasIndex("EmployeeId")
+                        .HasDatabaseName("ix_integration_link_codes_employee_id");
+
+                    b.HasIndex("Provider", "CodeHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_integration_link_codes_provider_code_hash");
+
+                    b.ToTable("integration_link_codes", (string)null);
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.Investment", b =>
@@ -631,6 +728,16 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                     b.Navigation("Department");
                 });
 
+            modelBuilder.Entity("FinGrow.Domain.Entities.EmployeeIntegration", b =>
+                {
+                    b.HasOne("FinGrow.Domain.Entities.Employee", null)
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_employee_integrations_employees_employee_id");
+                });
+
             modelBuilder.Entity("FinGrow.Domain.Entities.Goal", b =>
                 {
                     b.HasOne("FinGrow.Domain.Entities.Employee", "Employee")
@@ -711,6 +818,16 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
 
                     b.Navigation("Amount")
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("FinGrow.Domain.Entities.IntegrationLinkCode", b =>
+                {
+                    b.HasOne("FinGrow.Domain.Entities.Employee", null)
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_integration_link_codes_employees_employee_id");
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.Investment", b =>

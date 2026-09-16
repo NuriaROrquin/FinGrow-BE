@@ -1,6 +1,8 @@
 namespace FinGrow.Application.Interfaces;
 
+using FinGrow.Application.DTOs;
+
 public interface ITokenService
 {
-    string GenerateToken(Guid userId, Guid companyId, string role);
+    AuthToken GenerateToken(Guid userId, Guid companyId, string role, string fullName);
 }

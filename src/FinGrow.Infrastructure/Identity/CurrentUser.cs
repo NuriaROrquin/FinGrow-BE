@@ -18,6 +18,13 @@ internal sealed class CurrentUser : ICurrentUser
 
     public Guid? CompanyId => ReadGuidClaim(CompanyIdClaim);
 
+    public string? FullName => Principal?.FindFirstValue(ClaimTypes.Name);
+
+    public string? Role => Principal?.FindFirstValue(ClaimTypes.Role);
+
+    public DateTimeOffset? ExpiresAt =>
+        long.TryParse(Principal?.FindFirstValue("exp"), out var exp) ? DateTimeOffset.FromUnixTimeSeconds(exp) : null;
+
     public bool IsAuthenticated => Principal?.Identity?.IsAuthenticated ?? false;
 
     private Guid? ReadGuidClaim(string claimType) =>

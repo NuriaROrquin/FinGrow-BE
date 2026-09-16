@@ -1,3 +1,4 @@
+using FinGrow.Api.Authentication;
 using FinGrow.Api.Extensions;
 using FinGrow.Application;
 using FinGrow.Infrastructure;
@@ -11,6 +12,7 @@ builder.Host.UseSerilog((context, configuration) =>
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddSessionCookieAuthentication();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -30,6 +32,7 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 await app.MigrateDatabaseAsync();
+await app.SeedDatabaseAsync();
 
 app.UseExceptionHandling();
 app.UseSerilogRequestLogging();
