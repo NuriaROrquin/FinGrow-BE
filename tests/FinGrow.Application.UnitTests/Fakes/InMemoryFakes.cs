@@ -55,6 +55,22 @@ public sealed class FakeIntegrationLinkCodeRepository : IIntegrationLinkCodeRepo
     public void Add(IntegrationLinkCode linkCode) => LinkCodes.Add(linkCode);
 }
 
+public sealed class FakeTransactionRepository : ITransactionRepository
+{
+    public List<Transaction> Transactions { get; } = new();
+
+    public void Add(Transaction transaction) => Transactions.Add(transaction);
+
+    public Task<Transaction?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Transactions.FirstOrDefault(transaction => transaction.Id == id));
+
+    public Task<IReadOnlyList<Transaction>> ListByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Transaction>>(Transactions
+            .Where(transaction => transaction.EmployeeId == employeeId)
+            .OrderByDescending(transaction => transaction.OccurredOn)
+            .ToList());
+}
+
 public sealed class FakeTwilioMediaClient : ITwilioMediaClient
 {
     public List<Uri> Downloaded { get; } = new();

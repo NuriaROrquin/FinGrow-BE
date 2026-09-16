@@ -687,7 +687,7 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                             b1.HasKey("BudgetCategoryLimitId")
                                 .HasName("pk_budget_category_limits");
 
-                            b1.ToTable("budget_category_limits");
+                            b1.ToTable("budget_category_limits", (string)null);
 
                             b1.WithOwner()
                                 .HasForeignKey("BudgetCategoryLimitId")
@@ -767,7 +767,7 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                             b1.HasKey("GoalId")
                                 .HasName("pk_goals");
 
-                            b1.ToTable("goals");
+                            b1.ToTable("goals", (string)null);
 
                             b1.WithOwner()
                                 .HasForeignKey("GoalId")
@@ -809,7 +809,7 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                             b1.HasKey("GoalContributionId")
                                 .HasName("pk_goal_contributions");
 
-                            b1.ToTable("goal_contributions");
+                            b1.ToTable("goal_contributions", (string)null);
 
                             b1.WithOwner()
                                 .HasForeignKey("GoalContributionId")
@@ -859,7 +859,7 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                             b1.HasKey("InvestmentId")
                                 .HasName("pk_investments");
 
-                            b1.ToTable("investments");
+                            b1.ToTable("investments", (string)null);
 
                             b1.WithOwner()
                                 .HasForeignKey("InvestmentId")
@@ -901,7 +901,7 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                             b1.HasKey("InvestmentValuationId")
                                 .HasName("pk_investment_valuations");
 
-                            b1.ToTable("investment_valuations");
+                            b1.ToTable("investment_valuations", (string)null);
 
                             b1.WithOwner()
                                 .HasForeignKey("InvestmentValuationId")
@@ -941,7 +941,7 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                             b1.HasKey("TransactionId")
                                 .HasName("pk_transactions");
 
-                            b1.ToTable("transactions");
+                            b1.ToTable("transactions", (string)null);
 
                             b1.WithOwner()
                                 .HasForeignKey("TransactionId")

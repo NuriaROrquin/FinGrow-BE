@@ -10,18 +10,15 @@ using Microsoft.AspNetCore.Mvc;
 [Route("api/webhooks/whatsapp")]
 [AllowAnonymous]
 [ValidateTwilioSignature]
-public sealed class WhatsAppWebhookController : ControllerBase
+public sealed class WhatsAppWebhookController(ISender sender) : ControllerBase
 {
-    private readonly ISender _sender;
-
-    public WhatsAppWebhookController(ISender sender) => _sender = sender;
 
     [HttpPost]
     [Consumes("application/x-www-form-urlencoded")]
     [Produces(TwiMlResult.MediaType)]
     public async Task<IActionResult> Receive([FromForm] IFormCollection form, CancellationToken cancellationToken)
     {
-        var result = await _sender.Send(TwilioInboundMessage.ToCommand(form), cancellationToken);
+        var result = await sender.Send(TwilioInboundMessage.ToCommand(form), cancellationToken);
 
         return result.IsSuccess ? new TwiMlResult(result.Value.Text) : result.ToActionResult();
     }
