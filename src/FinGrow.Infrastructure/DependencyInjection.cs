@@ -9,6 +9,7 @@ using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Repositories;
 using FinGrow.Infrastructure.Ai;
 using FinGrow.Infrastructure.Identity;
+using FinGrow.Infrastructure.Integrations.Telegram;
 using FinGrow.Infrastructure.Integrations.Twilio;
 using FinGrow.Infrastructure.Persistence;
 using FinGrow.Infrastructure.Persistence.Repositories;
@@ -31,6 +32,7 @@ public static class DependencyInjection
         services.AddAiService(configuration);
         services.AddJwtAuthentication(configuration);
         services.AddTwilio(configuration);
+        services.AddTelegram(configuration);
 
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, CurrentUser>();
@@ -97,6 +99,27 @@ public static class DependencyInjection
 
                 client.Timeout = TimeSpan.FromSeconds(options.MediaTimeoutSeconds);
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", credentials);
+            })
+            .AddPolicyHandler(GetRetryPolicy());
+
+        return services;
+    }
+
+    private static IServiceCollection AddTelegram(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<TelegramOptions>()
+            .Bind(configuration.GetSection(TelegramOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddSingleton<ITelegramWebhookValidator, TelegramWebhookValidator>();
+
+        services.AddHttpClient<ITelegramBotClient, TelegramBotClient>((provider, client) =>
+            {
+                var options = provider.GetRequiredService<IOptions<TelegramOptions>>().Value;
+
+                client.BaseAddress = new Uri($"https://api.telegram.org/bot{options.BotToken}/");
+                client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
             })
             .AddPolicyHandler(GetRetryPolicy());
 

@@ -39,6 +39,8 @@ public class MigrateOnStartupTests
             ["Jwt:Audience"] = "FinGrow",
             ["Twilio:AccountSid"] = "ACunit-test",
             ["Twilio:AuthToken"] = "unit-test-twilio-auth-token",
+            ["Telegram:BotToken"] = "unit-test-telegram-bot-token",
+            ["Telegram:WebhookSecret"] = "unit-test-telegram-secret",
         });
         builder.Services.AddInfrastructure(builder.Configuration);
 
