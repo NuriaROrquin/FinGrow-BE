@@ -18,6 +18,17 @@ public sealed class FakeEmployeeRepository : IEmployeeRepository
         Task.FromResult(Employees.FirstOrDefault(employee => employee.Email == email));
 }
 
+public sealed class FakeCompanyRepository : ICompanyRepository
+{
+    public List<Company> Companies { get; } = new();
+
+    public Task<Company?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Companies.FirstOrDefault(company => company.Id == id));
+
+    public Task<Company?> GetByEmailAsync(Email email, CancellationToken cancellationToken) =>
+        Task.FromResult(Companies.FirstOrDefault(company => company.Email == email));
+}
+
 public sealed class FakeEmployeeIntegrationRepository : IEmployeeIntegrationRepository
 {
     public List<EmployeeIntegration> Integrations { get; } = new();
