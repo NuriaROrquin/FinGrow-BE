@@ -3,7 +3,9 @@ namespace FinGrow.Api.UnitTests.Authentication;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using FinGrow.Api.Contracts;
 using FinGrow.Application.Interfaces;
+using FinGrow.Api.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -47,10 +49,10 @@ public class JwtAuthenticationTests : IClassFixture<JwtAuthenticationTests.Secur
         var companyId = Guid.CreateVersion7();
         using var scope = _factory.Services.CreateScope();
         var tokenService = scope.ServiceProvider.GetRequiredService<ITokenService>();
-        var token = tokenService.GenerateToken(userId, companyId, "Employee");
+        var token = tokenService.GenerateToken(userId, companyId, "Employee", "Ana Pérez");
 
         var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Value);
 
         var response = await client.GetAsync(new Uri("/test/secure", UriKind.Relative));
 
@@ -59,6 +61,56 @@ public class JwtAuthenticationTests : IClassFixture<JwtAuthenticationTests.Secur
         body.ShouldNotBeNull();
         body.UserId.ShouldBe(userId);
         body.CompanyId.ShouldBe(companyId);
+    }
+
+    [Fact]
+    public async Task Secure_endpoint_returns_200_with_a_valid_token_in_the_session_cookie()
+    {
+        var userId = Guid.CreateVersion7();
+        var companyId = Guid.CreateVersion7();
+        using var scope = _factory.Services.CreateScope();
+        var tokenService = scope.ServiceProvider.GetRequiredService<ITokenService>();
+        var token = tokenService.GenerateToken(userId, companyId, "Employee", "Ana Pérez");
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add("Cookie", $"{SessionCookie.Name}={token.Value}");
+
+        var response = await client.GetAsync(new Uri("/test/secure", UriKind.Relative));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<SecureEndpointResponse>();
+        body.ShouldNotBeNull();
+        body.UserId.ShouldBe(userId);
+        body.CompanyId.ShouldBe(companyId);
+    }
+
+    [Fact]
+    public async Task Session_endpoint_returns_the_claims_and_delete_clears_the_cookie()
+    {
+        var userId = Guid.CreateVersion7();
+        var companyId = Guid.CreateVersion7();
+        using var scope = _factory.Services.CreateScope();
+        var tokenService = scope.ServiceProvider.GetRequiredService<ITokenService>();
+        var token = tokenService.GenerateToken(userId, companyId, "Empleado", "Ana Pérez");
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add("Cookie", $"{SessionCookie.Name}={token.Value}");
+
+        var session = await client.GetFromJsonAsync<SessionResponse>(new Uri("/session", UriKind.Relative));
+
+        session.ShouldNotBeNull();
+        session.UserId.ShouldBe(userId);
+        session.CompanyId.ShouldBe(companyId);
+        session.FullName.ShouldBe("Ana Pérez");
+        session.Role.ShouldBe("Empleado");
+        session.ExpiresAt.ShouldBe(token.ExpiresAt, TimeSpan.FromSeconds(1));
+
+        var logout = await client.DeleteAsync(new Uri("/session", UriKind.Relative));
+
+        logout.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        var setCookie = logout.Headers.GetValues("Set-Cookie").ShouldHaveSingleItem();
+        setCookie.ShouldStartWith($"{SessionCookie.Name}=;");
+        setCookie.ShouldContain("httponly", Case.Insensitive);
     }
 
     private sealed record SecureEndpointResponse(Guid? UserId, Guid? CompanyId);

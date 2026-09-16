@@ -53,6 +53,9 @@ public class LoginEmployeeCommandHandlerTests
         result.IsSuccess.ShouldBeTrue();
         result.Value.EmployeeId.ShouldBe(employee.Id);
         result.Value.Token.ShouldBe($"token-for-{employee.Id}");
+        result.Value.ExpiresAt.ShouldBe(FakeTokenService.ExpiresAt);
+        result.Value.Role.ShouldBe("Empleado");
+        result.Value.CompanyId.ShouldBe(employee.CompanyId);
         employee.LastLoginAt.ShouldBe(Now);
         unitOfWork.SaveCount.ShouldBe(1);
     }

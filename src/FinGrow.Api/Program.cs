@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using FinGrow.Api.Authentication;
 using FinGrow.Api.Extensions;
 using FinGrow.Application;
 using FinGrow.Infrastructure;
@@ -12,6 +13,7 @@ builder.Host.UseSerilog((context, configuration) =>
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddSessionCookieAuthentication();
 
 builder.Services.AddControllers()
     .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));

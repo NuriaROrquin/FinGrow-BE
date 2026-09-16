@@ -1,5 +1,6 @@
 namespace FinGrow.Application.UnitTests.Fakes;
 
+using FinGrow.Application.DTOs;
 using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
@@ -103,6 +104,12 @@ public sealed class FakeCurrentUser : ICurrentUser
 
     public Guid? CompanyId { get; set; }
 
+    public string? FullName { get; set; }
+
+    public string? Role { get; set; }
+
+    public DateTimeOffset? ExpiresAt { get; set; }
+
     public bool IsAuthenticated => UserId is not null;
 }
 
@@ -115,5 +122,8 @@ public sealed class FakePasswordHasher : IPasswordHasher
 
 public sealed class FakeTokenService : ITokenService
 {
-    public string GenerateToken(Guid userId, Guid companyId, string role) => $"token-for-{userId}";
+    public static readonly DateTimeOffset ExpiresAt = new(2026, 9, 15, 12, 0, 0, TimeSpan.Zero);
+
+    public AuthToken GenerateToken(Guid userId, Guid companyId, string role, string fullName) =>
+        new($"token-for-{userId}", ExpiresAt);
 }
