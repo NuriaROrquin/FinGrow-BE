@@ -1,7 +1,6 @@
 namespace FinGrow.Infrastructure.Persistence.Configurations;
 
 using FinGrow.Domain.Entities;
-using FinGrow.Domain.Enums;
 using FinGrow.Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -51,22 +50,5 @@ internal sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
         builder.Metadata
             .FindNavigation(nameof(Company.Departments))!
             .SetPropertyAccessMode(PropertyAccessMode.Field);
-
-        // Empresa de prueba para desarrollo local: no hay alta real todavia (HU-01 en curso en
-        // otra rama). Se borra cuando haya un flujo real de alta de empresa.
-        var seedTimestamp = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
-
-        builder.HasData(new
-        {
-            Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
-            Name = "FinGrow Dev",
-            TaxId = TaxId.From("20329145981"),
-            Email = Email.From("dev@fingrowapp.local"),
-            PasswordHash = "seed-not-a-real-hash",
-            DefaultCurrency = Currency.ARS,
-            IsActive = true,
-            CreatedAt = seedTimestamp,
-            UpdatedAt = seedTimestamp,
-        });
     }
 }

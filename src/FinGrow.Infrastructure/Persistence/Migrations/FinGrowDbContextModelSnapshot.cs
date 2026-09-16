@@ -160,20 +160,6 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_companies_tax_id");
 
                     b.ToTable("companies", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = new Guid("11111111-1111-1111-1111-111111111111"),
-                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            DefaultCurrency = "ARS",
-                            Email = "dev@fingrowapp.local",
-                            IsActive = true,
-                            Name = "FinGrow Dev",
-                            PasswordHash = "seed-not-a-real-hash",
-                            TaxId = "20329145981",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
-                        });
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.Department", b =>
@@ -303,21 +289,6 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_employees_email");
 
                     b.ToTable("employees", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = new Guid("22222222-2222-2222-2222-222222222222"),
-                            CompanyId = new Guid("11111111-1111-1111-1111-111111111111"),
-                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            Email = "empleado.dev@fingrowapp.local",
-                            FullName = "Empleado de Desarrollo",
-                            HiredOn = new DateOnly(2026, 1, 1),
-                            IsActive = true,
-                            PasswordHash = "$2a$11$kzAiw9odq64SZtAevVr.S.OiU2TzpfH.wxL4kIatQHch0TyIA8RbG",
-                            PreferredCurrency = "ARS",
-                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
-                        });
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.EmployeeIntegration", b =>
@@ -716,7 +687,7 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                             b1.HasKey("BudgetCategoryLimitId")
                                 .HasName("pk_budget_category_limits");
 
-                            b1.ToTable("budget_category_limits");
+                            b1.ToTable("budget_category_limits", (string)null);
 
                             b1.WithOwner()
                                 .HasForeignKey("BudgetCategoryLimitId")
@@ -796,7 +767,7 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                             b1.HasKey("GoalId")
                                 .HasName("pk_goals");
 
-                            b1.ToTable("goals");
+                            b1.ToTable("goals", (string)null);
 
                             b1.WithOwner()
                                 .HasForeignKey("GoalId")
@@ -838,7 +809,7 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                             b1.HasKey("GoalContributionId")
                                 .HasName("pk_goal_contributions");
 
-                            b1.ToTable("goal_contributions");
+                            b1.ToTable("goal_contributions", (string)null);
 
                             b1.WithOwner()
                                 .HasForeignKey("GoalContributionId")
@@ -888,7 +859,7 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                             b1.HasKey("InvestmentId")
                                 .HasName("pk_investments");
 
-                            b1.ToTable("investments");
+                            b1.ToTable("investments", (string)null);
 
                             b1.WithOwner()
                                 .HasForeignKey("InvestmentId")
@@ -930,7 +901,7 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                             b1.HasKey("InvestmentValuationId")
                                 .HasName("pk_investment_valuations");
 
-                            b1.ToTable("investment_valuations");
+                            b1.ToTable("investment_valuations", (string)null);
 
                             b1.WithOwner()
                                 .HasForeignKey("InvestmentValuationId")
@@ -970,7 +941,7 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                             b1.HasKey("TransactionId")
                                 .HasName("pk_transactions");
 
-                            b1.ToTable("transactions");
+                            b1.ToTable("transactions", (string)null);
 
                             b1.WithOwner()
                                 .HasForeignKey("TransactionId")
