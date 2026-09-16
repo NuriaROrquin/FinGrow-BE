@@ -1,18 +1,13 @@
-using FinGrow.Domain.Repositories;
-using FinGrow.Infrastructure.Persistence.Repositories;
-
 namespace FinGrow.Infrastructure;
 
 using System.Net.Http.Headers;
 using System.Text;
 using FinGrow.Application.Interfaces;
-using FinGrow.Domain.Repositories.Transactions;
 using FinGrow.Domain.Repositories;
 using FinGrow.Infrastructure.Ai;
 using FinGrow.Infrastructure.Identity;
 using FinGrow.Infrastructure.Integrations.Twilio;
 using FinGrow.Infrastructure.Persistence;
-using FinGrow.Infrastructure.Persistence.Repositories.Transactions;
 using FinGrow.Infrastructure.Persistence.Repositories;
 using FinGrow.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;

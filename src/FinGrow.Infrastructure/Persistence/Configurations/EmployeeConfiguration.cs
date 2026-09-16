@@ -62,6 +62,8 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         // Empleado de prueba para desarrollo local, colgado de la empresa de prueba de
         // CompanyConfiguration. Sirve para tener a quien emitirle un JWT mientras HU-01 no
         // este mergeada. Se borra cuando haya un flujo real de alta de empleado.
+        // Password de prueba: "Password123!" (hash bcrypt real, generado con BCrypt.Net-Next
+        // igual que PasswordHasher, para que el login real funcione contra este seed).
         var seedTimestamp = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
         builder.HasData(new
@@ -72,7 +74,7 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
             FullName = "Empleado de Desarrollo",
             Email = Email.From("empleado.dev@fingrowapp.local"),
             PhoneNumber = (string?)null,
-            PasswordHash = "seed-not-a-real-hash",
+            PasswordHash = "$2a$11$kzAiw9odq64SZtAevVr.S.OiU2TzpfH.wxL4kIatQHch0TyIA8RbG",
             PreferredCurrency = Currency.ARS,
             HiredOn = new DateOnly(2026, 1, 1),
             IsActive = true,

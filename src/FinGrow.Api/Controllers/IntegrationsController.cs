@@ -9,14 +9,10 @@ using Microsoft.AspNetCore.Mvc;
 [ApiController]
 [Route("api/integrations")]
 [Authorize]
-public sealed class IntegrationsController : ControllerBase
+public sealed class IntegrationsController(ISender sender) : ControllerBase
 {
-    private readonly ISender _sender;
-
-    public IntegrationsController(ISender sender) => _sender = sender;
-
     [HttpPost("whatsapp/link-code")]
     [ProducesResponseType<WhatsAppLinkCodeResponse>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GenerateWhatsAppLinkCode(CancellationToken cancellationToken) =>
-        (await _sender.Send(new GenerateWhatsAppLinkCodeCommand(), cancellationToken)).ToActionResult();
+        (await sender.Send(new GenerateWhatsAppLinkCodeCommand(), cancellationToken)).ToActionResult();
 }

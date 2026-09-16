@@ -1,16 +1,16 @@
 namespace FinGrow.Application.Features.Transactions.GetTransactionById;
 
 using FinGrow.Application.Common;
-using FinGrow.Application.DTOs.Transactions;
-using FinGrow.Domain.Services.Transactions;
+using FinGrow.Application.DTOs;
+using FinGrow.Domain.Repositories;
 using MediatR;
 
-internal class GetTransactionByIdHandler(ITransactionService transactionService)
-    : IRequestHandler<GetTransactionByIdRequest, Result<TransactionResponse>>
+internal sealed class GetTransactionByIdHandler(ITransactionRepository transactionRepository)
+    : IRequestHandler<GetTransactionByIdCommand, Result<TransactionResponse>>
 {
-    public async Task<Result<TransactionResponse>> Handle(GetTransactionByIdRequest request, CancellationToken cancellationToken)
+    public async Task<Result<TransactionResponse>> Handle(GetTransactionByIdCommand request, CancellationToken cancellationToken)
     {
-        var transaction = await transactionService.GetByIdAsync(request.Id, cancellationToken);
+        var transaction = await transactionRepository.GetByIdAsync(request.Id, cancellationToken);
 
         return transaction is null
             ? Result.Failure<TransactionResponse>(

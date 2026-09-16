@@ -314,7 +314,7 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                             FullName = "Empleado de Desarrollo",
                             HiredOn = new DateOnly(2026, 1, 1),
                             IsActive = true,
-                            PasswordHash = "seed-not-a-real-hash",
+                            PasswordHash = "$2a$11$kzAiw9odq64SZtAevVr.S.OiU2TzpfH.wxL4kIatQHch0TyIA8RbG",
                             PreferredCurrency = "ARS",
                             UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
                         });
