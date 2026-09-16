@@ -33,8 +33,7 @@ internal sealed class EmployeeIntegrationConfiguration : IEntityTypeConfiguratio
 
             grant.Property(value => value.RefreshToken)
                 .HasColumnName("oauth_refresh_token")
-                .HasAnnotation(EncryptedStringConverter.Annotation, true)
-                .IsRequired();
+                .HasAnnotation(EncryptedStringConverter.Annotation, true);
 
             grant.Property(value => value.ExpiresAt)
                 .HasColumnName("oauth_expires_at")

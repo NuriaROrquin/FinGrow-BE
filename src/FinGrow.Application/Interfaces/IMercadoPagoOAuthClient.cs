@@ -1,6 +1,6 @@
 namespace FinGrow.Application.Interfaces;
 
-public sealed record MercadoPagoTokens(string AccessToken, string RefreshToken, TimeSpan ExpiresIn, string UserId);
+public sealed record MercadoPagoTokens(string AccessToken, string? RefreshToken, TimeSpan ExpiresIn, string UserId);
 
 public interface IMercadoPagoOAuthClient
 {

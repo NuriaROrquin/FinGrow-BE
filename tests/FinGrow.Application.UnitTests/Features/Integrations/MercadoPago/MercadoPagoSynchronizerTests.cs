@@ -178,6 +178,29 @@ public class MercadoPagoSynchronizerTests
     }
 
     [Fact]
+    public async Task A_grant_without_refresh_token_keeps_working_until_it_expires()
+    {
+        _integration.Authorize(OAuthGrant.From("access", null, Now.AddDays(3)), Now);
+        _payments.Payments.Add(Purchase(20, "Canva", 10285m, "debit_card"));
+
+        var result = await Sync();
+
+        result.IsSuccess.ShouldBeTrue();
+        _integration.Grant!.AccessToken.ShouldBe("access");
+    }
+
+    [Fact]
+    public async Task An_expired_grant_without_refresh_token_asks_to_relink()
+    {
+        _integration.Authorize(OAuthGrant.From("access", null, Now.AddDays(-1)), Now);
+
+        var result = await Sync();
+
+        result.Error.ShouldBe(MercadoPagoSynchronizer.GrantExpired);
+        _payments.Searches.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task An_integration_without_a_grant_cannot_be_synced()
     {
         var unauthorized = EmployeeIntegration.Create(EmployeeId, IntegrationProvider.MercadoPago, MercadoPagoUserId, Now);

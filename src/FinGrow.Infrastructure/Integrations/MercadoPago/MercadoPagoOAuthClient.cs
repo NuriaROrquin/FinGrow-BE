@@ -62,16 +62,21 @@ internal sealed class MercadoPagoOAuthClient : IMercadoPagoOAuthClient
         var payload = await response.Content.ReadFromJsonAsync<TokenResponse>(cancellationToken)
             ?? throw new HttpRequestException("Mercado Pago devolvio una respuesta vacia al pedir el token.");
 
-        if (string.IsNullOrEmpty(payload.AccessToken) || string.IsNullOrEmpty(payload.RefreshToken) || payload.UserId is null)
+        if (string.IsNullOrEmpty(payload.AccessToken) || payload.UserId is not { } userId)
         {
-            throw new HttpRequestException("Mercado Pago devolvio un token incompleto.");
+            var missing = string.IsNullOrEmpty(payload.AccessToken) && payload.UserId is null
+                ? "access_token y user_id"
+                : string.IsNullOrEmpty(payload.AccessToken) ? "access_token" : "user_id";
+
+            throw new HttpRequestException(
+                $"Mercado Pago devolvio un token incompleto: falta {missing} (scope '{payload.Scope}').");
         }
 
         return new MercadoPagoTokens(
             payload.AccessToken,
             payload.RefreshToken,
             TimeSpan.FromSeconds(payload.ExpiresIn),
-            payload.UserId.Value.ToString(CultureInfo.InvariantCulture));
+            userId.ToString(CultureInfo.InvariantCulture));
     }
 
     private sealed record TokenRequest(
@@ -96,5 +101,6 @@ internal sealed class MercadoPagoOAuthClient : IMercadoPagoOAuthClient
         [property: JsonPropertyName("access_token")] string? AccessToken,
         [property: JsonPropertyName("refresh_token")] string? RefreshToken,
         [property: JsonPropertyName("expires_in")] long ExpiresIn,
-        [property: JsonPropertyName("user_id")] long? UserId);
+        [property: JsonPropertyName("user_id"), JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)] long? UserId,
+        [property: JsonPropertyName("scope")] string? Scope);
 }

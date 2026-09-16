@@ -68,10 +68,14 @@ public class EmployeeIntegrationTests
     }
 
     [Fact]
-    public void A_grant_needs_both_tokens()
+    public void A_grant_needs_an_access_token_but_the_refresh_token_is_optional()
     {
         Should.Throw<DomainException>(() => OAuthGrant.From(" ", "refresh", Now));
-        Should.Throw<DomainException>(() => OAuthGrant.From("access", "", Now));
+
+        var grant = OAuthGrant.From("access", " ", Now);
+
+        grant.RefreshToken.ShouldBeNull();
+        grant.CanRefresh.ShouldBeFalse();
     }
 
     [Fact]

@@ -102,9 +102,14 @@ internal sealed partial class MercadoPagoSynchronizer
             return grant;
         }
 
+        if (!grant.CanRefresh)
+        {
+            return grant.ExpiresWithin(TimeSpan.Zero, now) ? null : grant;
+        }
+
         try
         {
-            var refreshed = await _oauth.RefreshAsync(grant.RefreshToken, cancellationToken);
+            var refreshed = await _oauth.RefreshAsync(grant.RefreshToken!, cancellationToken);
             var renewed = OAuthGrant.From(refreshed.AccessToken, refreshed.RefreshToken, now.Add(refreshed.ExpiresIn));
 
             integration.Authorize(renewed, now);
