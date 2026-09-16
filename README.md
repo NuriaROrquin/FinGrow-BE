@@ -54,6 +54,9 @@ variables de entorno usando `__` como separador de sección.
 | `Twilio:AccountSid` | `Twilio__AccountSid` | Account SID de la cuenta de Twilio; autentica la descarga de adjuntos |
 | `Twilio:AuthToken` | `Twilio__AuthToken` | Auth Token de Twilio; valida la firma de cada webhook y autentica la descarga de adjuntos |
 | `Twilio:PublicBaseUrl` | `Twilio__PublicBaseUrl` | URL pública de la API tal como está cargada en Twilio (ej. `https://api.fingrow.app`). Solo hace falta detrás de un proxy o un túnel; en local se deja vacía |
+| `Telegram:BotToken` | `Telegram__BotToken` | Token del bot que entrega @BotFather; autentica las respuestas que la API manda por la Bot API |
+| `Telegram:WebhookSecret` | `Telegram__WebhookSecret` | Secreto elegido por nosotros al registrar el webhook (1 a 256 caracteres: letras, números, `_` y `-`); Telegram lo devuelve en cada update y la API rechaza con 403 el que no coincida |
+| `Telegram:TimeoutSeconds` | `Telegram__TimeoutSeconds` | Timeout de las llamadas a la Bot API (default 30) |
 | `Cors:AllowedOrigins` | `Cors__AllowedOrigins__0` | Orígenes habilitados para el frontend |
 
 Los secretos no se commitean. En desarrollo local:
@@ -64,9 +67,11 @@ dotnet user-secrets set "Jwt:SecretKey" "<clave de al menos 32 caracteres>" --pr
 dotnet user-secrets set "AiService:ApiKey" "<secreto compartido con FinGrow-AI>" --project src/FinGrow.Api
 dotnet user-secrets set "Twilio:AccountSid" "<Account SID de Twilio>" --project src/FinGrow.Api
 dotnet user-secrets set "Twilio:AuthToken" "<Auth Token de Twilio>" --project src/FinGrow.Api
+dotnet user-secrets set "Telegram:BotToken" "<token del bot>" --project src/FinGrow.Api
+dotnet user-secrets set "Telegram:WebhookSecret" "<secreto inventado para el webhook>" --project src/FinGrow.Api
 ```
 
-Si `Jwt:SecretKey`, `AiService:ApiKey` o las credenciales de Twilio faltan, la API no arranca y
+Si `Jwt:SecretKey`, `AiService:ApiKey` o las credenciales de Twilio o Telegram faltan, la API no arranca y
 el log dice cuál es. En
 desarrollo `AiService:ApiKey` puede ser cualquier texto: FinGrow-AI con `API_KEY` vacía no lo
 valida. En producción los dos servicios tienen que compartir el mismo valor.
@@ -91,6 +96,34 @@ Un número tiene que vincularse antes de que sus mensajes cuenten: el empleado l
 código con `POST /api/integrations/whatsapp/link-code`, lo manda por el chat dentro de los 10
 minutos y la API le contesta que quedó vinculado. Desde ahí cada mensaje de ese número se
 resuelve a ese empleado. Un número sin vincular solo recibe las instrucciones para hacerlo.
+
+### Telegram (Bot API)
+
+Los mensajes de Telegram entran por `POST /api/webhooks/telegram`. También es público y rechaza
+con 403 cualquier request cuya cabecera `X-Telegram-Bot-Api-Secret-Token` no coincida con
+`Telegram:WebhookSecret`. A diferencia de Twilio, la respuesta no va en el cuerpo del HTTP: la
+API contesta `200` enseguida y le escribe al chat llamando a `sendMessage` de la Bot API.
+
+Para probar en local:
+
+1. En Telegram, hablale a **@BotFather**, `/newbot`, elegí nombre y usuario (tiene que terminar
+   en `bot`). Copiá el token a `Telegram:BotToken` y el usuario a `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME`
+   del frontend.
+2. Levantá la API y exponela con un túnel HTTPS: `ngrok http 8080` (o el puerto que uses).
+3. Registrá el webhook una sola vez, con el secreto que hayas puesto en `Telegram:WebhookSecret`:
+
+   ```bash
+   curl "https://api.telegram.org/bot<token>/setWebhook"      -d "url=https://<subdominio>.ngrok-free.app/api/webhooks/telegram"      -d "secret_token=<secreto>"      -d "allowed_updates=[\"message\"]"
+   ```
+
+   Cada vez que ngrok cambie de URL hay que repetir este paso. `getWebhookInfo` en la misma
+   URL base muestra el estado y el último error si Telegram no logra entregar.
+
+El flujo de vinculación es el mismo que WhatsApp: el empleado pide un código con
+`POST /api/integrations/telegram/link-code` y se lo manda al bot. El frontend arma el link
+`https://t.me/<bot>?start=<código>`, así que basta tocar "Abrir" y "Iniciar": Telegram manda
+`/start <código>` y el chat queda vinculado. Solo se procesan chats privados; un mensaje en un
+grupo se ignora.
 
 ---
 
@@ -133,19 +166,20 @@ src/
 │   └── Repositories/       Interfaces, no implementaciones
 ├── FinGrow.Application/
 │   ├── Common/             Result, Error y el ValidationBehavior de MediatR
-│   ├── Interfaces/         IUnitOfWork, ICurrentUser, IAiService, IDateTimeProvider
-│   ├── Features/           Un subdirectorio por funcionalidad (Integrations/WhatsApp)
+│   ├── Interfaces/         IUnitOfWork, ICurrentUser, IAiService, IDateTimeProvider, ITwilio*, ITelegram*
+│   ├── Features/           Un subdirectorio por funcionalidad (Integrations/{GenerateLinkCode,GetIntegration,UnlinkIntegration,Linking,WhatsApp,Telegram})
 │   ├── DTOs/
 │   └── Validators/
 ├── FinGrow.Infrastructure/
 │   ├── Persistence/        DbContext, Configurations, Repositories, Migrations
 │   ├── Identity/           Resolución del usuario autenticado
 │   ├── Ai/                 Cliente HTTP hacia FinGrow-AI
-│   ├── Integrations/       Twilio (firma de webhooks y descarga de adjuntos); Telegram y Gmail después
+│   ├── Integrations/       Twilio (firma de webhooks y descarga de adjuntos) y Telegram (secreto del webhook y Bot API); Gmail después
 │   └── Services/
 └── FinGrow.Api/
     ├── Controllers/
     ├── Twilio/             Filtro de firma, parseo del form y respuesta TwiML del webhook
+    ├── Telegram/           Filtro del secreto y parseo del update JSON del webhook
     ├── Middleware/         Manejo global de errores → ProblemDetails
     ├── Extensions/
     └── Program.cs
