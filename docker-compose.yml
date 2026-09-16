@@ -32,6 +32,8 @@ services:
       Twilio__AccountSid: "${TWILIO_ACCOUNT_SID:-}"
       Twilio__AuthToken: "${TWILIO_AUTH_TOKEN:-}"
       Twilio__PublicBaseUrl: "${TWILIO_PUBLIC_BASE_URL:-}"
+      Telegram__BotToken: "${TELEGRAM_BOT_TOKEN:-}"
+      Telegram__WebhookSecret: "${TELEGRAM_WEBHOOK_SECRET:-}"
       Cors__AllowedOrigins__0: "http://localhost:3000"
     ports:
       - "8080:8080"

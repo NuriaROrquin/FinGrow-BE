@@ -49,6 +49,8 @@ public class AiServiceApiKeyTests
                     ["AiService:ApiKey"] = _apiKey,
                     ["Twilio:AccountSid"] = "ACunit-test",
                     ["Twilio:AuthToken"] = "unit-test-twilio-auth-token",
+                    ["Telegram:BotToken"] = "unit-test-telegram-bot-token",
+                    ["Telegram:WebhookSecret"] = "unit-test-telegram-secret",
                 }));
     }
 }

@@ -1,10 +1,8 @@
 namespace FinGrow.Api.UnitTests.Integrations;
 
-using System.Diagnostics.CodeAnalysis;
 using System.Net;
-using System.Security.Cryptography;
-using System.Text;
-using FinGrow.Api.Twilio;
+using System.Net.Http.Json;
+using FinGrow.Api.Telegram;
 using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
@@ -16,115 +14,116 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-public class WhatsAppWebhookTests
+public class TelegramWebhookTests
 {
-    private const string AuthToken = "unit-test-twilio-auth-token";
-    private const string WebhookPath = "/api/webhooks/whatsapp";
-    private const string Phone = "+5491112345678";
+    private const string Secret = "unit-test-telegram-secret";
+    private const string WebhookPath = "/api/webhooks/telegram";
+    private const long ChatId = 123456789;
     private const string Code = "ABCD2345";
 
     [Fact]
-    public void The_signature_validator_reproduces_the_example_from_the_twilio_docs()
-    {
-        var form = new Dictionary<string, string>
-        {
-            ["CallSid"] = "CA1234567890ABCDE",
-            ["Caller"] = "+12349013030",
-            ["Digits"] = "1234",
-            ["From"] = "+12349013030",
-            ["To"] = "+18005551212",
-        };
-        using var factory = new WebhookWebApplicationFactory("12345");
-        var validator = factory.Services.GetRequiredService<ITwilioRequestValidator>();
-
-        validator.IsValid("https://mycompany.com/myapp.php?foo=1&bar=2", form, "0/KCTR6DLpKmkAf8muzZqo1nDgQ=").ShouldBeTrue();
-        validator.IsValid("https://mycompany.com/myapp.php?foo=1&bar=2", form, "0/KCTR6DLpKmkAf8muzZqo1nDgX=").ShouldBeFalse();
-        validator.IsValid("https://mycompany.com/myapp.php?foo=1&bar=2", form, null).ShouldBeFalse();
-    }
-
-    [Fact]
-    public async Task A_request_without_a_valid_signature_is_rejected_and_links_nothing()
+    public async Task A_request_without_the_secret_header_is_rejected_and_links_nothing()
     {
         using var factory = new WebhookWebApplicationFactory();
         var client = factory.CreateClient();
-        factory.LinkCodes.Add(IntegrationLinkCode.Create(factory.Employee.Id, IntegrationProvider.WhatsApp, Code, DateTimeOffset.UtcNow));
-        var form = InboundMessage(Code);
+        factory.LinkCodes.Add(IntegrationLinkCode.Create(factory.Employee.Id, IntegrationProvider.Telegram, Code, DateTimeOffset.UtcNow));
 
-        using var content = new FormUrlEncodedContent(form);
-        content.Headers.Add(ValidateTwilioSignatureAttribute.SignatureHeader, "not-a-signature");
-        var response = await client.PostAsync(new Uri(WebhookPath, UriKind.Relative), content);
+        var response = await client.PostAsJsonAsync(new Uri(WebhookPath, UriKind.Relative), PrivateMessage(Code));
 
         response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
         factory.Integrations.ShouldBeEmpty();
+        factory.Bot.Sent.ShouldBeEmpty();
     }
 
     [Fact]
-    public async Task A_signed_message_with_a_valid_code_links_the_number_and_answers_with_twiml()
+    public async Task A_request_with_a_wrong_secret_is_rejected()
     {
         using var factory = new WebhookWebApplicationFactory();
         var client = factory.CreateClient();
-        factory.LinkCodes.Add(IntegrationLinkCode.Create(factory.Employee.Id, IntegrationProvider.WhatsApp, Code, DateTimeOffset.UtcNow));
-        var form = InboundMessage(Code);
 
-        var response = await PostSignedAsync(client, form);
+        var response = await PostAsync(client, PrivateMessage("hola"), "another-secret");
 
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        response.Content.Headers.ContentType!.MediaType.ShouldBe("application/xml");
-        var body = await response.Content.ReadAsStringAsync();
-        body.ShouldStartWith("<?xml");
-        body.ShouldContain("<Response><Message>Listo, Juan Perez");
-        factory.Integrations.ShouldHaveSingleItem().ExternalAccountId.ShouldBe(Phone);
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
 
     [Fact]
-    public async Task A_signed_message_from_an_unlinked_number_gets_the_linking_instructions()
+    public async Task A_message_with_a_valid_code_links_the_chat_and_replies_through_the_bot()
     {
         using var factory = new WebhookWebApplicationFactory();
         var client = factory.CreateClient();
-        var form = InboundMessage("hola");
-        form["From"] = "whatsapp:+5491100000000";
+        factory.LinkCodes.Add(IntegrationLinkCode.Create(factory.Employee.Id, IntegrationProvider.Telegram, Code, DateTimeOffset.UtcNow));
 
-        var response = await PostSignedAsync(client, form);
+        var response = await PostAsync(client, PrivateMessage("/start " + Code));
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var body = await response.Content.ReadAsStringAsync();
-        body.ShouldContain("todavía no está vinculado");
+        factory.Integrations.ShouldHaveSingleItem().ExternalAccountId.ShouldBe("123456789");
+        var sent = factory.Bot.Sent.ShouldHaveSingleItem();
+        sent.ChatId.ShouldBe(ChatId);
+        sent.Text.ShouldStartWith("Listo, Juan Perez");
     }
 
-    private static Dictionary<string, string> InboundMessage(string body) => new(StringComparer.Ordinal)
+    [Fact]
+    public async Task A_message_from_an_unlinked_chat_gets_the_linking_instructions()
     {
-        ["MessageSid"] = "SM0123456789abcdef",
-        ["AccountSid"] = "ACunit-test",
-        ["From"] = "whatsapp:" + Phone,
-        ["To"] = "whatsapp:+14155238886",
-        ["Body"] = body,
-        ["NumMedia"] = "0",
+        using var factory = new WebhookWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var response = await PostAsync(client, PrivateMessage("hola"));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        factory.Bot.Sent.ShouldHaveSingleItem().Text.ShouldContain("todavía no está vinculado");
+    }
+
+    [Fact]
+    public async Task Updates_that_are_not_private_text_messages_are_acknowledged_and_ignored()
+    {
+        using var factory = new WebhookWebApplicationFactory();
+        var client = factory.CreateClient();
+        factory.LinkCodes.Add(IntegrationLinkCode.Create(factory.Employee.Id, IntegrationProvider.Telegram, Code, DateTimeOffset.UtcNow));
+
+        var groupMessage = await PostAsync(client, new
+        {
+            update_id = 1,
+            message = new { message_id = 7, chat = new { id = -100200300, type = "group" }, text = Code },
+        });
+        var photo = await PostAsync(client, new
+        {
+            update_id = 2,
+            message = new { message_id = 8, chat = new { id = ChatId, type = "private" } },
+        });
+        var edited = await PostAsync(client, new { update_id = 3, edited_message = new { message_id = 9 } });
+
+        groupMessage.StatusCode.ShouldBe(HttpStatusCode.OK);
+        photo.StatusCode.ShouldBe(HttpStatusCode.OK);
+        edited.StatusCode.ShouldBe(HttpStatusCode.OK);
+        factory.Integrations.ShouldBeEmpty();
+        factory.Bot.Sent.ShouldBeEmpty();
+    }
+
+    private static object PrivateMessage(string text) => new
+    {
+        update_id = 100,
+        message = new
+        {
+            message_id = 7,
+            chat = new { id = ChatId, type = "private" },
+            text,
+        },
     };
 
-    private static async Task<HttpResponseMessage> PostSignedAsync(HttpClient client, Dictionary<string, string> form)
+    private static async Task<HttpResponseMessage> PostAsync(HttpClient client, object update, string secret = Secret)
     {
-        var url = new Uri(client.BaseAddress!, WebhookPath).ToString();
-        using var content = new FormUrlEncodedContent(form);
-        content.Headers.Add(ValidateTwilioSignatureAttribute.SignatureHeader, Sign(url, form));
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(WebhookPath, UriKind.Relative))
+        {
+            Content = JsonContent.Create(update),
+        };
+        request.Headers.Add(ValidateTelegramSecretAttribute.SecretHeader, secret);
 
-        return await client.PostAsync(new Uri(WebhookPath, UriKind.Relative), content);
-    }
-
-    [SuppressMessage("Security", "CA5350:Do Not Use Weak Cryptographic Algorithms", Justification = "Es el algoritmo de Twilio.")]
-    private static string Sign(string url, Dictionary<string, string> form)
-    {
-        var payload = url + string.Concat(form.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => pair.Key + pair.Value));
-        var hash = HMACSHA1.HashData(Encoding.UTF8.GetBytes(AuthToken), Encoding.UTF8.GetBytes(payload));
-
-        return Convert.ToBase64String(hash);
+        return await client.SendAsync(request);
     }
 
     private sealed class WebhookWebApplicationFactory : WebApplicationFactory<Program>
     {
-        private readonly string _authToken;
-
-        public WebhookWebApplicationFactory(string authToken = AuthToken) => _authToken = authToken;
-
         public Employee Employee { get; } = Employee.Create(
             Guid.CreateVersion7(),
             departmentId: null,
@@ -140,6 +139,8 @@ public class WhatsAppWebhookTests
 
         public List<IntegrationLinkCode> LinkCodes { get; } = new();
 
+        public RecordingTelegramBotClient Bot { get; } = new();
+
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.ConfigureAppConfiguration((_, configuration) =>
@@ -149,9 +150,9 @@ public class WhatsAppWebhookTests
                     ["Jwt:SecretKey"] = "unit-test-secret-key-at-least-32-characters-long",
                     ["AiService:ApiKey"] = "unit-test-ai-api-key",
                     ["Twilio:AccountSid"] = "ACunit-test",
-                    ["Twilio:AuthToken"] = _authToken,
+                    ["Twilio:AuthToken"] = "unit-test-twilio-auth-token",
                     ["Telegram:BotToken"] = "unit-test-telegram-bot-token",
-                    ["Telegram:WebhookSecret"] = "unit-test-telegram-secret",
+                    ["Telegram:WebhookSecret"] = Secret,
                 }));
 
             builder.ConfigureTestServices(services =>
@@ -160,7 +161,19 @@ public class WhatsAppWebhookTests
                 services.AddScoped<IEmployeeIntegrationRepository>(_ => new InMemoryEmployeeIntegrationRepository(Integrations));
                 services.AddScoped<IIntegrationLinkCodeRepository>(_ => new InMemoryIntegrationLinkCodeRepository(LinkCodes));
                 services.AddScoped<IUnitOfWork, NoOpUnitOfWork>();
+                services.AddSingleton<ITelegramBotClient>(Bot);
             });
+        }
+    }
+
+    private sealed class RecordingTelegramBotClient : ITelegramBotClient
+    {
+        public List<(long ChatId, string Text)> Sent { get; } = new();
+
+        public Task SendMessageAsync(long chatId, string text, CancellationToken cancellationToken = default)
+        {
+            Sent.Add((chatId, text));
+            return Task.CompletedTask;
         }
     }
 

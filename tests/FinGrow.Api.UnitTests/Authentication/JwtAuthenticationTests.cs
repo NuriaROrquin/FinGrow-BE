@@ -127,6 +127,8 @@ public class JwtAuthenticationTests : IClassFixture<JwtAuthenticationTests.Secur
                     ["AiService:ApiKey"] = "unit-test-ai-api-key",
                     ["Twilio:AccountSid"] = "ACunit-test",
                     ["Twilio:AuthToken"] = "unit-test-twilio-auth-token",
+                    ["Telegram:BotToken"] = "unit-test-telegram-bot-token",
+                    ["Telegram:WebhookSecret"] = "unit-test-telegram-secret",
                 }));
 
             builder.ConfigureTestServices(services =>

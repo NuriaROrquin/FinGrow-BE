@@ -6,10 +6,10 @@ public sealed class ReceiveWhatsAppMessageValidator : AbstractValidator<ReceiveW
 {
     public ReceiveWhatsAppMessageValidator()
     {
-        RuleFor(command => command.From)
+        RuleFor(command => command.PhoneNumber)
             .NotEmpty()
-            .Must(WhatsAppAddress.IsValid)
-            .WithMessage("El remitente tiene que venir como 'whatsapp:+<numero en E.164>'.");
+            .Matches(@"^\+[1-9][0-9]{6,14}$")
+            .WithMessage("El remitente tiene que ser un numero en formato E.164 (+<codigo de pais><numero>).");
 
         RuleFor(command => command.MessageSid).NotEmpty();
         RuleFor(command => command.Media).NotNull();

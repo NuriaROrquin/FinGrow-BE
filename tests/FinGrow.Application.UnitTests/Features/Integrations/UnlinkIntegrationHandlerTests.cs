@@ -1,13 +1,13 @@
-namespace FinGrow.Application.UnitTests.Features.Integrations.WhatsApp;
+namespace FinGrow.Application.UnitTests.Features.Integrations;
 
 using FinGrow.Application.Common;
-using FinGrow.Application.Features.Integrations.WhatsApp.UnlinkWhatsApp;
+using FinGrow.Application.Features.Integrations.UnlinkIntegration;
 using FinGrow.Application.UnitTests.Fakes;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
 using Microsoft.Extensions.Logging.Abstractions;
 
-public class UnlinkWhatsAppHandlerTests
+public class UnlinkIntegrationHandlerTests
 {
     private static readonly DateTimeOffset Now = new(2026, 3, 15, 10, 0, 0, TimeSpan.Zero);
 
@@ -23,11 +23,25 @@ public class UnlinkWhatsAppHandlerTests
         _integrations.Integrations.Add(
             EmployeeIntegration.Create(_employeeId, IntegrationProvider.WhatsApp, "+5491161972627", Now));
 
-        var result = await Handle();
+        var result = await Handle(IntegrationProvider.WhatsApp);
 
         result.IsSuccess.ShouldBeTrue();
         _integrations.Integrations.ShouldBeEmpty();
         _unitOfWork.SaveCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Unlinking_one_provider_keeps_the_others()
+    {
+        _currentUser.UserId = _employeeId;
+        var telegram = EmployeeIntegration.Create(_employeeId, IntegrationProvider.Telegram, "123456789", Now);
+        _integrations.Integrations.Add(telegram);
+        _integrations.Integrations.Add(
+            EmployeeIntegration.Create(_employeeId, IntegrationProvider.WhatsApp, "+5491161972627", Now));
+
+        await Handle(IntegrationProvider.WhatsApp);
+
+        _integrations.Integrations.ShouldHaveSingleItem().ShouldBe(telegram);
     }
 
     [Fact]
@@ -39,7 +53,7 @@ public class UnlinkWhatsAppHandlerTests
         _integrations.Integrations.Add(
             EmployeeIntegration.Create(_employeeId, IntegrationProvider.WhatsApp, "+5491161972627", Now));
 
-        await Handle();
+        await Handle(IntegrationProvider.WhatsApp);
 
         _integrations.Integrations.ShouldHaveSingleItem().ShouldBe(other);
     }
@@ -49,7 +63,7 @@ public class UnlinkWhatsAppHandlerTests
     {
         _currentUser.UserId = _employeeId;
 
-        var result = await Handle();
+        var result = await Handle(IntegrationProvider.Telegram);
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Type.ShouldBe(ErrorType.NotFound);
@@ -62,13 +76,14 @@ public class UnlinkWhatsAppHandlerTests
         _integrations.Integrations.Add(
             EmployeeIntegration.Create(_employeeId, IntegrationProvider.WhatsApp, "+5491161972627", Now));
 
-        var result = await Handle();
+        var result = await Handle(IntegrationProvider.WhatsApp);
 
         result.Error.Type.ShouldBe(ErrorType.Forbidden);
         _integrations.Integrations.ShouldHaveSingleItem();
     }
 
-    private Task<Result> Handle() =>
-        new UnlinkWhatsAppHandler(_currentUser, _integrations, _unitOfWork, NullLogger<UnlinkWhatsAppHandler>.Instance)
-            .Handle(new UnlinkWhatsAppCommand(), CancellationToken.None);
+    private Task<Result> Handle(IntegrationProvider provider) =>
+        new UnlinkIntegrationHandler(
+                _currentUser, _integrations, _unitOfWork, NullLogger<UnlinkIntegrationHandler>.Instance)
+            .Handle(new UnlinkIntegrationCommand(provider), CancellationToken.None);
 }
