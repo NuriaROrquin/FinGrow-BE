@@ -28,4 +28,6 @@ internal sealed class EmployeeIntegrationRepository : IEmployeeIntegrationReposi
             cancellationToken);
 
     public void Add(EmployeeIntegration integration) => _dbContext.EmployeeIntegrations.Add(integration);
+
+    public void Remove(EmployeeIntegration integration) => _dbContext.EmployeeIntegrations.Remove(integration);
 }

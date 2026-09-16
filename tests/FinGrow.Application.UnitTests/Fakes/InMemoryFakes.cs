@@ -37,6 +37,8 @@ public sealed class FakeEmployeeIntegrationRepository : IEmployeeIntegrationRepo
             integration.EmployeeId == employeeId && integration.Provider == provider));
 
     public void Add(EmployeeIntegration integration) => Integrations.Add(integration);
+
+    public void Remove(EmployeeIntegration integration) => Integrations.Remove(integration);
 }
 
 public sealed class FakeIntegrationLinkCodeRepository : IIntegrationLinkCodeRepository

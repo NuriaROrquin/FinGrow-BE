@@ -16,4 +16,6 @@ public interface IEmployeeIntegrationRepository
         CancellationToken cancellationToken = default);
 
     void Add(EmployeeIntegration integration);
+
+    void Remove(EmployeeIntegration integration);
 }
