@@ -312,6 +312,10 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("external_account_id");
 
+                    b.Property<DateTimeOffset?>("LastSyncedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_synced_at");
+
                     b.Property<DateTimeOffset>("LinkedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("linked_at");
@@ -687,7 +691,7 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                             b1.HasKey("BudgetCategoryLimitId")
                                 .HasName("pk_budget_category_limits");
 
-                            b1.ToTable("budget_category_limits", (string)null);
+                            b1.ToTable("budget_category_limits");
 
                             b1.WithOwner()
                                 .HasForeignKey("BudgetCategoryLimitId")
@@ -736,6 +740,39 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_employee_integrations_employees_employee_id");
+
+                    b.OwnsOne("FinGrow.Domain.ValueObjects.OAuthGrant", "Grant", b1 =>
+                        {
+                            b1.Property<Guid>("EmployeeIntegrationId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("AccessToken")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasColumnName("oauth_access_token")
+                                .HasAnnotation("FinGrow:Encrypted", true);
+
+                            b1.Property<DateTimeOffset>("ExpiresAt")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("oauth_expires_at");
+
+                            b1.Property<string>("RefreshToken")
+                                .HasColumnType("text")
+                                .HasColumnName("oauth_refresh_token")
+                                .HasAnnotation("FinGrow:Encrypted", true);
+
+                            b1.HasKey("EmployeeIntegrationId")
+                                .HasName("pk_employee_integrations");
+
+                            b1.ToTable("employee_integrations");
+
+                            b1.WithOwner()
+                                .HasForeignKey("EmployeeIntegrationId")
+                                .HasConstraintName("fk_employee_integrations_employee_integrations_id");
+                        });
+
+                    b.Navigation("Grant");
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.Goal", b =>
@@ -767,7 +804,7 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                             b1.HasKey("GoalId")
                                 .HasName("pk_goals");
 
-                            b1.ToTable("goals", (string)null);
+                            b1.ToTable("goals");
 
                             b1.WithOwner()
                                 .HasForeignKey("GoalId")
@@ -809,7 +846,7 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                             b1.HasKey("GoalContributionId")
                                 .HasName("pk_goal_contributions");
 
-                            b1.ToTable("goal_contributions", (string)null);
+                            b1.ToTable("goal_contributions");
 
                             b1.WithOwner()
                                 .HasForeignKey("GoalContributionId")
@@ -859,7 +896,7 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                             b1.HasKey("InvestmentId")
                                 .HasName("pk_investments");
 
-                            b1.ToTable("investments", (string)null);
+                            b1.ToTable("investments");
 
                             b1.WithOwner()
                                 .HasForeignKey("InvestmentId")
@@ -901,7 +938,7 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                             b1.HasKey("InvestmentValuationId")
                                 .HasName("pk_investment_valuations");
 
-                            b1.ToTable("investment_valuations", (string)null);
+                            b1.ToTable("investment_valuations");
 
                             b1.WithOwner()
                                 .HasForeignKey("InvestmentValuationId")
@@ -941,7 +978,7 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                             b1.HasKey("TransactionId")
                                 .HasName("pk_transactions");
 
-                            b1.ToTable("transactions", (string)null);
+                            b1.ToTable("transactions");
 
                             b1.WithOwner()
                                 .HasForeignKey("TransactionId")

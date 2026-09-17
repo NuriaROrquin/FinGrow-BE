@@ -4,7 +4,7 @@ using FinGrow.Application.Common;
 using MediatR;
 
 public sealed record ReceiveWhatsAppMessageCommand(
-    string From,
+    string PhoneNumber,
     string Body,
     string MessageSid,
     IReadOnlyList<WhatsAppInboundMedia> Media) : IRequest<Result<WhatsAppReply>>;

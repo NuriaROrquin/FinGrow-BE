@@ -61,13 +61,13 @@ internal sealed class LoginEmployeeCommandHandler : IRequestHandler<LoginEmploye
         employee.RegisterLogin(_dateTimeProvider.UtcNow);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var token = _tokenService.GenerateToken(employee.Id, employee.CompanyId, EmployeeRole, employee.FullName);
+        var token = _tokenService.GenerateToken(employee.Id, employee.CompanyId, Rol.Empleado, employee.FullName);
 
         return Result.Success(new LoginResponse(
             employee.Id,
             employee.CompanyId,
             employee.FullName,
-            EmployeeRole,
+            Rol.Empleado,
             token.Value,
             token.ExpiresAt));
     }

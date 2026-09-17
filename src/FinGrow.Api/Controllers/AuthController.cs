@@ -1,11 +1,10 @@
-﻿using FinGrow.Api.Authentication;
-using FinGrow.Api.Contracts;
-
-namespace FinGrow.Api.Controllers;
+﻿namespace FinGrow.Api.Controllers;
 
 using FinGrow.Api.Authentication;
 using FinGrow.Api.Contracts;
 using FinGrow.Api.Extensions;
+using FinGrow.Application.Common;
+using FinGrow.Application.DTOs;
 using FinGrow.Application.Features.Login;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -15,10 +14,15 @@ using Microsoft.AspNetCore.Mvc;
 public sealed class AuthController(IMediator mediator) : ControllerBase
 {
     [HttpPost("empleado")]
-    public async Task<IActionResult> LoginEmpleado(LoginEmployeeCommand command, CancellationToken cancellationToken)
-    {
-        var result = await mediator.Send(command, cancellationToken);
+    public async Task<IActionResult> LoginEmpleado(LoginEmployeeCommand command, CancellationToken cancellationToken) =>
+        StartSession(await mediator.Send(command, cancellationToken));
 
+    [HttpPost("empresa")]
+    public async Task<IActionResult> LoginEmpresa(LoginCompanyCommand command, CancellationToken cancellationToken) =>
+        StartSession(await mediator.Send(command, cancellationToken));
+
+    private IActionResult StartSession(Result<LoginResponse> result)
+    {
         if (result.IsFailure)
         {
             return result.ToActionResult();

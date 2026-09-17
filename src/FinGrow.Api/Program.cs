@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using FinGrow.Api.Authentication;
 using FinGrow.Api.Extensions;
+using FinGrow.Api.MercadoPago;
 using FinGrow.Application;
 using FinGrow.Infrastructure;
 using FinGrow.Infrastructure.Persistence;
@@ -14,6 +15,10 @@ builder.Host.UseSerilog((context, configuration) =>
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddSessionCookieAuthentication();
+builder.Services.AddOptions<MercadoPagoReturnOptions>()
+    .Bind(builder.Configuration.GetSection(MercadoPagoReturnOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 
 builder.Services.AddControllers()
     .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));

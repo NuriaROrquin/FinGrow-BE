@@ -1,6 +1,7 @@
 namespace FinGrow.Application.Features.Integrations.WhatsApp.ReceiveWhatsAppMessage;
 
 using FinGrow.Application.Common;
+using FinGrow.Application.Features.Integrations.Linking;
 using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
@@ -24,28 +25,19 @@ internal sealed partial class ReceiveWhatsAppMessageHandler
         "Recibido. Todavía no registro movimientos por WhatsApp, pero tu número ya está vinculado.";
 
     private readonly IEmployeeIntegrationRepository _integrations;
-    private readonly IIntegrationLinkCodeRepository _linkCodes;
-    private readonly IEmployeeRepository _employees;
+    private readonly LinkCodeRedeemer _linker;
     private readonly ITwilioMediaClient _media;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly IDateTimeProvider _clock;
     private readonly ILogger<ReceiveWhatsAppMessageHandler> _logger;
 
     public ReceiveWhatsAppMessageHandler(
         IEmployeeIntegrationRepository integrations,
-        IIntegrationLinkCodeRepository linkCodes,
-        IEmployeeRepository employees,
+        LinkCodeRedeemer linker,
         ITwilioMediaClient media,
-        IUnitOfWork unitOfWork,
-        IDateTimeProvider clock,
         ILogger<ReceiveWhatsAppMessageHandler> logger)
     {
         _integrations = integrations;
-        _linkCodes = linkCodes;
-        _employees = employees;
+        _linker = linker;
         _media = media;
-        _unitOfWork = unitOfWork;
-        _clock = clock;
         _logger = logger;
     }
 
@@ -53,12 +45,11 @@ internal sealed partial class ReceiveWhatsAppMessageHandler
         ReceiveWhatsAppMessageCommand request,
         CancellationToken cancellationToken)
     {
-        var phoneNumber = WhatsAppAddress.ToPhoneNumber(request.From);
         var integration = await _integrations.FindByExternalAccountAsync(
-            IntegrationProvider.WhatsApp, phoneNumber, cancellationToken);
+            IntegrationProvider.WhatsApp, request.PhoneNumber, cancellationToken);
 
         var reply = integration is null
-            ? await TryLinkAsync(phoneNumber, request.Body, cancellationToken)
+            ? await TryLinkAsync(request.PhoneNumber, request.Body, cancellationToken)
             : await HandleLinkedMessageAsync(integration, request, cancellationToken);
 
         return Result.Success(reply);
@@ -66,48 +57,14 @@ internal sealed partial class ReceiveWhatsAppMessageHandler
 
     private async Task<WhatsAppReply> TryLinkAsync(string phoneNumber, string body, CancellationToken cancellationToken)
     {
-        var code = IntegrationLinkCode.Normalize(body);
+        var attempt = await _linker.TryLinkAsync(IntegrationProvider.WhatsApp, phoneNumber, body, cancellationToken);
 
-        if (code.Length != IntegrationLinkCode.Length)
+        return attempt.Outcome switch
         {
-            return new WhatsAppReply(NotLinkedReply);
-        }
-
-        var now = _clock.UtcNow;
-        var linkCode = await _linkCodes.FindByHashAsync(
-            IntegrationProvider.WhatsApp, IntegrationLinkCode.Hash(code), cancellationToken);
-
-        if (linkCode is null || !linkCode.IsUsable(now))
-        {
-            return new WhatsAppReply(InvalidCodeReply);
-        }
-
-        var employee = await _employees.GetByIdAsync(linkCode.EmployeeId, cancellationToken);
-
-        if (employee is null || !employee.IsActive)
-        {
-            return new WhatsAppReply(InvalidCodeReply);
-        }
-
-        linkCode.Redeem(now);
-
-        var existing = await _integrations.FindByEmployeeAsync(
-            employee.Id, IntegrationProvider.WhatsApp, cancellationToken);
-
-        if (existing is null)
-        {
-            _integrations.Add(EmployeeIntegration.Create(employee.Id, IntegrationProvider.WhatsApp, phoneNumber, now));
-        }
-        else
-        {
-            existing.Relink(phoneNumber, now);
-        }
-
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-        LogLinked(_logger, employee.Id);
-
-        return new WhatsAppReply($"Listo, {employee.FullName}{LinkedReplySuffix}");
+            LinkOutcome.NotACode => new WhatsAppReply(NotLinkedReply),
+            LinkOutcome.InvalidCode => new WhatsAppReply(InvalidCodeReply),
+            _ => new WhatsAppReply($"Listo, {attempt.Employee!.FullName}{LinkedReplySuffix}")
+        };
     }
 
     private async Task<WhatsAppReply> HandleLinkedMessageAsync(
@@ -126,9 +83,6 @@ internal sealed partial class ReceiveWhatsAppMessageHandler
 
         return new WhatsAppReply(MessageReceivedReply);
     }
-
-    [LoggerMessage(Level = LogLevel.Information, Message = "WhatsApp vinculado al empleado {EmployeeId}.")]
-    private static partial void LogLinked(ILogger logger, Guid employeeId);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Adjunto de WhatsApp del empleado {EmployeeId}: {ContentType}, {Bytes} bytes (mensaje {MessageSid}).")]
     private static partial void LogAttachment(ILogger logger, Guid employeeId, string contentType, int bytes, string messageSid);

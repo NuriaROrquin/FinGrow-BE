@@ -1,6 +1,7 @@
 namespace FinGrow.Infrastructure.Persistence.Configurations;
 
 using FinGrow.Domain.Entities;
+using FinGrow.Infrastructure.Persistence.Protection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -22,6 +23,24 @@ internal sealed class EmployeeIntegrationConfiguration : IEntityTypeConfiguratio
             .IsRequired();
 
         builder.Property(integration => integration.LinkedAt).IsRequired();
+
+        builder.OwnsOne(integration => integration.Grant, grant =>
+        {
+            grant.Property(value => value.AccessToken)
+                .HasColumnName("oauth_access_token")
+                .HasAnnotation(EncryptedStringConverter.Annotation, true)
+                .IsRequired();
+
+            grant.Property(value => value.RefreshToken)
+                .HasColumnName("oauth_refresh_token")
+                .HasAnnotation(EncryptedStringConverter.Annotation, true);
+
+            grant.Property(value => value.ExpiresAt)
+                .HasColumnName("oauth_expires_at")
+                .IsRequired();
+        });
+
+        builder.Property(integration => integration.LastSyncedAt);
         builder.Property(integration => integration.CreatedAt).IsRequired();
         builder.Property(integration => integration.UpdatedAt).IsRequired();
 

@@ -98,14 +98,25 @@ dependencias sin tocar `Program.cs` ni `AddApplication()`.
 
 El primer feature real es `Application/Features/Integrations/WhatsApp` (T-25): sirve de
 referencia de cómo queda un caso de uso completo, con repositorios en `Domain/Repositories`
-implementados en `Infrastructure/Persistence/Repositories`. `tests/FinGrow.Application.UnitTests`
+implementados en `Infrastructure/Persistence/Repositories`. Lo que comparten los canales de
+chat vive fuera de la carpeta del proveedor: `Integrations/GenerateLinkCode`, `GetIntegration`
+y `UnlinkIntegration` reciben el `IntegrationProvider` como parámetro (la ruta es
+`api/integrations/{provider}`), y `Integrations/Linking/LinkCodeRedeemer` canjea el código
+para cualquiera de los dos webhooks. Un handler nuevo por proveedor solo debería contener lo
+que es distinto de ese proveedor. `tests/FinGrow.Application.UnitTests`
 prueba los handlers con fakes en memoria (`Fakes/InMemoryFakes.cs`) y `tests/FinGrow.Api.UnitTests`
 el borde HTTP reemplazando los repositorios en `ConfigureTestServices`.
 
-**El webhook de WhatsApp es público y se protege con la firma de Twilio**, no con JWT.
-`ValidateTwilioSignatureAttribute` (`Api/Twilio/`) corta antes del handler; el controller no
-tiene lógica: parsear el form es `TwilioInboundMessage` y responder es `TwiMlResult`. Un número
-que no está en `employee_integrations` solo puede mandar su código de vinculación.
+**Los webhooks son públicos y se protegen con el secreto de cada proveedor**, no con JWT.
+`ValidateTwilioSignatureAttribute` (`Api/Twilio/`) y `ValidateTelegramSecretAttribute`
+(`Api/Telegram/`) cortan antes del handler; los controllers no tienen lógica: parsear la
+entrada es `TwilioInboundMessage` / `TelegramInboundMessage` y el formato de transporte
+(`whatsapp:+549…`, el JSON del update) se queda en `Api`, Application recibe datos limpios.
+WhatsApp responde inline con `TwiMlResult`; Telegram responde `200` y manda el texto por
+`ITelegramBotClient`, y si esa llamada falla el handler lo loguea sin fallar el request, porque
+Telegram reintenta cualquier respuesta que no sea 2xx y un código ya canjeado se rechazaría en
+el reintento. Una cuenta que no está en `employee_integrations` solo puede mandar su código de
+vinculación.
 
 ## Convenciones
 
