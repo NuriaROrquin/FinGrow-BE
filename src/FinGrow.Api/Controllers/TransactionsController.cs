@@ -2,10 +2,10 @@ namespace FinGrow.Api.Controllers;
 
 using FinGrow.Api.Extensions;
 using FinGrow.Application.Features.Transactions.CreateTransaction;
-using FinGrow.Application.Features.Transactions.GetTransactionById;
-using FinGrow.Application.Features.Transactions.ListTransactions;
-using FinGrow.Application.Interfaces;
 using FinGrow.Application.Features.Transactions.GetHistory;
+using FinGrow.Application.Features.Transactions.GetTransactionById;
+using FinGrow.Application.Features.Transactions.GetTransactionSummary;
+using FinGrow.Application.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -23,28 +23,22 @@ public sealed class TransactionsController(ISender sender, ICurrentUser currentU
         return (await sender.Send(command, cancellationToken)).ToActionResult();
     }
 
-    [HttpGet]
-    public async Task<IActionResult> List(CancellationToken cancellationToken) =>
-        (await sender.Send(new ListTransactionsCommand(currentUser.UserId!.Value), cancellationToken)).ToActionResult();
-
-    [HttpGet("{id:guid}")]
-    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken) =>
-        (await sender.Send(new GetTransactionByIdCommand(id), cancellationToken)).ToActionResult();
+    [HttpGet("summary")]
+    public async Task<IActionResult> GetSummary(CancellationToken cancellationToken) =>
+        (await sender.Send(new GetTransactionSummaryQuery(), cancellationToken)).ToActionResult();
 
     [HttpGet]
-    [Authorize]
-    public async Task<IActionResult> GetHistory(
-        [FromServices] ISender sender,
+    public async Task<IActionResult> GetTransactions(
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 20,
         [FromQuery] string? search = null,
         [FromQuery] string? type = null,
-        CancellationToken cancellationToken = default)
-    {
-        var result = await sender.Send(
+        CancellationToken cancellationToken = default) =>
+        (await sender.Send(
             new GetTransactionHistoryQuery(pageNumber, pageSize, search, type),
-            cancellationToken);
+            cancellationToken)).ToActionResult();
 
-        return result.ToActionResult();
-    }
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken) =>
+        (await sender.Send(new GetTransactionByIdCommand(id), cancellationToken)).ToActionResult();
 }

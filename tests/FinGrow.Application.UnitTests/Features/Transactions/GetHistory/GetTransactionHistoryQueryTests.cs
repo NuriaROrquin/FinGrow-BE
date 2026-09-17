@@ -2,6 +2,7 @@ namespace FinGrow.Application.UnitTests.Features.Transactions.GetHistory;
 
 using FinGrow.Application.Common;
 using FinGrow.Application.Features.Transactions.GetHistory;
+using FinGrow.Application.Features.Transactions.GetTransactionSummary;
 using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
@@ -52,6 +53,40 @@ public sealed class GetTransactionHistoryQueryTests
     }
 
     [Fact]
+    public async Task Handler_orders_items_from_newest_to_oldest_date()
+    {
+        var older = Transaction.RegisterExpense(
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            Money.From(100m, Currency.ARS),
+            ExpenseCategory.Alimentos,
+            "Viejo",
+            new DateOnly(2025, 1, 10),
+            PaymentMethod.CreditCard,
+            TransactionSource.MercadoPago,
+            TransactionStatus.Confirmed,
+            new DateTimeOffset(2025, 1, 10, 12, 0, 0, TimeSpan.Zero));
+
+        var newer = Transaction.RegisterExpense(
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            Money.From(200m, Currency.ARS),
+            ExpenseCategory.Alimentos,
+            "Nuevo",
+            new DateOnly(2026, 9, 12),
+            PaymentMethod.CreditCard,
+            TransactionSource.MercadoPago,
+            TransactionStatus.Confirmed,
+            new DateTimeOffset(2026, 9, 12, 12, 0, 0, TimeSpan.Zero));
+
+        var repository = new FakeTransactionReadRepository(new[] { older, newer });
+        var handler = CreateHandler(repository, older.EmployeeId);
+
+        var result = await handler.Handle(new GetTransactionHistoryQuery(), CancellationToken.None);
+
+        result.Value.Items.Select(item => item.OccurredOn)
+            .ShouldBe(new[] { newer.OccurredOn, older.OccurredOn });
+    }
+
+    [Fact]
     public async Task Handler_returns_forbidden_without_an_authenticated_user_id()
     {
         var repository = new FakeTransactionReadRepository();
@@ -75,6 +110,12 @@ public sealed class GetTransactionHistoryQueryTests
 
         public Guid? CompanyId => null;
 
+        public string? FullName => "Fake User";
+
+        public string? Role => "Employee";
+
+        public DateTimeOffset? ExpiresAt => DateTimeOffset.UtcNow.AddHours(1);
+
         public bool IsAuthenticated => UserId.HasValue;
     }
 
@@ -88,6 +129,18 @@ public sealed class GetTransactionHistoryQueryTests
         public Guid? RequestedEmployeeId { get; private set; }
 
         public bool WasCalled { get; private set; }
+
+        public Task<TransactionSummary> GetSummaryAsync(
+            Guid employeeId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new TransactionSummary(
+                _transactions.Count,
+                0,
+                0,
+                0m,
+                0m,
+                0m,
+                0m));
 
         public Task<TransactionPage> GetPageAsync(
             Guid employeeId,
@@ -104,10 +157,67 @@ public sealed class GetTransactionHistoryQueryTests
                 _transactions,
                 pageNumber,
                 pageSize,
-                _transactions.Count,
-                new Dictionary<string, decimal>(),
-                new Dictionary<string, decimal>()));
+                _transactions.Count));
         }
+    }
+}
+
+public sealed class GetTransactionSummaryQueryTests
+{
+    [Fact]
+    public async Task Handler_returns_summary_totals_for_all_income_and_expense_records()
+    {
+        var employeeId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var repository = new FakeTransactionReadRepository();
+        var handler = new GetTransactionSummaryQueryHandler(repository, new FakeCurrentUser(employeeId));
+
+        var result = await handler.Handle(new GetTransactionSummaryQuery(), CancellationToken.None);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.TotalIncomeArs.ShouldBe(1200m);
+        result.Value.TotalIncomeUsd.ShouldBe(250m);
+        result.Value.TotalIncomeTransactions.ShouldBe(2);
+        result.Value.TotalExpenseArs.ShouldBe(850m);
+        result.Value.TotalExpenseUsd.ShouldBe(320m);
+        result.Value.TotalExpenseTransactions.ShouldBe(3);
+        result.Value.TotalTransactions.ShouldBe(5);
+    }
+
+    private sealed class FakeCurrentUser(Guid? userId) : ICurrentUser
+    {
+        public Guid? UserId { get; } = userId;
+
+        public Guid? CompanyId => null;
+
+        public string? FullName => "Fake User";
+
+        public string? Role => "Employee";
+
+        public DateTimeOffset? ExpiresAt => DateTimeOffset.UtcNow.AddHours(1);
+
+        public bool IsAuthenticated => UserId.HasValue;
+    }
+
+    private sealed class FakeTransactionReadRepository : ITransactionReadRepository
+    {
+        public Task<TransactionSummary> GetSummaryAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new TransactionSummary(
+                5,
+                3,
+                2,
+                1200m,
+                250m,
+                850m,
+                320m));
+
+        public Task<TransactionPage> GetPageAsync(
+            Guid employeeId,
+            int pageNumber,
+            int pageSize,
+            string? search,
+            TransactionType? type,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new TransactionPage(Array.Empty<Transaction>(), pageNumber, pageSize, 0));
     }
 }
 

@@ -84,10 +84,15 @@ public static class DependencyInjection
 
     private static IServiceCollection AddTwilio(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddOptions<TwilioOptions>()
-            .Bind(configuration.GetSection(TwilioOptions.SectionName))
-            .ValidateDataAnnotations()
-            .ValidateOnStart();
+        var twilioOptions = services.AddOptions<TwilioOptions>()
+            .Bind(configuration.GetSection(TwilioOptions.SectionName));
+
+        if (!configuration.GetValue<bool>("Twilio:SkipValidation"))
+        {
+            twilioOptions
+                .ValidateDataAnnotations()
+                .ValidateOnStart();
+        }
 
         services.AddSingleton<ITwilioRequestValidator, TwilioRequestValidator>();
 

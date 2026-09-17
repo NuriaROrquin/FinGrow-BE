@@ -29,32 +29,21 @@ public sealed record TransactionHistoryResponse(
     int PageNumber,
     int PageSize,
     int TotalCount,
-    int TotalPages,
-    IReadOnlyDictionary<string, decimal> TotalSpent,
-    IReadOnlyDictionary<string, decimal> TotalIncome);
+    int TotalPages);
 
-internal sealed class GetTransactionHistoryQueryHandler
+internal sealed class GetTransactionHistoryQueryHandler(
+    ITransactionReadRepository transactionReadRepository,
+    ICurrentUser currentUser)
     : IRequestHandler<GetTransactionHistoryQuery, Result<TransactionHistoryResponse>>
 {
-    private readonly ITransactionReadRepository _transactionReadRepository;
-    private readonly ICurrentUser _currentUser;
-
-    public GetTransactionHistoryQueryHandler(
-        ITransactionReadRepository transactionReadRepository,
-        ICurrentUser currentUser)
-    {
-        _transactionReadRepository = transactionReadRepository;
-        _currentUser = currentUser;
-    }
-
     public async Task<Result<TransactionHistoryResponse>> Handle(
         GetTransactionHistoryQuery request,
         CancellationToken cancellationToken)
     {
-        if (!_currentUser.UserId.HasValue)
+        if (currentUser.UserId is not { } employeeId)
         {
             return Result.Failure<TransactionHistoryResponse>(
-                Error.Forbidden("Transactions.UserRequired", "No se pudo identificar al usuario autenticado."));
+                Error.Forbidden("Transactions.Unauthenticated", "Hay que iniciar sesion para consultar los movimientos."));
         }
 
         var type = request.Type?.Trim().ToLowerInvariant() switch
@@ -65,8 +54,8 @@ internal sealed class GetTransactionHistoryQueryHandler
             _ => (TransactionType?)null
         };
 
-        var page = await _transactionReadRepository.GetPageAsync(
-            _currentUser.UserId.Value,
+        var page = await transactionReadRepository.GetPageAsync(
+            employeeId,
             request.PageNumber,
             request.PageSize,
             request.Search,
@@ -74,6 +63,8 @@ internal sealed class GetTransactionHistoryQueryHandler
             cancellationToken);
 
         var items = page.Items
+            .OrderByDescending(transaction => transaction.OccurredOn)
+            .ThenByDescending(transaction => transaction.Id)
             .Select(transaction => new TransactionHistoryItem(
                 transaction.Id,
                 transaction.OccurredOn,
@@ -91,9 +82,7 @@ internal sealed class GetTransactionHistoryQueryHandler
             page.PageNumber,
             page.PageSize,
             page.TotalCount,
-            page.TotalPages,
-            page.TotalSpent,
-            page.TotalIncome));
+            page.TotalPages));
     }
 
     private static string GetCategory(Transaction transaction) =>

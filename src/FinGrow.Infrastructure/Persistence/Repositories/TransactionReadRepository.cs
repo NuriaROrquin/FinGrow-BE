@@ -11,6 +11,35 @@ internal sealed class TransactionReadRepository : ITransactionReadRepository
 
     public TransactionReadRepository(FinGrowDbContext dbContext) => _dbContext = dbContext;
 
+    public async Task<TransactionSummary> GetSummaryAsync(Guid employeeId, CancellationToken cancellationToken = default)
+    {
+        var confirmedQuery = _dbContext.Transactions
+            .AsNoTracking()
+            .Where(transaction => transaction.EmployeeId == employeeId)
+            .Where(transaction => transaction.Status == TransactionStatus.Confirmed);
+
+        var totalTransactions = await confirmedQuery.CountAsync(cancellationToken);
+        var totalIncomeTransactions = await confirmedQuery.CountAsync(
+            transaction => transaction.Type == TransactionType.Income, cancellationToken);
+        var totalExpenseTransactions = await confirmedQuery.CountAsync(
+            transaction => transaction.Type == TransactionType.Expense, cancellationToken);
+
+        var totalIncomeArs = await GetTotalAsync(confirmedQuery, TransactionType.Income, Currency.ARS, cancellationToken);
+        var totalIncomeUsd = await GetTotalAsync(confirmedQuery, TransactionType.Income, Currency.USD, cancellationToken);
+        var totalExpenseArs = await GetTotalAsync(confirmedQuery, TransactionType.Expense, Currency.ARS, cancellationToken);
+        var totalExpenseUsd = await GetTotalAsync(confirmedQuery, TransactionType.Expense, Currency.USD, cancellationToken);
+
+        return new TransactionSummary(
+            totalTransactions,
+            totalExpenseTransactions,
+            totalIncomeTransactions,
+            totalIncomeArs,
+            totalIncomeUsd,
+            totalExpenseArs,
+            totalExpenseUsd);
+    }
+    
+
     public async Task<TransactionPage> GetPageAsync(
         Guid employeeId,
         int pageNumber,
@@ -38,14 +67,6 @@ internal sealed class TransactionReadRepository : ITransactionReadRepository
         }
 
         var totalCount = await filteredQuery.CountAsync(cancellationToken);
-        var totalSpent = await GetTotalsByCurrencyAsync(
-            filteredQuery,
-            TransactionType.Expense,
-            cancellationToken);
-        var totalIncome = await GetTotalsByCurrencyAsync(
-            filteredQuery,
-            TransactionType.Income,
-            cancellationToken);
 
         var items = await filteredQuery
             .OrderByDescending(transaction => transaction.OccurredOn)
@@ -54,28 +75,15 @@ internal sealed class TransactionReadRepository : ITransactionReadRepository
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
-        return new TransactionPage(
-            items,
-            pageNumber,
-            pageSize,
-            totalCount,
-            totalSpent,
-            totalIncome);
+        return new TransactionPage(items, pageNumber, pageSize, totalCount);
     }
 
-    private static async Task<IReadOnlyDictionary<string, decimal>> GetTotalsByCurrencyAsync(
+    private static Task<decimal> GetTotalAsync(
         IQueryable<Transaction> query,
         TransactionType type,
+        Currency currency,
         CancellationToken cancellationToken) =>
-        (await query
-            .Where(transaction => transaction.Type == type)
-            .Where(transaction => transaction.Status == TransactionStatus.Confirmed)
-            .GroupBy(transaction => transaction.Amount.Currency)
-            .Select(group => new
-            {
-                Currency = group.Key,
-                Total = group.Sum(transaction => transaction.Amount.Amount)
-            })
-            .ToListAsync(cancellationToken))
-        .ToDictionary(item => item.Currency.ToString(), item => item.Total);
+        query
+            .Where(transaction => transaction.Type == type && transaction.Amount.Currency == currency)
+            .SumAsync(transaction => transaction.Amount.Amount, cancellationToken);
 }

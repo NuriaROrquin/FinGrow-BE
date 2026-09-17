@@ -188,6 +188,8 @@ public class WhatsAppWebhookTests
             Task.FromResult(_integrations.FirstOrDefault(integration => integration.EmployeeId == employeeId && integration.Provider == provider));
 
         public void Add(EmployeeIntegration integration) => _integrations.Add(integration);
+
+        public void Remove(EmployeeIntegration integration) => _integrations.Remove(integration);
     }
 
     private sealed class InMemoryIntegrationLinkCodeRepository : IIntegrationLinkCodeRepository
