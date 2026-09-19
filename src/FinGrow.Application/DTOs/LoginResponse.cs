@@ -6,4 +6,6 @@ public sealed record LoginResponse(
     string FullName,
     string Role,
     string Token,
-    DateTimeOffset ExpiresAt);
+    DateTimeOffset ExpiresAt,
+    string RefreshToken,
+    DateTimeOffset RefreshExpiresAt);

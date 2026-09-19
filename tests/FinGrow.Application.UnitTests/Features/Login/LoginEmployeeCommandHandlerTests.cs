@@ -1,6 +1,7 @@
 ﻿namespace FinGrow.Application.UnitTests.Features.Login;
 
 using FinGrow.Application.Features.Login;
+using FinGrow.Application.Features.Session;
 using FinGrow.Application.UnitTests.Fakes;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
@@ -31,6 +32,9 @@ public class LoginEmployeeCommandHandlerTests
         return employee;
     }
 
+    private static SessionIssuer CreateSessionIssuer() =>
+        new(new FakeTokenService(), new FakeRefreshTokenRepository(), new FakeDateTimeProvider(Now));
+
     [Fact]
     public async Task Valid_credentials_log_the_employee_in_and_return_a_token()
     {
@@ -42,7 +46,7 @@ public class LoginEmployeeCommandHandlerTests
         var handler = new LoginEmployeeCommandHandler(
             employeeRepository,
             new FakePasswordHasher(),
-            new FakeTokenService(),
+            CreateSessionIssuer(),
             unitOfWork,
             new FakeDateTimeProvider(Now));
 
@@ -70,7 +74,7 @@ public class LoginEmployeeCommandHandlerTests
         var handler = new LoginEmployeeCommandHandler(
             employeeRepository,
             new FakePasswordHasher(),
-            new FakeTokenService(),
+            CreateSessionIssuer(),
             new FakeUnitOfWork(),
             new FakeDateTimeProvider(Now));
 
@@ -88,7 +92,7 @@ public class LoginEmployeeCommandHandlerTests
         var handler = new LoginEmployeeCommandHandler(
             new FakeEmployeeRepository(),
             new FakePasswordHasher(),
-            new FakeTokenService(),
+            CreateSessionIssuer(),
             new FakeUnitOfWork(),
             new FakeDateTimeProvider(Now));
 
@@ -110,7 +114,7 @@ public class LoginEmployeeCommandHandlerTests
         var handler = new LoginEmployeeCommandHandler(
             employeeRepository,
             new FakePasswordHasher(),
-            new FakeTokenService(),
+            CreateSessionIssuer(),
             new FakeUnitOfWork(),
             new FakeDateTimeProvider(Now));
 

@@ -238,3 +238,23 @@ public sealed class FakeAiService : IAiService
             .ToList());
     }
 }
+
+public sealed class FakeRefreshTokenRepository : IRefreshTokenRepository
+{
+    public List<RefreshToken> Tokens { get; } = new();
+
+    public Task<RefreshToken?> FindByHashAsync(string tokenHash, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Tokens.FirstOrDefault(token => token.TokenHash == tokenHash));
+
+    public void Add(RefreshToken refreshToken) => Tokens.Add(refreshToken);
+
+    public Task RevokeAllForUserAsync(Guid userId, DateTimeOffset revokedAt, CancellationToken cancellationToken = default)
+    {
+        foreach (var token in Tokens.Where(t => t.UserId == userId && t.RevokedAt is null))
+        {
+            token.Revoke(revokedAt);
+        }
+
+        return Task.CompletedTask;
+    }
+}
