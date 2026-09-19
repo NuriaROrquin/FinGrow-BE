@@ -37,7 +37,9 @@ public sealed class FinGrowDbContext : DbContext, IUnitOfWork
 
     public DbSet<IntegrationLinkCode> IntegrationLinkCodes => Set<IntegrationLinkCode>();
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
+protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
 

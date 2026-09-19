@@ -44,6 +44,7 @@ public static class DependencyInjection
         services.AddScoped<IIntegrationLinkCodeRepository, IntegrationLinkCodeRepository>();
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
+        services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 
         return services;
     }
