@@ -77,6 +77,7 @@ dotnet user-secrets set "Twilio:AccountSid" "<Account SID de Twilio>" --project 
 dotnet user-secrets set "Twilio:AuthToken" "<Auth Token de Twilio>" --project src/FinGrow.Api
 dotnet user-secrets set "Telegram:BotToken" "<token del bot>" --project src/FinGrow.Api
 dotnet user-secrets set "Telegram:WebhookSecret" "<secreto inventado para el webhook>" --project src/FinGrow.Api
+dotnet user-secrets set "TokenEncryption:Key" "$(openssl rand -base64 32)" --project src/FinGrow.Api
 ```
 
 Si `Jwt:SecretKey`, `AiService:ApiKey` o las credenciales de Twilio o Telegram faltan, la API no arranca y

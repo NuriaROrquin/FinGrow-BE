@@ -258,3 +258,10 @@ public sealed class FakeRefreshTokenRepository : IRefreshTokenRepository
         return Task.CompletedTask;
     }
 }
+
+public sealed class FakeGoalRepository : IGoalRepository
+{
+    public List<Goal> Goals { get; } = new();
+
+    public void Add(Goal goal) => Goals.Add(goal);
+}
