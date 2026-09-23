@@ -43,7 +43,7 @@ internal sealed class AddGoalContributionHandler(
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new GoalContributionAddedResponse(
-            GoalResponse.FromEntity(goal),
+            GoalResponse.FromEntity(goal, dateTimeProvider.Today),
             GoalContributionResponse.FromEntity(contribution)));
     }
 }

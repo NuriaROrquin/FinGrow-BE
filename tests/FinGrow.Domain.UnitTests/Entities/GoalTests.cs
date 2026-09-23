@@ -173,6 +173,43 @@ public class GoalTests
         goal.DaysRemaining(new DateOnly(2027, 1, 10)).ShouldBe(-10);
     }
 
+    [Fact]
+    public void A_deadline_of_today_in_argentina_is_accepted_late_at_night()
+    {
+        var lateNightInBuenosAires = new DateTimeOffset(2026, 9, 24, 2, 30, 0, TimeSpan.Zero);
+
+        var goal = Goal.Create(EmployeeId, "Regalo", Money.From(1000m, Currency.ARS), new DateOnly(2026, 9, 23), lateNightInBuenosAires);
+
+        goal.Deadline.ShouldBe(new DateOnly(2026, 9, 23));
+    }
+
+    [Fact]
+    public void An_active_goal_is_overdue_only_after_its_deadline()
+    {
+        var goal = CreateGoal();
+
+        goal.IsOverdue(Deadline).ShouldBeFalse();
+        goal.IsOverdue(Deadline.AddDays(1)).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void An_achieved_goal_is_never_overdue()
+    {
+        var goal = CreateGoal();
+        goal.AddContribution(Money.From(1000000m, Currency.ARS), Today, null, Now);
+
+        goal.IsOverdue(Deadline.AddDays(1)).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void A_cancelled_goal_is_never_overdue()
+    {
+        var goal = CreateGoal();
+        goal.Cancel(Now);
+
+        goal.IsOverdue(Deadline.AddDays(1)).ShouldBeFalse();
+    }
+
     private static Goal CreateGoal() => Goal.Create(
         EmployeeId,
         "Fondo de emergencia",

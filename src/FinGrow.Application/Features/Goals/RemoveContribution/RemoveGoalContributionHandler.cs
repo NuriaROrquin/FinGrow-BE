@@ -34,6 +34,6 @@ internal sealed class RemoveGoalContributionHandler(
         goal.RemoveContribution(request.ContributionId, dateTimeProvider.UtcNow);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(GoalResponse.FromEntity(goal));
+        return Result.Success(GoalResponse.FromEntity(goal, dateTimeProvider.Today));
     }
 }

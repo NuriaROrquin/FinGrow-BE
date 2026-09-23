@@ -75,7 +75,7 @@ public sealed class Goal : AggregateRoot
             throw new DomainException("El monto objetivo tiene que ser mayor a cero.");
         }
 
-        if (deadline < DateOnly.FromDateTime(createdAt.UtcDateTime))
+        if (deadline < ArgentinaTime.DateOf(createdAt))
         {
             throw new DomainException("La fecha limite de una meta no puede estar en el pasado.");
         }
@@ -102,6 +102,12 @@ public sealed class Goal : AggregateRoot
         : TargetAmount.Subtract(CurrentAmount);
 
     public int DaysRemaining(DateOnly today) => Deadline.DayNumber - today.DayNumber;
+
+    /// <summary>
+    /// Vencida es una lectura que depende del dia de hoy, no un <see cref="GoalStatus"/>: guardarla
+    /// obligaria a un proceso que la actualice cada medianoche. Una meta alcanzada o cancelada no vence.
+    /// </summary>
+    public bool IsOverdue(DateOnly today) => Status == GoalStatus.Active && Deadline < today;
 
     /// <summary>Registra un aporte y marca la meta como alcanzada si con eso llega al objetivo.</summary>
     public GoalContribution AddContribution(

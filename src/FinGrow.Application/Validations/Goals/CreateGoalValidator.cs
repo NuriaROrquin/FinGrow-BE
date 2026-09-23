@@ -23,7 +23,7 @@ public sealed class CreateGoalValidator : AbstractValidator<CreateGoalCommand>
             .IsInEnum();
 
         RuleFor(command => command.Deadline)
-            .Must(deadline => deadline >= DateOnly.FromDateTime(dateTimeProvider.UtcNow.UtcDateTime))
+            .Must(deadline => deadline >= dateTimeProvider.Today)
             .WithMessage("La fecha limite de una meta no puede estar en el pasado.");
     }
 }

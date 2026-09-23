@@ -17,7 +17,7 @@ public sealed class AddGoalContributionValidator : AbstractValidator<AddGoalCont
             .IsInEnum();
 
         RuleFor(command => command.ContributedOn)
-            .Must(contributedOn => contributedOn <= DateOnly.FromDateTime(dateTimeProvider.UtcNow.UtcDateTime))
+            .Must(contributedOn => contributedOn <= dateTimeProvider.Today)
             .WithMessage("La fecha de un aporte no puede estar en el futuro.");
 
         RuleFor(command => command.Note)

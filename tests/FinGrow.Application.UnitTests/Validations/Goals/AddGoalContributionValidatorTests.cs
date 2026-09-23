@@ -41,6 +41,17 @@ public class AddGoalContributionValidatorTests
         result.Errors.ShouldContain(error => error.PropertyName == nameof(AddGoalContributionCommand.ContributedOn));
     }
 
+    [Fact]
+    public void Late_at_night_a_contribution_dated_tomorrow_in_argentina_is_rejected()
+    {
+        var lateNightInBuenosAires = new DateTimeOffset(2026, 9, 23, 2, 30, 0, TimeSpan.Zero);
+        var validator = new AddGoalContributionValidator(new FakeDateTimeProvider(lateNightInBuenosAires));
+
+        var result = validator.Validate(ValidCommand() with { ContributedOn = new DateOnly(2026, 9, 23) });
+
+        result.Errors.ShouldContain(error => error.PropertyName == nameof(AddGoalContributionCommand.ContributedOn));
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(-10)]
