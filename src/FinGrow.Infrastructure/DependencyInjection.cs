@@ -6,6 +6,7 @@ using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Repositories;
 using FinGrow.Infrastructure.Ai;
 using FinGrow.Infrastructure.Identity;
+using FinGrow.Infrastructure.Integrations;
 using FinGrow.Infrastructure.Integrations.MercadoPago;
 using FinGrow.Infrastructure.Integrations.Telegram;
 using FinGrow.Infrastructure.Integrations.Twilio;
@@ -30,6 +31,7 @@ public static class DependencyInjection
         services.AddPersistence(configuration);
         services.AddAiService(configuration);
         services.AddJwtAuthentication(configuration);
+
         services.AddTwilio(configuration);
         services.AddTelegram(configuration);
         services.AddMercadoPago(configuration);

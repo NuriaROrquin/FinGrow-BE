@@ -5,7 +5,11 @@ using FinGrow.Domain.Enums;
 
 public interface ITransactionReadRepository
 {
-    Task<TransactionSummary> GetSummaryAsync(Guid employeeId, CancellationToken cancellationToken = default);
+    Task<TransactionSummary> GetSummaryAsync(
+        Guid employeeId,
+        DateOnly? fromDate = null,
+        DateOnly? toDate = null,
+        CancellationToken cancellationToken = default);
 
     Task<TransactionPage> GetPageAsync(
         Guid employeeId,
@@ -13,6 +17,12 @@ public interface ITransactionReadRepository
         int pageSize,
         string? search,
         TransactionType? type,
+        TransactionStatus? status,
+        ExpenseCategory? expenseCategory,
+        IncomeCategory? incomeCategory,
+        PaymentMethod? paymentMethod,
+        DateOnly? fromDate,
+        DateOnly? toDate,
         CancellationToken cancellationToken = default);
 }
 

@@ -6,11 +6,7 @@ using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
 using MediatR;
 
-public sealed record GetTransactionHistoryQuery(
-    int PageNumber = 1,
-    int PageSize = 20,
-    string? Search = null,
-    string? Type = null)
+public sealed record GetTransactionHistoryQuery(TransactionFilters Filters)
     : IRequest<Result<TransactionHistoryResponse>>;
 
 public sealed record TransactionHistoryItem(
@@ -22,7 +18,8 @@ public sealed record TransactionHistoryItem(
     string Description,
     string PaymentMethod,
     string Type,
-    string Source);
+    string Source,
+    string Status);
 
 public sealed record TransactionHistoryResponse(
     IReadOnlyList<TransactionHistoryItem> Items,
@@ -46,20 +43,19 @@ internal sealed class GetTransactionHistoryQueryHandler(
                 Error.Forbidden("Transactions.Unauthenticated", "Hay que iniciar sesion para consultar los movimientos."));
         }
 
-        var type = request.Type?.Trim().ToLowerInvariant() switch
-        {
-            null or "" => null,
-            "ingreso" or "income" => TransactionType.Income,
-            "gasto" or "expense" => TransactionType.Expense,
-            _ => (TransactionType?)null
-        };
-
+        var filters = request.Filters;
         var page = await transactionReadRepository.GetPageAsync(
             employeeId,
-            request.PageNumber,
-            request.PageSize,
-            request.Search,
-            type,
+            filters.PageNumber,
+            filters.PageSize,
+            filters.Search,
+            filters.Type,
+            filters.Status,
+            filters.ExpenseCategory,
+            filters.IncomeCategory,
+            filters.PaymentMethod,
+            filters.DateFrom,
+            filters.DateTo,
             cancellationToken);
 
         var items = page.Items
@@ -74,7 +70,8 @@ internal sealed class GetTransactionHistoryQueryHandler(
                 transaction.Description,
                 transaction.PaymentMethod.ToString(),
                 transaction.Type.ToString(),
-                transaction.Source.ToString()))
+                    transaction.Source.ToString(),
+                    transaction.Status.ToString()))
             .ToList();
 
         return Result.Success(new TransactionHistoryResponse(

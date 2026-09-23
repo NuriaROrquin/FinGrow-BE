@@ -1,5 +1,6 @@
 namespace FinGrow.Api.Controllers;
 
+using FinGrow.Api.Contracts;
 using FinGrow.Api.Extensions;
 using FinGrow.Application.Features.Transactions.CreateTransaction;
 using FinGrow.Application.Features.Transactions.GetHistory;
@@ -24,19 +25,17 @@ public sealed class TransactionsController(ISender sender, ICurrentUser currentU
     }
 
     [HttpGet("summary")]
-    public async Task<IActionResult> GetSummary(CancellationToken cancellationToken) =>
-        (await sender.Send(new GetTransactionSummaryQuery(), cancellationToken)).ToActionResult();
+    public async Task<IActionResult> GetSummary(
+        [FromQuery(Name = "dateFrom")] DateOnly? fromDate = null,
+        [FromQuery(Name = "dateTo")] DateOnly? toDate = null,
+        CancellationToken cancellationToken = default) =>
+        (await sender.Send(new GetTransactionSummaryQuery(fromDate, toDate), cancellationToken)).ToActionResult();
 
     [HttpGet]
     public async Task<IActionResult> GetTransactions(
-        [FromQuery] int pageNumber = 1,
-        [FromQuery] int pageSize = 20,
-        [FromQuery] string? search = null,
-        [FromQuery] string? type = null,
+        [FromQuery] TransactionQueryParameters parameters,
         CancellationToken cancellationToken = default) =>
-        (await sender.Send(
-            new GetTransactionHistoryQuery(pageNumber, pageSize, search, type),
-            cancellationToken)).ToActionResult();
+        (await sender.Send(new GetTransactionHistoryQuery(parameters.ToFilters()), cancellationToken)).ToActionResult();
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken) =>

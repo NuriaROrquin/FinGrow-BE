@@ -4,7 +4,9 @@ using FinGrow.Application.Common;
 using FinGrow.Application.Interfaces;
 using MediatR;
 
-public sealed record GetTransactionSummaryQuery : IRequest<Result<TransactionSummaryResponse>>;
+public sealed record GetTransactionSummaryQuery(
+    DateOnly? FromDate = null,
+    DateOnly? ToDate = null) : IRequest<Result<TransactionSummaryResponse>>;
 
 public sealed record TransactionSummaryResponse(
     decimal TotalIncomeArs,
@@ -30,7 +32,8 @@ internal sealed class GetTransactionSummaryQueryHandler(
                 Error.Forbidden("Transactions.Unauthenticated", "Hay que iniciar sesion para consultar el resumen."));
         }
 
-        var summary = await transactionReadRepository.GetSummaryAsync(employeeId, cancellationToken);
+        var summary = await transactionReadRepository.GetSummaryAsync(
+            employeeId, request.FromDate, request.ToDate, cancellationToken);
 
         return Result.Success(new TransactionSummaryResponse(
             summary.TotalIncomeArs,
