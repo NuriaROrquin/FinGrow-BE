@@ -55,6 +55,18 @@ public class AddGoalContributionHandlerTests
 
         result.Value.Goal.Status.ShouldBe(GoalStatus.Achieved);
         result.Value.Goal.ProgressPercentage.ShouldBe(100m);
+        result.Value.Goal.AchievedAt.ShouldBe(Now);
+    }
+
+    [Fact]
+    public async Task A_contribution_that_does_not_reach_the_target_leaves_the_goal_in_progress()
+    {
+        var goal = StoreGoal(target: 1000m);
+
+        var result = await _handler.Handle(Command(goal.Id, amount: 999.99m), CancellationToken.None);
+
+        result.Value.Goal.Status.ShouldBe(GoalStatus.Active);
+        result.Value.Goal.AchievedAt.ShouldBeNull();
     }
 
     [Fact]

@@ -56,6 +56,7 @@ public class RemoveGoalContributionHandlerTests
             CancellationToken.None);
 
         result.Value.Status.ShouldBe(GoalStatus.Active);
+        result.Value.AchievedAt.ShouldBeNull();
         result.Value.CurrentAmount.ShouldBe(0m);
     }
 
