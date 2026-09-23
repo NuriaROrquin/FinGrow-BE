@@ -2,6 +2,7 @@
 
 using FinGrow.Application.Common;
 using FinGrow.Application.DTOs;
+using FinGrow.Application.Features.Session;
 using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Repositories;
 using FinGrow.Domain.ValueObjects;
@@ -14,16 +15,19 @@ internal sealed class LoginCompanyCommandHandler : IRequestHandler<LoginCompanyC
 
     private readonly ICompanyRepository _companyRepository;
     private readonly IPasswordHasher _passwordHasher;
-    private readonly ITokenService _tokenService;
+    private readonly SessionIssuer _sessionIssuer;
+    private readonly IUnitOfWork _unitOfWork;
 
     public LoginCompanyCommandHandler(
         ICompanyRepository companyRepository,
         IPasswordHasher passwordHasher,
-        ITokenService tokenService)
+        SessionIssuer sessionIssuer,
+        IUnitOfWork unitOfWork)
     {
         _companyRepository = companyRepository;
         _passwordHasher = passwordHasher;
-        _tokenService = tokenService;
+        _sessionIssuer = sessionIssuer;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<LoginResponse>> Handle(
@@ -52,8 +56,10 @@ internal sealed class LoginCompanyCommandHandler : IRequestHandler<LoginCompanyC
             return Result.Failure<LoginResponse>(CredencialesInvalidas);
         }
 
-        var token = _tokenService.GenerateToken(company.Id, company.Id, Rol.Empresa, company.Name);
+        var session = _sessionIssuer.Issue(company.Id, company.Id, Rol.Empresa, company.Name);
 
-        return Result.Success(new LoginResponse(company.Id, company.Id, company.Name, Rol.Empresa, token.Value, token.ExpiresAt));
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return Result.Success(session);
     }
 }

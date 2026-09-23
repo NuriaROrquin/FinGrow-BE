@@ -6,11 +6,21 @@ public static class SessionCookie
 {
     public const string Name = "fingrow-session";
 
-    public static void Append(HttpResponse response, string token, DateTimeOffset expiresAt) =>
-        response.Cookies.Append(Name, token, BuildOptions(expiresAt));
+    public const string RefreshName = "fingrow-refresh";
 
-    public static void Delete(HttpResponse response) =>
-        response.Cookies.Delete(Name, BuildOptions(expiresAt: null));
+    private const string RefreshPath = "/session";
+
+    public static void Append(HttpResponse response, string token, DateTimeOffset expiresAt) =>
+        response.Cookies.Append(Name, token, BuildOptions(expiresAt, "/"));
+
+    public static void AppendRefresh(HttpResponse response, string token, DateTimeOffset expiresAt) =>
+        response.Cookies.Append(RefreshName, token, BuildOptions(expiresAt, RefreshPath));
+
+    public static void Delete(HttpResponse response)
+    {
+        response.Cookies.Delete(Name, BuildOptions(expiresAt: null, "/"));
+        response.Cookies.Delete(RefreshName, BuildOptions(expiresAt: null, RefreshPath));
+    }
 
     public static IServiceCollection AddSessionCookieAuthentication(this IServiceCollection services)
     {
@@ -33,12 +43,12 @@ public static class SessionCookie
         return services;
     }
 
-    private static CookieOptions BuildOptions(DateTimeOffset? expiresAt) => new()
+    private static CookieOptions BuildOptions(DateTimeOffset? expiresAt, string path) => new()
     {
         HttpOnly = true,
         Secure = true,
         SameSite = SameSiteMode.None,
-        Path = "/",
+        Path = path,
         Expires = expiresAt,
     };
 }

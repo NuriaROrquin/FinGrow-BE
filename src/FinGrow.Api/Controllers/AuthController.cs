@@ -30,6 +30,7 @@ public sealed class AuthController(IMediator mediator) : ControllerBase
 
         var login = result.Value;
         SessionCookie.Append(Response, login.Token, login.ExpiresAt);
+        SessionCookie.AppendRefresh(Response, login.RefreshToken, login.RefreshExpiresAt);
 
         return Ok(new SessionResponse(login.EmployeeId, login.CompanyId, login.FullName, login.Role, login.ExpiresAt));
     }

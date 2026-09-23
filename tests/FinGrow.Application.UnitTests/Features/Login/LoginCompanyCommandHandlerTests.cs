@@ -1,6 +1,7 @@
 ﻿namespace FinGrow.Application.UnitTests.Features.Login;
 
 using FinGrow.Application.Features.Login;
+using FinGrow.Application.Features.Session;
 using FinGrow.Application.UnitTests.Fakes;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
@@ -8,6 +9,8 @@ using FinGrow.Domain.ValueObjects;
 
 public class LoginCompanyCommandHandlerTests
 {
+    private static readonly DateTimeOffset Now = new(2026, 9, 15, 10, 0, 0, TimeSpan.Zero);
+
     private static Company CreateCompany(string plainPassword = "1234", bool isActive = true)
     {
         var company = Company.Create(
@@ -26,6 +29,9 @@ public class LoginCompanyCommandHandlerTests
         return company;
     }
 
+    private static SessionIssuer CreateSessionIssuer() =>
+        new(new FakeTokenService(), new FakeRefreshTokenRepository(), new FakeDateTimeProvider(Now));
+
     [Fact]
     public async Task Valid_credentials_log_the_company_in_and_return_a_token()
     {
@@ -36,7 +42,8 @@ public class LoginCompanyCommandHandlerTests
         var handler = new LoginCompanyCommandHandler(
             companyRepository,
             new FakePasswordHasher(),
-            new FakeTokenService());
+            CreateSessionIssuer(),
+            new FakeUnitOfWork());
 
         var result = await handler.Handle(
             new LoginCompanyCommand("empresa@empresa.com", "1234"),
@@ -61,7 +68,8 @@ public class LoginCompanyCommandHandlerTests
         var handler = new LoginCompanyCommandHandler(
             companyRepository,
             new FakePasswordHasher(),
-            new FakeTokenService());
+            CreateSessionIssuer(),
+            new FakeUnitOfWork());
 
         var result = await handler.Handle(
             new LoginCompanyCommand("empresa@empresa.com", "wrong"),
@@ -77,7 +85,8 @@ public class LoginCompanyCommandHandlerTests
         var handler = new LoginCompanyCommandHandler(
             new FakeCompanyRepository(),
             new FakePasswordHasher(),
-            new FakeTokenService());
+            CreateSessionIssuer(),
+            new FakeUnitOfWork());
 
         var result = await handler.Handle(
             new LoginCompanyCommand("nadie@empresa.com", "1234"),
@@ -97,7 +106,8 @@ public class LoginCompanyCommandHandlerTests
         var handler = new LoginCompanyCommandHandler(
             companyRepository,
             new FakePasswordHasher(),
-            new FakeTokenService());
+            CreateSessionIssuer(),
+            new FakeUnitOfWork());
 
         var result = await handler.Handle(
             new LoginCompanyCommand("empresa@empresa.com", "1234"),

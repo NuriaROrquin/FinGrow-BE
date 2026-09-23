@@ -108,9 +108,15 @@ public class JwtAuthenticationTests : IClassFixture<JwtAuthenticationTests.Secur
         var logout = await client.DeleteAsync(new Uri("/session", UriKind.Relative));
 
         logout.StatusCode.ShouldBe(HttpStatusCode.NoContent);
-        var setCookie = logout.Headers.GetValues("Set-Cookie").ShouldHaveSingleItem();
-        setCookie.ShouldStartWith($"{SessionCookie.Name}=;");
-        setCookie.ShouldContain("httponly", Case.Insensitive);
+
+        var setCookies = logout.Headers.GetValues("Set-Cookie").ToList();
+        setCookies.Count.ShouldBe(2);
+
+        var sessionCookie = setCookies.Single(cookie => cookie.StartsWith($"{SessionCookie.Name}=;", StringComparison.Ordinal));
+        sessionCookie.ShouldContain("httponly", Case.Insensitive);
+
+        var refreshCookie = setCookies.Single(cookie => cookie.StartsWith($"{SessionCookie.RefreshName}=;", StringComparison.Ordinal));
+        refreshCookie.ShouldContain("httponly", Case.Insensitive);
     }
 
     private sealed record SecureEndpointResponse(Guid? UserId, Guid? CompanyId);

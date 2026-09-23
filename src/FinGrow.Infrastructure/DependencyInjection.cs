@@ -46,6 +46,7 @@ public static class DependencyInjection
         services.AddScoped<IIntegrationLinkCodeRepository, IntegrationLinkCodeRepository>();
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
+        services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 
         return services;
     }
@@ -70,6 +71,7 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<FinGrowDbContext>());
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<ITransactionReadRepository, TransactionReadRepository>();
+        services.AddScoped<IGoalRepository, GoalRepository>();
 
         services.AddScoped<DatabaseSeeder>();
 

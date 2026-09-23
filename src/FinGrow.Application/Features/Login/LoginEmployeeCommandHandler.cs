@@ -2,6 +2,7 @@
 
 using FinGrow.Application.Common;
 using FinGrow.Application.DTOs;
+using FinGrow.Application.Features.Session;
 using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Repositories;
 using FinGrow.Domain.ValueObjects;
@@ -16,20 +17,20 @@ internal sealed class LoginEmployeeCommandHandler : IRequestHandler<LoginEmploye
 
     private readonly IEmployeeRepository _employeeRepository;
     private readonly IPasswordHasher _passwordHasher;
-    private readonly ITokenService _tokenService;
+    private readonly SessionIssuer _sessionIssuer;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public LoginEmployeeCommandHandler(
         IEmployeeRepository employeeRepository,
         IPasswordHasher passwordHasher,
-        ITokenService tokenService,
+        SessionIssuer sessionIssuer,
         IUnitOfWork unitOfWork,
         IDateTimeProvider dateTimeProvider)
     {
         _employeeRepository = employeeRepository;
         _passwordHasher = passwordHasher;
-        _tokenService = tokenService;
+        _sessionIssuer = sessionIssuer;
         _unitOfWork = unitOfWork;
         _dateTimeProvider = dateTimeProvider;
     }
@@ -59,16 +60,11 @@ internal sealed class LoginEmployeeCommandHandler : IRequestHandler<LoginEmploye
         }
 
         employee.RegisterLogin(_dateTimeProvider.UtcNow);
+
+        var session = _sessionIssuer.Issue(employee.Id, employee.CompanyId, Rol.Empleado, employee.FullName);
+
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var token = _tokenService.GenerateToken(employee.Id, employee.CompanyId, Rol.Empleado, employee.FullName);
-
-        return Result.Success(new LoginResponse(
-            employee.Id,
-            employee.CompanyId,
-            employee.FullName,
-            Rol.Empleado,
-            token.Value,
-            token.ExpiresAt));
+        return Result.Success(session);
     }
 }
