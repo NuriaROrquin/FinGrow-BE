@@ -25,6 +25,6 @@ internal sealed class CreateGoalHandler(
         goalRepository.Add(goal);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(GoalResponse.FromEntity(goal));
+        return Result.Success(GoalResponse.FromEntity(goal, dateTimeProvider.Today));
     }
 }

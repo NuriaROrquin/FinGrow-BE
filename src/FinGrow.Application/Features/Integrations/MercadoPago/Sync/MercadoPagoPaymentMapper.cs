@@ -2,6 +2,7 @@ namespace FinGrow.Application.Features.Integrations.MercadoPago.Sync;
 
 using System.Globalization;
 using FinGrow.Application.Interfaces;
+using FinGrow.Domain.Common;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.ValueObjects;
@@ -11,8 +12,6 @@ internal static class MercadoPagoPaymentMapper
     internal const string ApprovedStatus = "approved";
     internal const string OwnMoneyIn = "account_fund";
     internal const string FallbackDescription = "Movimiento de Mercado Pago";
-
-    private static readonly TimeSpan ArgentinaUtcOffset = TimeSpan.FromHours(-3);
 
     public static string ExternalReference(MercadoPagoPayment payment) => payment.Id.ToString(CultureInfo.InvariantCulture);
 
@@ -25,7 +24,7 @@ internal static class MercadoPagoPaymentMapper
     public static Transaction ToPendingTransaction(MercadoPagoPayment payment, EmployeeIntegration integration, DateTimeOffset now)
     {
         var amount = Money.From(payment.TransactionAmount, Enum.Parse<Currency>(payment.CurrencyId));
-        var occurredOn = DateOnly.FromDateTime((payment.DateApproved ?? payment.DateCreated).ToOffset(ArgentinaUtcOffset).DateTime);
+        var occurredOn = ArgentinaTime.DateOf(payment.DateApproved ?? payment.DateCreated);
         var description = string.IsNullOrWhiteSpace(payment.Description) ? FallbackDescription : payment.Description;
         var paymentMethod = ToPaymentMethod(payment.PaymentTypeId);
         var isIncome = payment.CollectorId?.ToString(CultureInfo.InvariantCulture) == integration.ExternalAccountId;

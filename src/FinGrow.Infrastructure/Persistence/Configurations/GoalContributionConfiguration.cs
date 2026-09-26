@@ -13,6 +13,8 @@ internal sealed class GoalContributionConfiguration : IEntityTypeConfiguration<G
 
         builder.HasKey(contribution => contribution.Id);
 
+        builder.Property(contribution => contribution.Id).ValueGeneratedNever();
+
         builder.OwnsMoney(contribution => contribution.Amount, "amount", "currency");
 
         builder.Property(contribution => contribution.ContributedOn).IsRequired();

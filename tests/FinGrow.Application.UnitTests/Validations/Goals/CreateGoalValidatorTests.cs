@@ -37,6 +37,17 @@ public class CreateGoalValidatorTests
     }
 
     [Fact]
+    public void Late_at_night_today_is_the_argentinian_date_not_the_utc_one()
+    {
+        var lateNightInBuenosAires = new DateTimeOffset(2026, 9, 23, 2, 30, 0, TimeSpan.Zero);
+        var validator = new CreateGoalValidator(new FakeDateTimeProvider(lateNightInBuenosAires));
+
+        var result = validator.Validate(ValidCommand() with { Deadline = new DateOnly(2026, 9, 22) });
+
+        result.IsValid.ShouldBeTrue();
+    }
+
+    [Fact]
     public void A_deadline_in_the_past_is_rejected()
     {
         var result = _validator.Validate(ValidCommand() with { Deadline = Today.AddDays(-1) });
