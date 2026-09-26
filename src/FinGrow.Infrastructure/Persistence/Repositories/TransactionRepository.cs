@@ -10,11 +10,15 @@ internal sealed class TransactionRepository(FinGrowDbContext dbContext) : ITrans
     public void Add(Transaction transaction) => dbContext.Transactions.Add(transaction);
 
     public Task<Transaction?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
-        dbContext.Transactions.FirstOrDefaultAsync(transaction => transaction.Id == id, cancellationToken);
+        dbContext.Transactions.FirstOrDefaultAsync(
+            transaction => transaction.Id == id && transaction.Status != TransactionStatus.Eliminated,
+            cancellationToken);
 
     public async Task<IReadOnlyList<Transaction>> ListByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
         await dbContext.Transactions
-            .Where(transaction => transaction.EmployeeId == employeeId)
+            .Where(transaction =>
+                transaction.EmployeeId == employeeId
+                && transaction.Status != TransactionStatus.Eliminated)
             .OrderByDescending(transaction => transaction.OccurredOn)
             .ThenByDescending(transaction => transaction.CreatedAt)
             .ToListAsync(cancellationToken);

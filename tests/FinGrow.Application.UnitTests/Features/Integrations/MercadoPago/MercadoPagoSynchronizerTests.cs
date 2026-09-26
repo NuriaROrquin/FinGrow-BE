@@ -100,6 +100,31 @@ public class MercadoPagoSynchronizerTests
     }
 
     [Fact]
+    public async Task A_deleted_mercado_pago_transaction_is_not_recreated_on_next_sync()
+    {
+        var deleted = Transaction.RegisterExpense(
+            EmployeeId,
+            Money.From(10285m, Currency.ARS),
+            ExpenseCategory.Otros,
+            "Canva",
+            new DateOnly(2026, 9, 1),
+            PaymentMethod.DebitCard,
+            TransactionSource.MercadoPago,
+            TransactionStatus.Pending,
+            Now.AddDays(-2),
+            externalReference: "55");
+        deleted.Eliminate(Now.AddDays(-1));
+        _transactions.Transactions.Add(deleted);
+        _payments.Payments.Add(Purchase(55, "Canva", 10285m, "debit_card"));
+
+        var result = await Sync();
+
+        result.Value.Imported.ShouldBe(0);
+        result.Value.AlreadyKnown.ShouldBe(1);
+        _transactions.Transactions.Count.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task The_occurred_date_is_the_approval_date_in_argentina()
     {
         _payments.Payments.Add(Purchase(6, "Cena", 5000m, "credit_card") with

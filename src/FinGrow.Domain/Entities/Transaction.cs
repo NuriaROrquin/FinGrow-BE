@@ -256,6 +256,17 @@ public sealed class Transaction : AggregateRoot
         UpdatedAt = updatedAt;
     }
 
+    public void Eliminate(DateTimeOffset eliminatedAt)
+    {
+        if (Status == TransactionStatus.Eliminated)
+        {
+            throw new DomainException("El movimiento ya fue eliminado.");
+        }
+
+        Status = TransactionStatus.Eliminated;
+        UpdatedAt = eliminatedAt;
+    }
+
     /// <summary>Corregir la categoria de un gasto, por ejemplo lo que propuso la IA (HU-15).</summary>
     public void RecategorizeExpense(ExpenseCategory category, DateTimeOffset updatedAt)
     {

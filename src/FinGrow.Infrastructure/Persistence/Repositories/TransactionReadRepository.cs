@@ -81,7 +81,10 @@ internal sealed class TransactionReadRepository : ITransactionReadRepository
     {
         var filteredQuery = _dbContext.Transactions
             .AsNoTracking()
-            .Where(transaction => transaction.EmployeeId == employeeId);
+            .Where(transaction => transaction.EmployeeId == employeeId)
+            .Where(transaction =>
+                transaction.Status == TransactionStatus.Pending
+                || transaction.Status == TransactionStatus.Confirmed);
 
         if (!string.IsNullOrWhiteSpace(search))
         {

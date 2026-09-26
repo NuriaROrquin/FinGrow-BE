@@ -77,7 +77,8 @@ public sealed class FakeTransactionRepository : ITransactionRepository
     public void Add(Transaction transaction) => Transactions.Add(transaction);
 
     public Task<Transaction?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
-        Task.FromResult(Transactions.FirstOrDefault(transaction => transaction.Id == id));
+        Task.FromResult(Transactions.FirstOrDefault(
+            transaction => transaction.Id == id && transaction.Status != TransactionStatus.Eliminated));
 
     public Task<IReadOnlySet<string>> ListExistingExternalReferencesAsync(Guid employeeId, TransactionSource source, IReadOnlyCollection<string> externalReferences, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlySet<string>>(Transactions
@@ -87,7 +88,9 @@ public sealed class FakeTransactionRepository : ITransactionRepository
 
     public Task<IReadOnlyList<Transaction>> ListByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Transaction>>(Transactions
-            .Where(transaction => transaction.EmployeeId == employeeId)
+            .Where(transaction =>
+                transaction.EmployeeId == employeeId
+                && transaction.Status != TransactionStatus.Eliminated)
             .OrderByDescending(transaction => transaction.OccurredOn)
             .ToList());
 }

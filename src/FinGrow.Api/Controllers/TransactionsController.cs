@@ -6,6 +6,7 @@ using FinGrow.Application.Features.Transactions.CreateTransaction;
 using FinGrow.Application.Features.Transactions.GetHistory;
 using FinGrow.Application.Features.Transactions.GetTransactionById;
 using FinGrow.Application.Features.Transactions.GetTransactionSummary;
+using FinGrow.Application.Features.Transactions.DeleteTransaction;
 using FinGrow.Application.Features.Transactions.UpdateTransaction;
 using FinGrow.Application.Interfaces;
 using MediatR;
@@ -52,4 +53,8 @@ public sealed class TransactionsController(ISender sender, ICurrentUser currentU
 
         return (await sender.Send(command, cancellationToken)).ToActionResult();
     }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken) =>
+        (await sender.Send(new DeleteTransactionCommand(id), cancellationToken)).ToActionResult();
 }
