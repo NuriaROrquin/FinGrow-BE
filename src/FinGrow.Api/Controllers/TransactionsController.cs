@@ -6,6 +6,7 @@ using FinGrow.Application.Features.Transactions.CreateTransaction;
 using FinGrow.Application.Features.Transactions.GetHistory;
 using FinGrow.Application.Features.Transactions.GetTransactionById;
 using FinGrow.Application.Features.Transactions.GetTransactionSummary;
+using FinGrow.Application.Features.Transactions.UpdateTransaction;
 using FinGrow.Application.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -40,4 +41,15 @@ public sealed class TransactionsController(ISender sender, ICurrentUser currentU
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken) =>
         (await sender.Send(new GetTransactionByIdCommand(id), cancellationToken)).ToActionResult();
+
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(
+        Guid id,
+        UpdateTransactionCommand command,
+        CancellationToken cancellationToken)
+    {
+        command = command with { Id = id };
+
+        return (await sender.Send(command, cancellationToken)).ToActionResult();
+    }
 }

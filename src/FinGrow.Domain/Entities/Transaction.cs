@@ -192,6 +192,70 @@ public sealed class Transaction : AggregateRoot
         UpdatedAt = updatedAt;
     }
 
+    public void Correct(
+        TransactionType type,
+        Money amount,
+        ExpenseCategory? expenseCategory,
+        IncomeCategory? incomeCategory,
+        string description,
+        DateOnly occurredOn,
+        PaymentMethod paymentMethod,
+        TransactionStatus status,
+        DateTimeOffset updatedAt)
+    {
+        EnsureValidAmount(amount);
+
+        if (!Enum.IsDefined(type))
+        {
+            throw new DomainException($"El tipo de movimiento '{type}' no existe.");
+        }
+
+        if (!Enum.IsDefined(status))
+        {
+            throw new DomainException($"El estado del movimiento '{status}' no existe.");
+        }
+
+        if (Status == TransactionStatus.Confirmed && status == TransactionStatus.Pending)
+        {
+            throw new DomainException("Una transaccion confirmada no puede volver a pendiente.");
+        }
+
+        if (type == TransactionType.Expense)
+        {
+            if (expenseCategory is null || !Enum.IsDefined(expenseCategory.Value))
+            {
+                throw new DomainException("La categoria de gasto es obligatoria.");
+            }
+
+            if (incomeCategory is not null)
+            {
+                throw new DomainException("Un gasto no puede tener categoria de ingreso.");
+            }
+        }
+        else
+        {
+            if (incomeCategory is null || !Enum.IsDefined(incomeCategory.Value))
+            {
+                throw new DomainException("La categoria de ingreso es obligatoria.");
+            }
+
+            if (expenseCategory is not null)
+            {
+                throw new DomainException("Un ingreso no puede tener categoria de gasto.");
+            }
+        }
+
+        Type = type;
+        Amount = amount;
+        ExpenseCategory = type == TransactionType.Expense ? expenseCategory : null;
+        IncomeCategory = type == TransactionType.Income ? incomeCategory : null;
+        Description = EnsureValidDescription(description);
+        OccurredOn = occurredOn;
+        PaymentMethod = paymentMethod;
+        Status = status;
+        UpdatedAt = updatedAt;
+    }
+
     /// <summary>Corregir la categoria de un gasto, por ejemplo lo que propuso la IA (HU-15).</summary>
     public void RecategorizeExpense(ExpenseCategory category, DateTimeOffset updatedAt)
     {
