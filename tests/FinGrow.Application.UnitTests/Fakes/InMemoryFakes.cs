@@ -1,6 +1,8 @@
 namespace FinGrow.Application.UnitTests.Fakes;
 
+using FinGrow.Application.Common;
 using FinGrow.Application.DTOs;
+using FinGrow.Application.Features.Investments.ListInvestments;
 using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
@@ -378,4 +380,30 @@ public sealed class FakeExchangeRateProvider : IExchangeRateProvider
 
     public Task<MepQuote> GetMepQuoteAsync(CancellationToken cancellationToken = default) =>
         Failure is null ? Task.FromResult(Quote) : Task.FromException<MepQuote>(Failure);
+}
+
+public sealed class FakeInvestmentReadRepository : IInvestmentReadRepository
+{
+    public List<Investment> Investments { get; } = new();
+
+    public Guid? RequestedEmployeeId { get; private set; }
+
+    public InvestmentFilters? RequestedFilters { get; private set; }
+
+    public Task<PagedResult<Investment>> GetPageAsync(Guid employeeId, InvestmentFilters filters, CancellationToken cancellationToken = default)
+    {
+        RequestedEmployeeId = employeeId;
+        RequestedFilters = filters;
+
+        var owned = Investments
+            .Where(investment => investment.EmployeeId == employeeId)
+            .OrderByDescending(investment => investment.PurchasedOn)
+            .ToList();
+
+        return Task.FromResult(new PagedResult<Investment>(
+            owned.Skip((filters.PageNumber - 1) * filters.PageSize).Take(filters.PageSize).ToList(),
+            filters.PageNumber,
+            filters.PageSize,
+            owned.Count));
+    }
 }

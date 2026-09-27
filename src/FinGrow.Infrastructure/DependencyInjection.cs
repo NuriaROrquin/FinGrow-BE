@@ -76,6 +76,7 @@ public static class DependencyInjection
         services.AddScoped<ITransactionReadRepository, TransactionReadRepository>();
         services.AddScoped<IGoalRepository, GoalRepository>();
         services.AddScoped<IInvestmentRepository, InvestmentRepository>();
+        services.AddScoped<IInvestmentReadRepository, InvestmentReadRepository>();
         services.AddScoped<IJobRunRepository, JobRunRepository>();
         services.AddScoped<IMetricsSnapshotRepository, MetricsSnapshotRepository>();
         services.AddScoped<IPeriodActivityReadRepository, PeriodActivityReadRepository>();
