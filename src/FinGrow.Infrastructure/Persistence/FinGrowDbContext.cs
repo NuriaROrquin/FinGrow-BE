@@ -39,6 +39,12 @@ public sealed class FinGrowDbContext : DbContext, IUnitOfWork
 
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
+    public DbSet<Course> Courses => Set<Course>();
+
+    public DbSet<Lesson> Lessons => Set<Lesson>();
+
+    public DbSet<Article> Articles => Set<Article>();
+
 protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
