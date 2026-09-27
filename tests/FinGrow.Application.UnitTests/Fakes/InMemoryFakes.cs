@@ -379,3 +379,33 @@ public sealed class FakeExchangeRateProvider : IExchangeRateProvider
     public Task<MepQuote> GetMepQuoteAsync(CancellationToken cancellationToken = default) =>
         Failure is null ? Task.FromResult(Quote) : Task.FromException<MepQuote>(Failure);
 }
+
+public sealed class FakeCourseRepository : ICourseRepository
+{
+    public List<Course> Courses { get; } = new();
+
+    public List<LessonCompletion> Completions { get; } = new();
+
+    public void Add(Course course) => Courses.Add(course);
+
+    public void Complete(Guid employeeId, Lesson lesson) =>
+        Completions.Add(LessonCompletion.Create(employeeId, lesson.Id, DateTimeOffset.UnixEpoch));
+
+    public Task<IReadOnlyList<Course>> ListPublishedAsync(
+        CourseLevel? level,
+        int? maxDurationMinutes,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Course>>(Courses
+            .Where(course => course.IsPublished)
+            .Where(course => level is null || course.Level == level)
+            .Where(course => maxDurationMinutes is null || course.DurationMinutes <= maxDurationMinutes)
+            .OrderBy(course => course.Level)
+            .ThenBy(course => course.Title)
+            .ToList());
+
+    public Task<IReadOnlySet<Guid>> ListCompletedLessonIdsAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlySet<Guid>>(Completions
+            .Where(completion => completion.EmployeeId == employeeId)
+            .Select(completion => completion.LessonId)
+            .ToHashSet());
+}
