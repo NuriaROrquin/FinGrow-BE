@@ -2,7 +2,9 @@ namespace FinGrow.Api.Controllers;
 
 using Extensions;
 using Application.Features.Investments.CreateInvestment;
+using Application.Features.Investments.DeleteInvestment;
 using Application.Features.Investments.ListInvestments;
+using Application.Features.Investments.UpdateInvestment;
 using Application.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -24,4 +26,16 @@ public sealed class InvestmentsController(ISender sender, ICurrentUser currentUs
 
         return (await sender.Send(command, cancellationToken)).ToActionResult();
     }
+
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, UpdateInvestmentCommand command, CancellationToken cancellationToken)
+    {
+        command = command with { Id = id, EmployeeId = currentUser.UserId!.Value };
+
+        return (await sender.Send(command, cancellationToken)).ToActionResult();
+    }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken) =>
+        (await sender.Send(new DeleteInvestmentCommand(id, currentUser.UserId!.Value), cancellationToken)).ToActionResult();
 }
