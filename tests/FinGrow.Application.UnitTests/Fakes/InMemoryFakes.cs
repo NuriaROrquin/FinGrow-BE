@@ -277,3 +277,25 @@ public sealed class FakeGoalRepository : IGoalRepository
             .OrderByDescending(goal => goal.CreatedAt)
             .ToList());
 }
+
+public sealed class FakeArticleRepository : IArticleRepository
+{
+    public List<Article> Articles { get; } = new();
+
+    public void Add(Article article) => Articles.Add(article);
+
+    public Task<IReadOnlyList<Article>> ListPublishedAsync(
+        EducationCategory? category,
+        int? maxReadingTimeMinutes,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Article>>(Articles
+            .Where(article => article.IsPublished)
+            .Where(article => category is null || article.Category == category)
+            .Where(article => maxReadingTimeMinutes is null || article.ReadingTimeMinutes <= maxReadingTimeMinutes)
+            .OrderByDescending(article => article.PublishedAt)
+            .ThenBy(article => article.Title)
+            .ToList());
+
+    public Task<Article?> GetPublishedBySlugAsync(string slug, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Articles.FirstOrDefault(article => article.Slug == slug && article.IsPublished));
+}

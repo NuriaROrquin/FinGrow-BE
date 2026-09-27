@@ -74,6 +74,7 @@ public static class DependencyInjection
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<ITransactionReadRepository, TransactionReadRepository>();
         services.AddScoped<IGoalRepository, GoalRepository>();
+        services.AddScoped<IArticleRepository, ArticleRepository>();
 
         services.AddScoped<DatabaseSeeder>();
         services.AddScoped<EducationCatalogSeeder>();
