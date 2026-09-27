@@ -357,6 +357,11 @@ public sealed class FakeInvestmentRepository : IInvestmentRepository
 
     public void Add(Investment investment) => Investments.Add(investment);
 
+    public void Remove(Investment investment) => Investments.Remove(investment);
+
+    public Task<Investment?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Investments.FirstOrDefault(investment => investment.Id == id));
+
     public Task<IReadOnlyList<Investment>> ListByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Investment>>(Investments
             .Where(investment => investment.EmployeeId == employeeId)

@@ -8,6 +8,11 @@ internal sealed class InvestmentRepository(FinGrowDbContext dbContext) : IInvest
 {
     public void Add(Investment investment) => dbContext.Investments.Add(investment);
 
+    public void Remove(Investment investment) => dbContext.Investments.Remove(investment);
+
+    public Task<Investment?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        dbContext.Investments.FirstOrDefaultAsync(investment => investment.Id == id, cancellationToken);
+
     public async Task<IReadOnlyList<Investment>> ListByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
         await dbContext.Investments
             .Where(investment => investment.EmployeeId == employeeId)
