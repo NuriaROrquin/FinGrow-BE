@@ -12,6 +12,7 @@ public class ResultExtensionsTests
     [InlineData(ErrorType.NotFound, StatusCodes.Status404NotFound)]
     [InlineData(ErrorType.Conflict, StatusCodes.Status409Conflict)]
     [InlineData(ErrorType.Forbidden, StatusCodes.Status403Forbidden)]
+    [InlineData(ErrorType.Unavailable, StatusCodes.Status503ServiceUnavailable)]
     [InlineData(ErrorType.Failure, StatusCodes.Status500InternalServerError)]
     public void A_failed_Result_maps_to_the_correct_status_code(ErrorType errorType, int expectedStatusCode)
     {
@@ -31,6 +32,7 @@ public class ResultExtensionsTests
     [InlineData(ErrorType.NotFound, StatusCodes.Status404NotFound)]
     [InlineData(ErrorType.Conflict, StatusCodes.Status409Conflict)]
     [InlineData(ErrorType.Forbidden, StatusCodes.Status403Forbidden)]
+    [InlineData(ErrorType.Unavailable, StatusCodes.Status503ServiceUnavailable)]
     [InlineData(ErrorType.Failure, StatusCodes.Status500InternalServerError)]
     public void A_failed_generic_Result_maps_to_the_correct_status_code(ErrorType errorType, int expectedStatusCode)
     {

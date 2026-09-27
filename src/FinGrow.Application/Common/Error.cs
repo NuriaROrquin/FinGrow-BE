@@ -14,6 +14,8 @@ public sealed record Error(string Code, string Description, ErrorType Type)
 
     public static Error Unauthorized(string code, string description) => new(code, description, ErrorType.Unauthorized);
 
+    public static Error Unavailable(string code, string description) => new(code, description, ErrorType.Unavailable);
+
     public static Error Failure(string code, string description) => new(code, description, ErrorType.Failure);
 }
 
@@ -24,5 +26,6 @@ public enum ErrorType
     NotFound = 2,
     Conflict = 3,
     Forbidden = 4,
-    Unauthorized = 5
+    Unauthorized = 5,
+    Unavailable = 6
 }
