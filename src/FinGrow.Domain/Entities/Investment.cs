@@ -114,6 +114,8 @@ public sealed class Investment : AggregateRoot
         ? 0m
         : decimal.Round(ReturnAmount / InvestedAmount.Amount * 100m, 2, MidpointRounding.ToEven);
 
+    public bool HasMarketValuation => _valuations.Any(valuation => valuation.Source == ValuationSource.Feed);
+
     public InvestmentValuation RecordValuation(
         Money value,
         DateOnly valuedOn,

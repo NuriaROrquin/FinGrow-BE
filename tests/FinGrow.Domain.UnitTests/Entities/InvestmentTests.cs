@@ -146,6 +146,47 @@ public class InvestmentTests
             investment.Correct("VOO", InvestmentType.Etf, Money.From(0m, Currency.USD), PurchasedOn, Now));
     }
 
+    [Fact]
+    public void A_new_investment_is_valued_at_cost_until_the_market_quotes_it()
+    {
+        var investment = CreateInvestment();
+
+        investment.HasMarketValuation.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void A_valuation_from_the_feed_makes_the_investment_quoted()
+    {
+        var investment = CreateInvestment();
+
+        investment.RecordValuation(Money.From(1100m, Currency.USD), new DateOnly(2026, 7, 10), ValuationSource.Feed, Now);
+
+        investment.HasMarketValuation.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Manual_valuations_and_added_capital_do_not_make_the_investment_quoted()
+    {
+        var investment = CreateInvestment();
+
+        investment.RecordValuation(Money.From(1100m, Currency.USD), new DateOnly(2026, 7, 10), ValuationSource.Manual, Now);
+        investment.AddCapital(Money.From(500m, Currency.USD), new DateOnly(2026, 8, 10), Now);
+
+        investment.HasMarketValuation.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Adding_capital_after_a_market_valuation_keeps_the_investment_quoted()
+    {
+        var investment = CreateInvestment();
+
+        investment.RecordValuation(Money.From(1100m, Currency.USD), new DateOnly(2026, 7, 10), ValuationSource.Feed, Now);
+        investment.AddCapital(Money.From(500m, Currency.USD), new DateOnly(2026, 8, 10), Now);
+
+        investment.HasMarketValuation.ShouldBeTrue();
+        investment.CurrentValue.Amount.ShouldBe(1600m);
+    }
+
     private static Investment CreateInvestment() => Investment.Create(
         EmployeeId,
         "S&P 500 ETF",

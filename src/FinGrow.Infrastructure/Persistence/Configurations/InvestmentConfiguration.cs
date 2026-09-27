@@ -33,6 +33,7 @@ internal sealed class InvestmentConfiguration : IEntityTypeConfiguration<Investm
         builder.Ignore(investment => investment.ValuedOn);
         builder.Ignore(investment => investment.ReturnAmount);
         builder.Ignore(investment => investment.ReturnPercentage);
+        builder.Ignore(investment => investment.HasMarketValuation);
 
         builder.HasOne(investment => investment.Employee)
             .WithMany()
