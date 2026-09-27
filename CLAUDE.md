@@ -89,8 +89,8 @@ dependencias sin tocar `Program.cs` ni `AddApplication()`.
   invocar al handler.
 - **El mapeo a HTTP vive en Api, no en Application**, para no acoplar Application a ASP.NET
   Core. `ResultExtensions.ToActionResult()` (`Api/Extensions/`) traduce `Error.Type` a status
-  code: `Validation`→400, `NotFound`→404, `Conflict`→409, `Forbidden`→403, cualquier otro
-  (`Failure`)→500. Un controller nuevo solo necesita
+  code: `Validation`→400, `NotFound`→404, `Conflict`→409, `Forbidden`→403, `Unavailable`→503
+  (un servicio externo que no responde, como DolarApi), cualquier otro (`Failure`)→500. Un controller nuevo solo necesita
   `return (await sender.Send(command, ct)).ToActionResult();`.
 - Esto es distinto de `ExceptionHandlingMiddleware`: ese middleware sigue cubriendo únicamente
   lo inesperado (excepciones no manejadas); `Result.Failure` es el camino para fallos de negocio
