@@ -369,3 +369,13 @@ public sealed class FakeInvestmentRepository : IInvestmentRepository
             .ThenByDescending(investment => investment.CreatedAt)
             .ToList());
 }
+
+public sealed class FakeExchangeRateProvider : IExchangeRateProvider
+{
+    public MepQuote Quote { get; set; } = new(1544.30m, 1557.30m, new DateTimeOffset(2026, 9, 27, 14, 57, 0, TimeSpan.Zero), "DolarApi");
+
+    public Exception? Failure { get; set; }
+
+    public Task<MepQuote> GetMepQuoteAsync(CancellationToken cancellationToken = default) =>
+        Failure is null ? Task.FromResult(Quote) : Task.FromException<MepQuote>(Failure);
+}
