@@ -350,3 +350,17 @@ public sealed class FakePeriodActivityReadRepository : IPeriodActivityReadReposi
             Activity.TryGetValue((companyId, period.Start), out var employees) ? employees : new List<EmployeePeriodActivity>());
     }
 }
+
+public sealed class FakeInvestmentRepository : IInvestmentRepository
+{
+    public List<Investment> Investments { get; } = new();
+
+    public void Add(Investment investment) => Investments.Add(investment);
+
+    public Task<IReadOnlyList<Investment>> ListByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Investment>>(Investments
+            .Where(investment => investment.EmployeeId == employeeId)
+            .OrderByDescending(investment => investment.PurchasedOn)
+            .ThenByDescending(investment => investment.CreatedAt)
+            .ToList());
+}
