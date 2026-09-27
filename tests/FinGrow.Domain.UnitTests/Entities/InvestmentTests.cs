@@ -104,6 +104,48 @@ public class InvestmentTests
         investment.Valuations.Count.ShouldBe(2);
     }
 
+    [Fact]
+    public void Correcting_the_purchase_rewrites_the_initial_valuation_so_there_is_still_no_invented_return()
+    {
+        var investment = CreateInvestment();
+        var correctedOn = new DateOnly(2026, 1, 5);
+
+        investment.Correct("Bitcoin", InvestmentType.Crypto, Money.From(800m, Currency.ARS), correctedOn, Now.AddDays(1));
+
+        investment.AssetName.ShouldBe("Bitcoin");
+        investment.Type.ShouldBe(InvestmentType.Crypto);
+        investment.InvestedAmount.ShouldBe(Money.From(800m, Currency.ARS));
+        investment.PurchasedOn.ShouldBe(correctedOn);
+        investment.CurrentValue.ShouldBe(Money.From(800m, Currency.ARS));
+        investment.ValuedOn.ShouldBe(correctedOn);
+        investment.ReturnAmount.ShouldBe(0m);
+        investment.UpdatedAt.ShouldBe(Now.AddDays(1));
+        investment.Valuations.ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public void With_later_valuations_only_the_name_and_type_can_be_corrected()
+    {
+        var investment = CreateInvestment();
+        investment.RecordValuation(Money.From(1250m, Currency.USD), new DateOnly(2026, 7, 10), ValuationSource.Feed, Now);
+
+        investment.Correct("VOO", InvestmentType.Stock, Money.From(1000m, Currency.USD), PurchasedOn, Now);
+
+        investment.AssetName.ShouldBe("VOO");
+        investment.Type.ShouldBe(InvestmentType.Stock);
+        Should.Throw<DomainException>(() =>
+            investment.Correct("VOO", InvestmentType.Stock, Money.From(900m, Currency.USD), PurchasedOn, Now));
+    }
+
+    [Fact]
+    public void A_correction_to_zero_capital_is_rejected()
+    {
+        var investment = CreateInvestment();
+
+        Should.Throw<DomainException>(() =>
+            investment.Correct("VOO", InvestmentType.Etf, Money.From(0m, Currency.USD), PurchasedOn, Now));
+    }
+
     private static Investment CreateInvestment() => Investment.Create(
         EmployeeId,
         "S&P 500 ETF",
