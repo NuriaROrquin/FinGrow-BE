@@ -70,6 +70,21 @@ public class MercadoPagoSyncJobTests
     }
 
     [Fact]
+    public async Task A_revoked_authorization_counts_as_rejected_and_does_not_fail_the_run()
+    {
+        var revoked = Linked("gina", "token-gina", refreshToken: null);
+        var healthy = Linked("hugo", "token-hugo");
+        _payments.UnauthorizedAccessToken = "token-gina";
+
+        var result = await Job().ExecuteAsync(CancellationToken.None);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Summary.ShouldBe("2 cuenta(s) vinculada(s): 1 sincronizada(s), 1 rechazada(s), 0 con error.");
+        _transactions.Transactions.ShouldHaveSingleItem().EmployeeId.ShouldBe(healthy.EmployeeId);
+        revoked.LastSyncedAt.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task A_technical_failure_in_one_account_marks_the_run_as_failed_but_the_rest_still_sync()
     {
         var broken = Linked("elena", "token-elena");

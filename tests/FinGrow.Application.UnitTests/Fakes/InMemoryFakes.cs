@@ -213,11 +213,18 @@ public sealed class FakeMercadoPagoPaymentsClient : IMercadoPagoPaymentsClient
 
     public string? BrokenAccessToken { get; set; }
 
+    public string? UnauthorizedAccessToken { get; set; }
+
     public Task<MercadoPagoPaymentsPage> SearchUpdatedBetweenAsync(string accessToken, DateTimeOffset from, DateTimeOffset to, int offset, CancellationToken cancellationToken = default)
     {
         if (accessToken == BrokenAccessToken)
         {
             throw new InvalidOperationException("Mercado Pago devolvio una respuesta que no se pudo leer");
+        }
+
+        if (accessToken == UnauthorizedAccessToken)
+        {
+            throw new HttpRequestException("Response status code does not indicate success: 401 (Unauthorized).", null, System.Net.HttpStatusCode.Unauthorized);
         }
 
         Searches.Add((from, to, offset));
