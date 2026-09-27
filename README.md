@@ -92,9 +92,8 @@ variables de entorno usando `__` como separador de sección.
 | `MercadoPago:RedirectUri` | `MercadoPago__RedirectUri` | URL pública de `GET /api/integrations/mercadopago/oauth/callback`, idéntica a la cargada en la aplicación de Mercado Pago. MP no acepta `localhost`: en local se usa un túnel (ngrok) |
 | `MercadoPago:FrontendReturnUrl` | `MercadoPago__FrontendReturnUrl` | Página del frontend a la que vuelve el navegador al terminar la vinculación; recibe `?mercadopago=linked` o `?mercadopago=error&reason=...` (default `http://localhost:3000/dashboard/settings`) |
 | `MercadoPago:TimeoutSeconds` | `MercadoPago__TimeoutSeconds` | Timeout de las llamadas a la API de Mercado Pago (default 30) |
-| `MercadoPago:SyncIntervalMinutes` | `MercadoPago__SyncIntervalMinutes` | Cada cuántos minutos el job recorre las cuentas vinculadas y trae los movimientos nuevos (default 60). Mercado Pago no avisa por webhook lo que un usuario paga: solo lo que cobra, por eso se consulta |
-| `MercadoPago:SyncInitialDelaySeconds` | `MercadoPago__SyncInitialDelaySeconds` | Espera antes de la primera sincronización al arrancar (default 30) |
 | `TokenEncryption:Key` | `TokenEncryption__Key` | Clave AES-256 en base64 (`openssl rand -base64 32`) con la que se cifran en la base los tokens OAuth de las integraciones. Cambiarla deja ilegibles los tokens ya guardados |
+| `Jobs:ApiKey` | `Jobs__ApiKey` | Clave (mínimo 16 caracteres, `openssl rand -base64 24`) que tiene que traer la cabecera `X-Jobs-Key` para disparar o consultar los trabajos programados en `/api/jobs`. Es la que usa el cron de Dokploy; ver [Trabajos programados](#trabajos-programados-dokploy) |
 | `Cors:AllowedOrigins` | `Cors__AllowedOrigins__0` | Orígenes habilitados para el frontend |
 
 Los secretos no se commitean. En desarrollo local:
@@ -108,6 +107,7 @@ dotnet user-secrets set "Twilio:AuthToken" "<Auth Token de Twilio>" --project sr
 dotnet user-secrets set "Telegram:BotToken" "<token del bot>" --project src/FinGrow.Api
 dotnet user-secrets set "Telegram:WebhookSecret" "<secreto inventado para el webhook>" --project src/FinGrow.Api
 dotnet user-secrets set "TokenEncryption:Key" "$(openssl rand -base64 32)" --project src/FinGrow.Api
+dotnet user-secrets set "Jobs:ApiKey" "$(openssl rand -base64 24)" --project src/FinGrow.Api
 ```
 
 Si `Jwt:SecretKey`, `AiService:ApiKey` o las credenciales de Twilio o Telegram faltan, la API no arranca y
@@ -167,6 +167,47 @@ El flujo de vinculación es el mismo que WhatsApp: el empleado pide un código c
 `/start <código>` y el chat queda vinculado. Solo se procesan chats privados; un mensaje en un
 grupo se ignora.
 
+### Trabajos programados (Dokploy)
+
+La API no tiene un scheduler propio. Lo que corre "solo cada tanto" son **trabajos** registrados
+en código (`IScheduledJob`) que se disparan desde afuera, y en los entornos desplegados el que
+los dispara es el cron de Dokploy (*Schedules*). Cada corrida queda registrada en la tabla
+`job_runs` con inicio, fin, resultado y, si falló, el error; una corrida fallida nunca impide la
+siguiente.
+
+| Trabajo | Cron sugerido (UTC) | Qué hace |
+|---|---|---|
+| `metrics-snapshot` | `0 4 1 * *` (el 1 de cada mes, 01:00 de Argentina) | Genera las fotos mensuales de métricas por empresa y por departamento (`company_metrics_snapshots` y `department_metrics_snapshots`) del último mes cerrado, y completa las de los meses anteriores que falten desde el alta de cada empresa. Es idempotente: correrlo de nuevo actualiza la foto del último mes cerrado en lugar de duplicarla |
+| `mercadopago-sync` | `0 * * * *` (cada hora) | Recorre las cuentas de Mercado Pago vinculadas y trae los movimientos nuevos como pendientes de revisión. Mercado Pago no avisa por webhook lo que un usuario paga, por eso se consulta |
+
+Los endpoints viven bajo `/api/jobs` y se protegen con la cabecera `X-Jobs-Key`, que tiene que
+coincidir con `Jobs:ApiKey`. No usan JWT: los llama un cron, no una persona logueada.
+
+| Método y ruta | Qué hace |
+|---|---|
+| `GET /api/jobs` | Lista los trabajos registrados con su cron sugerido y su última corrida |
+| `POST /api/jobs/{nombre}/run` | Ejecuta el trabajo en el momento y responde cuando termina con la corrida registrada (`status`, `summary`, `error`, `durationSeconds`). `404` si el nombre no existe, `409` si ese mismo trabajo ya está corriendo |
+| `GET /api/jobs/{nombre}/runs?take=20` | Las últimas corridas, la más reciente primero (`take` entre 1 y 100) |
+
+En Dokploy, dentro del servicio de la API, pestaña **Schedules → Create Schedule**: un schedule
+por trabajo, con el cron de la tabla y este comando. El comando corre dentro del contenedor, que
+ya trae `curl` y tiene `Jobs__ApiKey` en su entorno, así que la clave no se copia a ningún lado:
+
+```bash
+curl -fsS -X POST "http://localhost:8080/api/jobs/metrics-snapshot/run" -H "X-Jobs-Key: $Jobs__ApiKey"
+```
+
+Si el schedule corre en el servidor en lugar de dentro del contenedor, es la misma llamada contra
+el host público con la clave pegada. Y para probar a mano desde tu máquina:
+
+```bash
+curl -fsS -X POST "https://dev-be.fingrow.com.ar/api/jobs/metrics-snapshot/run" -H "X-Jobs-Key: <Jobs:ApiKey del entorno>"
+```
+
+La respuesta es la corrida registrada; si `status` es `Failed`, `error` dice por qué y el log de
+la API tiene el detalle completo. `GET /api/jobs` sirve para verificar de un vistazo que cada
+cron esté corriendo: muestra la última corrida de cada trabajo.
+
 ---
 
 ## Arquitectura
@@ -209,7 +250,8 @@ src/
 ├── FinGrow.Application/
 │   ├── Common/             Result, Error y el ValidationBehavior de MediatR
 │   ├── Interfaces/         IUnitOfWork, ICurrentUser, IAiService, IDateTimeProvider, ITwilio*, ITelegram*
-│   ├── Features/           Un subdirectorio por funcionalidad (Integrations/{GenerateLinkCode,GetIntegration,UnlinkIntegration,Linking,WhatsApp,Telegram})
+│   ├── Jobs/               IScheduledJob, JobResult y el JobRunner que registra cada corrida
+│   ├── Features/           Un subdirectorio por funcionalidad (Integrations/{GenerateLinkCode,GetIntegration,UnlinkIntegration,Linking,WhatsApp,Telegram}, Jobs, Metrics)
 │   ├── DTOs/
 │   └── Validators/
 ├── FinGrow.Infrastructure/
@@ -222,6 +264,7 @@ src/
     ├── Controllers/
     ├── Twilio/             Filtro de firma, parseo del form y respuesta TwiML del webhook
     ├── Telegram/           Filtro del secreto y parseo del update JSON del webhook
+    ├── Jobs/               Filtro de la clave X-Jobs-Key con la que el cron dispara los trabajos
     ├── Middleware/         Manejo global de errores → ProblemDetails
     ├── Extensions/
     └── Program.cs
@@ -251,6 +294,9 @@ Siete entidades y tres value objects. El esquema se crea con la migración `Init
 | `budgets` | Budget | Tope por categoría y período |
 | `goals` | Goal | Metas de ahorro con objetivo, avance y fecha límite |
 | `investments` | Investment | Posiciones del portafolio: capital invertido y valuación actual |
+| `job_runs` | JobRun | Registro de cada corrida de un trabajo programado: inicio, fin, resultado y error |
+| `company_metrics_snapshots` | CompanyMetricsSnapshot | Foto mensual de métricas agregadas de una empresa: empleados activos, cuántos participaron, movimientos confirmados, presupuestos, metas e integraciones |
+| `department_metrics_snapshots` | DepartmentMetricsSnapshot | La misma foto, por departamento |
 
 Decisiones que conviene conocer antes de tocar el modelo:
 
