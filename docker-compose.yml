@@ -26,9 +26,7 @@ services:
       ASPNETCORE_HTTP_PORTS: 8080
       ConnectionStrings__Database: "Host=db;Port=5432;Database=fingrow;Username=fingrow;Password=fingrow"
       AiService__BaseUrl: "http://ai:8000"
-      # Secreto compartido con FinGrow-AI (variable API_KEY del otro lado). En local la IA
-      # arranca con API_KEY vacia y no lo valida, por eso alcanza con un valor de relleno.
-      AiService__ApiKey: "dev-ai-api-key"
+      AiService__ApiKey: "${API_KEY:-dev-ai-api-key}"
       Twilio__AccountSid: "${TWILIO_ACCOUNT_SID:-}"
       Twilio__AuthToken: "${TWILIO_AUTH_TOKEN:-}"
       Twilio__PublicBaseUrl: "${TWILIO_PUBLIC_BASE_URL:-}"
@@ -40,19 +38,25 @@ services:
       MercadoPago__FrontendReturnUrl: "${MERCADOPAGO_FRONTEND_RETURN_URL:-http://localhost:3000/dashboard/settings}"
       TokenEncryption__Key: "${TOKEN_ENCRYPTION_KEY:-}"
       Cors__AllowedOrigins__0: "http://localhost:3000"
+      Jwt__SecretKey: "dev-only-secret-key-change-in-production-32chars"
     ports:
       - "8080:8080"
     depends_on:
       db:
         condition: service_healthy
+      ai:
+        condition: service_started
 
-  # El servicio de IA vive en el repo FinGrow-AI; se habilita cuando tenga Dockerfile.
-  # ai:
-  #   build:
-  #     context: ../FinGrow-AI
-  #   container_name: fingrow-ai
-  #   ports:
-  #     - "8000:8000"
+  ai:
+    build:
+      context: ../FinGrow-AI
+    container_name: fingrow-ai
+    env_file:
+      - ../FinGrow-AI/.env
+    environment:
+      API_KEY: "${API_KEY:-dev-ai-api-key}"
+    ports:
+      - "8000:8000"
 
 volumes:
   fingrow-db-data:
