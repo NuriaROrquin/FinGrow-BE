@@ -94,6 +94,9 @@ variables de entorno usando `__` como separador de sección.
 | `MercadoPago:TimeoutSeconds` | `MercadoPago__TimeoutSeconds` | Timeout de las llamadas a la API de Mercado Pago (default 30) |
 | `TokenEncryption:Key` | `TokenEncryption__Key` | Clave AES-256 en base64 (`openssl rand -base64 32`) con la que se cifran en la base los tokens OAuth de las integraciones. Cambiarla deja ilegibles los tokens ya guardados |
 | `Jobs:ApiKey` | `Jobs__ApiKey` | Clave (mínimo 16 caracteres, `openssl rand -base64 24`) que tiene que traer la cabecera `X-Jobs-Key` para disparar o consultar los trabajos programados en `/api/jobs`. Es la que usa el cron de Dokploy; ver [Trabajos programados](#trabajos-programados-dokploy) |
+| `DolarApi:BaseUrl` | `DolarApi__BaseUrl` | URL base de [DolarApi](https://dolarapi.com), de donde sale la cotización del dólar MEP que usa la pantalla de Inversiones (default `https://dolarapi.com/`). Es pública y no pide credenciales |
+| `DolarApi:TimeoutSeconds` | `DolarApi__TimeoutSeconds` | Timeout de la consulta de la cotización (default 10) |
+| `DolarApi:CacheMinutes` | `DolarApi__CacheMinutes` | Minutos que la API reutiliza la última cotización antes de volver a pedirla (default 5) |
 | `Cors:AllowedOrigins` | `Cors__AllowedOrigins__0` | Orígenes habilitados para el frontend |
 
 Los secretos no se commitean. En desarrollo local:
@@ -117,6 +120,11 @@ producción los dos servicios tienen que compartir el mismo valor.
 
 `/health` informa `Degraded` (no `Unhealthy`) si FinGrow-AI no responde: la API sigue atendiendo
 todo lo que no depende de la IA.
+
+`GET /api/exchange-rates/mep` devuelve la cotización del dólar MEP (compra, venta y hora de
+actualización) que la pantalla de Inversiones usa para mostrar el portafolio en una sola moneda.
+Si DolarApi no responde o devuelve algo que no se puede leer, el endpoint contesta `503` y el
+frontend muestra cada moneda por separado; una respuesta fallida nunca queda guardada en la caché.
 
 ### WhatsApp (Twilio)
 
