@@ -37,6 +37,7 @@ services:
       MercadoPago__RedirectUri: "${MERCADOPAGO_REDIRECT_URI:-}"
       MercadoPago__FrontendReturnUrl: "${MERCADOPAGO_FRONTEND_RETURN_URL:-http://localhost:3000/dashboard/settings}"
       TokenEncryption__Key: "${TOKEN_ENCRYPTION_KEY:-}"
+      Jobs__ApiKey: "${JOBS_API_KEY:-dev-only-jobs-key-change-in-production}"
       Cors__AllowedOrigins__0: "http://localhost:3000"
       Jwt__SecretKey: "dev-only-secret-key-change-in-production-32chars"
     ports:
