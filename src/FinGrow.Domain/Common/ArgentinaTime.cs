@@ -11,4 +11,7 @@ public static class ArgentinaTime
 
     public static DateOnly DateOf(DateTimeOffset instant) =>
         DateOnly.FromDateTime(instant.ToOffset(UtcOffset).DateTime);
+
+    public static DateTimeOffset StartOfDay(DateOnly date) =>
+        new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), UtcOffset).ToUniversalTime();
 }

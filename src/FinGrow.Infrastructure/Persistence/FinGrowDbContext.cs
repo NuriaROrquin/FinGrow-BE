@@ -39,7 +39,13 @@ public sealed class FinGrowDbContext : DbContext, IUnitOfWork
 
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
-protected override void OnModelCreating(ModelBuilder modelBuilder)
+    public DbSet<JobRun> JobRuns => Set<JobRun>();
+
+    public DbSet<CompanyMetricsSnapshot> CompanyMetricsSnapshots => Set<CompanyMetricsSnapshot>();
+
+    public DbSet<DepartmentMetricsSnapshot> DepartmentMetricsSnapshots => Set<DepartmentMetricsSnapshot>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
 

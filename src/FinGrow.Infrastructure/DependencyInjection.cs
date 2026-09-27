@@ -73,6 +73,9 @@ public static class DependencyInjection
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<ITransactionReadRepository, TransactionReadRepository>();
         services.AddScoped<IGoalRepository, GoalRepository>();
+        services.AddScoped<IJobRunRepository, JobRunRepository>();
+        services.AddScoped<IMetricsSnapshotRepository, MetricsSnapshotRepository>();
+        services.AddScoped<IPeriodActivityReadRepository, PeriodActivityReadRepository>();
 
         services.AddScoped<DatabaseSeeder>();
 
@@ -166,8 +169,6 @@ public static class DependencyInjection
 
         services.AddHttpClient<IMercadoPagoPaymentsClient, MercadoPagoPaymentsClient>(ConfigureMercadoPagoClient)
             .AddPolicyHandler(GetRetryPolicy());
-
-        services.AddHostedService<MercadoPagoSyncWorker>();
 
         return services;
     }
