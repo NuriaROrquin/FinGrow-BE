@@ -21,11 +21,41 @@ El backend consume la API de IA por HTTP; el frontend nunca la llama directo.
 
 ## Puesta en marcha
 
-Con Docker, que levanta la base y la API juntas:
+Con Docker, que levanta la base, la API y FinGrow-AI juntas:
 
 ```bash
 docker compose up --build
 ```
+
+El servicio `ai` se construye desde `../FinGrow-AI`, así que los dos repos tienen que estar
+clonados uno al lado del otro en la misma carpeta:
+
+```
+FinGrow/
+├── FinGrow-BE/
+└── FinGrow-AI/
+```
+
+FinGrow-AI además tiene que tener su propio `.env`, porque compose lo lee al levantar la IA (sin
+ese archivo `docker compose up` falla). Se crea desde la plantilla de ese repo:
+
+```bash
+cp ../FinGrow-AI/.env.example ../FinGrow-AI/.env
+```
+
+Con la plantilla tal cual, la IA usa el proveedor `stub` (respuestas de prueba, sin llamar a
+Anthropic). Para usar Claude, completar ahí `LLM_PROVIDER=anthropic` y `LLM_API_KEY`.
+
+El secreto compartido entre la API y la IA va en un `.env` en la raíz de este repo, que no se
+commitea:
+
+```bash
+echo "API_KEY=$(openssl rand -hex 32)" >> .env
+```
+
+Compose se lo pasa a la API como `AiService__ApiKey` y a la IA como `API_KEY`, pisando el
+`API_KEY` del `.env` de FinGrow-AI, así que los dos siempre coinciden. Sin ese `.env` ambos
+reciben el mismo valor de relleno y la comunicación funciona igual.
 
 En local, contra una PostgreSQL ya disponible:
 
@@ -81,9 +111,12 @@ dotnet user-secrets set "TokenEncryption:Key" "$(openssl rand -base64 32)" --pro
 ```
 
 Si `Jwt:SecretKey`, `AiService:ApiKey` o las credenciales de Twilio o Telegram faltan, la API no arranca y
-el log dice cuál es. En
-desarrollo `AiService:ApiKey` puede ser cualquier texto: FinGrow-AI con `API_KEY` vacía no lo
-valida. En producción los dos servicios tienen que compartir el mismo valor.
+el log dice cuál es. Con `dotnet run` contra una FinGrow-AI levantada con `uvicorn` y `API_KEY`
+vacía, `AiService:ApiKey` puede ser cualquier texto porque la IA no lo valida. Con Docker y en
+producción los dos servicios tienen que compartir el mismo valor.
+
+`/health` informa `Degraded` (no `Unhealthy`) si FinGrow-AI no responde: la API sigue atendiendo
+todo lo que no depende de la IA.
 
 ### WhatsApp (Twilio)
 

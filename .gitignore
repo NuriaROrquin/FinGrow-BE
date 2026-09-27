@@ -6,6 +6,9 @@
 # dotenv files
 .env
 
+# local-only compose overrides (may contain shared dev credentials)
+docker-compose.shared-db.yml
+
 # User-specific files
 *.rsuser
 *.suo

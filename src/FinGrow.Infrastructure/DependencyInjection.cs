@@ -18,6 +18,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Polly;
@@ -98,6 +99,9 @@ public static class DependencyInjection
                 client.DefaultRequestHeaders.Add(AiServiceOptions.ApiKeyHeader, options.ApiKey);
             })
             .AddPolicyHandler(GetRetryPolicy());
+
+        services.AddHealthChecks()
+            .AddCheck<AiServiceHealthCheck>("ai", HealthStatus.Degraded, timeout: TimeSpan.FromSeconds(5));
 
         return services;
     }
