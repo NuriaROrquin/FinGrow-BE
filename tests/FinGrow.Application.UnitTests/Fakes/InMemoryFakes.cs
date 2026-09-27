@@ -274,3 +274,42 @@ public sealed class FakeGoalRepository : IGoalRepository
             .OrderByDescending(goal => goal.CreatedAt)
             .ToList());
 }
+
+/// <summary>Solo responde los totales mensuales; el resto de las lecturas no lo usan los reportes.</summary>
+public sealed class FakeMonthlyTotalsRepository : ITransactionReadRepository
+{
+    public List<MonthlyTotals> Totals { get; } = new();
+
+    public (Currency Currency, DateOnly From, DateOnly To)? LastRequest { get; private set; }
+
+    public Task<IReadOnlyList<MonthlyTotals>> GetMonthlyTotalsAsync(
+        Guid employeeId,
+        Currency currency,
+        DateOnly fromDate,
+        DateOnly toDate,
+        CancellationToken cancellationToken = default)
+    {
+        LastRequest = (currency, fromDate, toDate);
+        return Task.FromResult<IReadOnlyList<MonthlyTotals>>(Totals);
+    }
+
+    public Task<TransactionSummary> GetSummaryAsync(
+        Guid employeeId,
+        DateOnly? fromDate = null,
+        DateOnly? toDate = null,
+        CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+    public Task<TransactionPage> GetPageAsync(
+        Guid employeeId,
+        int pageNumber,
+        int pageSize,
+        string? search,
+        TransactionType? type,
+        TransactionStatus? status,
+        ExpenseCategory? expenseCategory,
+        IncomeCategory? incomeCategory,
+        PaymentMethod? paymentMethod,
+        DateOnly? fromDate,
+        DateOnly? toDate,
+        CancellationToken cancellationToken = default) => throw new NotSupportedException();
+}

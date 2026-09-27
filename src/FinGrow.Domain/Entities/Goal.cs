@@ -109,6 +109,26 @@ public sealed class Goal : AggregateRoot
     /// </summary>
     public bool IsOverdue(DateOnly today) => Status == GoalStatus.Active && Deadline < today;
 
+    public int PlannedMonths => Math.Max(1, MonthNumber(Deadline) - MonthNumber(ArgentinaTime.DateOf(CreatedAt)) + 1);
+
+    public Money MonthlyCommitment => Money.From(TargetAmount.Amount / PlannedMonths, TargetAmount.Currency);
+
+    public bool IsCommittedIn(DateOnly anyDayOfMonth)
+    {
+        var month = MonthNumber(anyDayOfMonth);
+
+        if (Status == GoalStatus.Cancelled
+            || month < MonthNumber(ArgentinaTime.DateOf(CreatedAt))
+            || month > MonthNumber(Deadline))
+        {
+            return false;
+        }
+
+        return AchievedAt is not { } achievedAt || MonthNumber(ArgentinaTime.DateOf(achievedAt)) >= month;
+    }
+
+    private static int MonthNumber(DateOnly date) => (date.Year * 12) + date.Month - 1;
+
     /// <summary>Registra un aporte y marca la meta como alcanzada si con eso llega al objetivo.</summary>
     public GoalContribution AddContribution(
         Money amount,

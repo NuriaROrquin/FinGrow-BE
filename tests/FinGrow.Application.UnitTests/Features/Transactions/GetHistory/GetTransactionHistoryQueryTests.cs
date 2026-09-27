@@ -190,6 +190,14 @@ public sealed class GetTransactionHistoryQueryTests
                 0m,
                 0m));
 
+        public Task<IReadOnlyList<MonthlyTotals>> GetMonthlyTotalsAsync(
+            Guid employeeId,
+            Currency currency,
+            DateOnly fromDate,
+            DateOnly toDate,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<MonthlyTotals>>(Array.Empty<MonthlyTotals>());
+
         public Task<TransactionPage> GetPageAsync(
             Guid employeeId,
             int pageNumber,
@@ -273,6 +281,14 @@ public sealed class GetTransactionSummaryQueryTests
                 250m,
                 850m,
                 320m));
+
+        public Task<IReadOnlyList<MonthlyTotals>> GetMonthlyTotalsAsync(
+            Guid employeeId,
+            Currency currency,
+            DateOnly fromDate,
+            DateOnly toDate,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<MonthlyTotals>>(Array.Empty<MonthlyTotals>());
 
         public Task<TransactionPage> GetPageAsync(
             Guid employeeId,

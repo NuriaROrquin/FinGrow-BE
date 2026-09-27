@@ -11,6 +11,16 @@ public interface ITransactionReadRepository
         DateOnly? toDate = null,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Ingresos y gastos confirmados en una moneda, agrupados por mes. Los meses sin movimientos no vienen.
+    /// </summary>
+    Task<IReadOnlyList<MonthlyTotals>> GetMonthlyTotalsAsync(
+        Guid employeeId,
+        Currency currency,
+        DateOnly fromDate,
+        DateOnly toDate,
+        CancellationToken cancellationToken = default);
+
     Task<TransactionPage> GetPageAsync(
         Guid employeeId,
         int pageNumber,
@@ -35,6 +45,8 @@ public sealed record TransactionSummary(
     decimal TotalIncomeUsd,
     decimal TotalExpenseArs,
     decimal TotalExpenseUsd);
+
+public sealed record MonthlyTotals(int Year, int Month, decimal Income, decimal Expense);
 
 public sealed record TransactionPage(
     IReadOnlyList<Transaction> Items,
