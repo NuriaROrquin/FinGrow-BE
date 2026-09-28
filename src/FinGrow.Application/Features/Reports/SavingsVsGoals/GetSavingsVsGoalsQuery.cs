@@ -10,25 +10,25 @@ public sealed record GetSavingsVsGoalsQuery(Guid EmployeeId, Currency Currency, 
     public const int MaxMonths = 36;
 }
 
+/// <param name="CompletionRate">Aportado sobre comprometido en el periodo, en %; null si no habia nada comprometido.</param>
 public sealed record SavingsVsGoalsResponse(
     Currency Currency,
     IReadOnlyList<SavingsVsGoalsMonth> Months,
-    decimal TotalIncome,
-    decimal TotalActualSavings,
+    decimal TotalContributed,
     decimal TotalCommitted,
     int MonthsWithCommitment,
     int MonthsOnTarget,
-    decimal? SavingsRate,
+    decimal? CompletionRate,
     bool HasGoals);
 
-/// <param name="ActualSavings">Ingresos menos gastos confirmados del mes; puede ser negativo.</param>
+/// <param name="Contributed">Suma de los aportes con fecha en ese mes, en todas las metas de la moneda.</param>
 /// <param name="Committed">Suma de la cuota mensual de las metas vigentes ese mes.</param>
-/// <param name="MetTarget">Null si ese mes no habia ninguna meta comprometida.</param>
+/// <param name="MetTarget">
+/// Null si ese mes no habia ninguna meta comprometida, o si es el mes en curso y todavia no se llego a la cuota.
+/// </param>
 public sealed record SavingsVsGoalsMonth(
     int Year,
     int Month,
-    decimal Income,
-    decimal Expense,
-    decimal ActualSavings,
+    decimal Contributed,
     decimal Committed,
     bool? MetTarget);

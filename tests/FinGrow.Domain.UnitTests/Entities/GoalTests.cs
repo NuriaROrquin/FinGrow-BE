@@ -224,6 +224,38 @@ public class GoalTests
     }
 
     [Fact]
+    public void A_goal_completed_with_a_backdated_contribution_stops_committing_after_the_contribution_month()
+    {
+        var goal = CreateGoal();
+        goal.AddContribution(Money.From(400000m, Currency.ARS), new DateOnly(2026, 5, 10), null, new DateTimeOffset(2026, 8, 1, 12, 0, 0, TimeSpan.Zero));
+        goal.AddContribution(Money.From(600000m, Currency.ARS), new DateOnly(2026, 6, 5), null, new DateTimeOffset(2026, 9, 1, 12, 0, 0, TimeSpan.Zero));
+
+        goal.AchievedAt.ShouldBe(new DateTimeOffset(2026, 9, 1, 12, 0, 0, TimeSpan.Zero));
+        goal.ReachedOn.ShouldBe(new DateOnly(2026, 6, 5));
+        goal.IsCommittedIn(new DateOnly(2026, 6, 1)).ShouldBeTrue();
+        goal.IsCommittedIn(new DateOnly(2026, 7, 1)).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void The_target_is_reached_by_contribution_date_not_by_registration_order()
+    {
+        var goal = CreateGoal();
+        goal.AddContribution(Money.From(700000m, Currency.ARS), new DateOnly(2026, 6, 1), null, Now);
+        goal.AddContribution(Money.From(300000m, Currency.ARS), new DateOnly(2026, 4, 1), null, Now);
+
+        goal.ReachedOn.ShouldBe(new DateOnly(2026, 6, 1));
+    }
+
+    [Fact]
+    public void A_goal_in_progress_has_not_been_reached()
+    {
+        var goal = CreateGoal();
+        goal.AddContribution(Money.From(1000m, Currency.ARS), Today, null, Now);
+
+        goal.ReachedOn.ShouldBeNull();
+    }
+
+    [Fact]
     public void A_cancelled_goal_commits_nothing()
     {
         var goal = CreateGoal();

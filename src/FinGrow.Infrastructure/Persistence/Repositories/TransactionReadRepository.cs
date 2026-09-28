@@ -63,41 +63,7 @@ internal sealed class TransactionReadRepository : ITransactionReadRepository
             totalExpenseArs,
             totalExpenseUsd);
     }
-
-    public async Task<IReadOnlyList<MonthlyTotals>> GetMonthlyTotalsAsync(
-        Guid employeeId,
-        Currency currency,
-        DateOnly fromDate,
-        DateOnly toDate,
-        CancellationToken cancellationToken = default)
-    {
-        var totals = await _dbContext.Transactions
-            .AsNoTracking()
-            .Where(transaction => transaction.EmployeeId == employeeId)
-            .Where(transaction => transaction.Status == TransactionStatus.Confirmed)
-            .Where(transaction => transaction.Amount.Currency == currency)
-            .Where(transaction => transaction.OccurredOn >= fromDate && transaction.OccurredOn <= toDate)
-            .GroupBy(transaction => new { transaction.OccurredOn.Year, transaction.OccurredOn.Month, transaction.Type })
-            .Select(group => new
-            {
-                group.Key.Year,
-                group.Key.Month,
-                group.Key.Type,
-                Total = group.Sum(transaction => transaction.Amount.Amount)
-            })
-            .ToListAsync(cancellationToken);
-
-        return totals
-            .GroupBy(total => new { total.Year, total.Month })
-            .Select(month => new MonthlyTotals(
-                month.Key.Year,
-                month.Key.Month,
-                month.Where(total => total.Type == TransactionType.Income).Sum(total => total.Total),
-                month.Where(total => total.Type == TransactionType.Expense).Sum(total => total.Total)))
-            .OrderBy(month => month.Year)
-            .ThenBy(month => month.Month)
-            .ToList();
-    }
+    
 
     public async Task<TransactionPage> GetPageAsync(
         Guid employeeId,

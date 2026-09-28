@@ -124,7 +124,39 @@ public sealed class Goal : AggregateRoot
             return false;
         }
 
-        return AchievedAt is not { } achievedAt || MonthNumber(ArgentinaTime.DateOf(achievedAt)) >= month;
+        return ReachedOn is not { } reachedOn || MonthNumber(reachedOn) >= month;
+    }
+
+    /// <summary>
+    /// Fecha del aporte con el que el acumulado llego al objetivo, recorriendo los aportes por su fecha.
+    /// Difiere de <see cref="AchievedAt"/> cuando el aporte se carga con fecha atrasada: AchievedAt es
+    /// cuando se registro, ReachedOn es cuando se ahorro. Null si la meta no esta alcanzada.
+    /// </summary>
+    public DateOnly? ReachedOn
+    {
+        get
+        {
+            if (Status != GoalStatus.Achieved)
+            {
+                return null;
+            }
+
+            var accumulated = Money.Zero(TargetAmount.Currency);
+
+            foreach (var contribution in _contributions
+                         .OrderBy(contribution => contribution.ContributedOn)
+                         .ThenBy(contribution => contribution.CreatedAt))
+            {
+                accumulated = accumulated.Add(contribution.Amount);
+
+                if (accumulated.IsAtLeast(TargetAmount))
+                {
+                    return contribution.ContributedOn;
+                }
+            }
+
+            return null;
+        }
     }
 
     private static int MonthNumber(DateOnly date) => (date.Year * 12) + date.Month - 1;

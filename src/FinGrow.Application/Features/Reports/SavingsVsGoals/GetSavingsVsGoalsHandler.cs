@@ -9,7 +9,6 @@ using MediatR;
 
 internal sealed class GetSavingsVsGoalsHandler(
     IGoalRepository goalRepository,
-    ITransactionReadRepository transactionReadRepository,
     IDateTimeProvider dateTimeProvider) : IRequestHandler<GetSavingsVsGoalsQuery, Result<SavingsVsGoalsResponse>>
 {
     private const int MonthsWithoutGoals = 6;
@@ -25,50 +24,59 @@ internal sealed class GetSavingsVsGoalsHandler(
         var monthCount = request.Months ?? MonthsSinceFirstGoal(goals.Select(goal => goal.CreatedAt), currentMonth);
         var firstMonth = currentMonth.AddMonths(-(monthCount - 1));
 
-        var totalsByMonth = (await transactionReadRepository.GetMonthlyTotalsAsync(
-                request.EmployeeId,
-                request.Currency,
-                firstMonth,
-                currentMonth.AddMonths(1).AddDays(-1),
-                cancellationToken))
-            .ToDictionary(totals => (totals.Year, totals.Month));
+        var contributedByMonth = goals
+            .SelectMany(goal => goal.Contributions)
+            .GroupBy(contribution => (contribution.ContributedOn.Year, contribution.ContributedOn.Month))
+            .ToDictionary(month => month.Key, month => month.Sum(contribution => contribution.Amount.Amount));
 
         var months = Enumerable.Range(0, monthCount)
             .Select(offset => firstMonth.AddMonths(offset))
             .Select(month =>
             {
-                var totals = totalsByMonth.GetValueOrDefault((month.Year, month.Month));
-                var income = totals?.Income ?? 0m;
-                var expense = totals?.Expense ?? 0m;
+                var contributed = contributedByMonth.GetValueOrDefault((month.Year, month.Month));
                 var committed = goals
                     .Where(goal => goal.IsCommittedIn(month))
                     .Sum(goal => goal.MonthlyCommitment.Amount);
-                var actualSavings = income - expense;
 
                 return new SavingsVsGoalsMonth(
                     month.Year,
                     month.Month,
-                    income,
-                    expense,
-                    actualSavings,
+                    contributed,
                     committed,
-                    committed > 0m ? actualSavings >= committed : null);
+                    MetTarget(contributed, committed, isCurrentMonth: month == currentMonth));
             })
             .ToList();
 
-        var totalIncome = months.Sum(month => month.Income);
-        var totalActualSavings = months.Sum(month => month.ActualSavings);
+        var totalContributed = months.Sum(month => month.Contributed);
+        var totalCommitted = months.Sum(month => month.Committed);
 
         return Result.Success(new SavingsVsGoalsResponse(
             request.Currency,
             months,
-            totalIncome,
-            totalActualSavings,
-            months.Sum(month => month.Committed),
+            totalContributed,
+            totalCommitted,
             months.Count(month => month.MetTarget is not null),
             months.Count(month => month.MetTarget == true),
-            totalIncome > 0m ? decimal.Round(totalActualSavings / totalIncome * 100m, 1) : null,
+            totalCommitted > 0m ? decimal.Round(totalContributed / totalCommitted * 100m, 1) : null,
             goals.Count > 0));
+    }
+
+    /// <summary>
+    /// El mes en curso no se da por incumplido antes de que termine: cuenta solo si ya se llego a la cuota.
+    /// </summary>
+    private static bool? MetTarget(decimal contributed, decimal committed, bool isCurrentMonth)
+    {
+        if (committed <= 0m)
+        {
+            return null;
+        }
+
+        if (contributed >= committed)
+        {
+            return true;
+        }
+
+        return isCurrentMonth ? null : false;
     }
 
     private static int MonthsSinceFirstGoal(IEnumerable<DateTimeOffset> goalCreations, DateOnly currentMonth)

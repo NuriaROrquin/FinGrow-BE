@@ -34,6 +34,7 @@ internal sealed class GoalConfiguration : IEntityTypeConfiguration<Goal>
         builder.Ignore(goal => goal.RemainingAmount);
         builder.Ignore(goal => goal.PlannedMonths);
         builder.Ignore(goal => goal.MonthlyCommitment);
+        builder.Ignore(goal => goal.ReachedOn);
 
         builder.HasOne(goal => goal.Employee)
             .WithMany()
