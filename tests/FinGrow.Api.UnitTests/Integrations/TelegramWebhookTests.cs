@@ -157,6 +157,7 @@ public class TelegramWebhookTests
                     ["MercadoPago:ClientSecret"] = "unit-test-mp-client-secret",
                     ["MercadoPago:RedirectUri"] = "https://api.test/api/integrations/mercadopago/oauth/callback",
                     ["TokenEncryption:Key"] = "dW5pdC10ZXN0LXRva2VuLWVuY3J5cHRpb24ta2V5ISE=",
+                    ["Jobs:ApiKey"] = "unit-test-jobs-api-key-1234",
                 }));
 
             builder.ConfigureTestServices(services =>

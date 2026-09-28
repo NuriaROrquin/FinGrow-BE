@@ -50,4 +50,12 @@ public sealed class InvestmentValuation : Entity
 
         return new InvestmentValuation(Guid.CreateVersion7(), investmentId, value, valuedOn, source, createdAt);
     }
+
+    internal void Correct(Money value, DateOnly valuedOn)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+
+        Value = value;
+        ValuedOn = valuedOn;
+    }
 }

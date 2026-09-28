@@ -1,5 +1,6 @@
 namespace FinGrow.Application.Features.Integrations.MercadoPago.Sync;
 
+using System.Net;
 using FinGrow.Application.Common;
 using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Entities;
@@ -63,7 +64,13 @@ internal sealed partial class MercadoPagoSynchronizer
         }
 
         var from = (integration.LastSyncedAt ?? now.Subtract(InitialLookback)).Subtract(Overlap);
-        var payments = await FetchAsync(grant.AccessToken, from, now, cancellationToken);
+        var payments = await FetchReauthorizingOnceAsync(integration, grant, from, now, cancellationToken);
+
+        if (payments is null)
+        {
+            return Result.Failure<MercadoPagoSyncSummary>(GrantExpired);
+        }
+
         var importable = payments.Where(MercadoPagoPaymentMapper.IsImportable).ToList();
         var known = await _transactions.ListExistingExternalReferencesAsync(
             integration.EmployeeId,
@@ -102,9 +109,21 @@ internal sealed partial class MercadoPagoSynchronizer
             return grant;
         }
 
+        var renewed = await TryRefreshAsync(integration, grant, now, cancellationToken);
+
+        if (renewed is not null)
+        {
+            return renewed;
+        }
+
+        return grant.ExpiresWithin(TimeSpan.Zero, now) ? null : grant;
+    }
+
+    private async Task<OAuthGrant?> TryRefreshAsync(EmployeeIntegration integration, OAuthGrant grant, DateTimeOffset now, CancellationToken cancellationToken)
+    {
         if (!grant.CanRefresh)
         {
-            return grant.ExpiresWithin(TimeSpan.Zero, now) ? null : grant;
+            return null;
         }
 
         try
@@ -121,7 +140,42 @@ internal sealed partial class MercadoPagoSynchronizer
         {
             LogRefreshFailed(_logger, exception, integration.EmployeeId);
 
-            return grant.ExpiresWithin(TimeSpan.Zero, now) ? null : grant;
+            return null;
+        }
+    }
+
+    private async Task<List<MercadoPagoPayment>?> FetchReauthorizingOnceAsync(
+        EmployeeIntegration integration,
+        OAuthGrant grant,
+        DateTimeOffset from,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await FetchAsync(grant.AccessToken, from, now, cancellationToken);
+        }
+        catch (HttpRequestException exception) when (exception.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            LogUnauthorized(_logger, integration.EmployeeId);
+        }
+
+        var renewed = await TryRefreshAsync(integration, grant, now, cancellationToken);
+
+        if (renewed is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return await FetchAsync(renewed.AccessToken, from, now, cancellationToken);
+        }
+        catch (HttpRequestException exception) when (exception.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            LogStillUnauthorized(_logger, integration.EmployeeId);
+
+            return null;
         }
     }
 
@@ -188,6 +242,12 @@ internal sealed partial class MercadoPagoSynchronizer
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "No se pudo renovar el token de Mercado Pago del empleado {EmployeeId}.")]
     private static partial void LogRefreshFailed(ILogger logger, Exception exception, Guid employeeId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Mercado Pago rechazo el token del empleado {EmployeeId} (401); se intenta renovar la autorizacion antes de darla por vencida.")]
+    private static partial void LogUnauthorized(ILogger logger, Guid employeeId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Mercado Pago sigue rechazando al empleado {EmployeeId} despues de renovar el token: la autorizacion fue revocada y hay que volver a vincular la cuenta.")]
+    private static partial void LogStillUnauthorized(ILogger logger, Guid employeeId);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "FinGrow-AI no categorizo {Count} gastos de Mercado Pago; quedan como 'otros' hasta que el empleado los revise.")]
     private static partial void LogCategorizationFailed(ILogger logger, Exception exception, int count);

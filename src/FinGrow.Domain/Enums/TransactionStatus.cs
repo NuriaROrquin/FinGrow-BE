@@ -8,5 +8,6 @@ namespace FinGrow.Domain.Enums;
 public enum TransactionStatus
 {
     Pending = 1,
-    Confirmed = 2
+    Confirmed = 2,
+    Eliminated = 3
 }

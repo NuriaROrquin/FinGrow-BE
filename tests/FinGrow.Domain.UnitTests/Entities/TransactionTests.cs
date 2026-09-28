@@ -125,6 +125,44 @@ public class TransactionTests
     }
 
     [Fact]
+    public void A_pending_transaction_can_be_confirmed_while_editing_it()
+    {
+        var transaction = RegisterExpense(Money.From(4500m, Currency.ARS));
+
+        transaction.Correct(
+            TransactionType.Expense,
+            Money.From(5000m, Currency.ARS),
+            ExpenseCategory.Servicios,
+            null,
+            "Factura de luz actualizada",
+            Today,
+            PaymentMethod.DebitCard,
+            TransactionStatus.Confirmed,
+            Now.AddMinutes(5));
+
+        transaction.Status.ShouldBe(TransactionStatus.Confirmed);
+        transaction.UpdatedAt.ShouldBe(Now.AddMinutes(5));
+    }
+
+    [Fact]
+    public void A_confirmed_transaction_cannot_be_set_back_to_pending()
+    {
+        var transaction = RegisterExpense(Money.From(4500m, Currency.ARS));
+        transaction.Confirm(Now);
+
+        Should.Throw<DomainException>(() => transaction.Correct(
+            TransactionType.Expense,
+            Money.From(4500m, Currency.ARS),
+            ExpenseCategory.Servicios,
+            null,
+            "Factura de luz",
+            Today,
+            PaymentMethod.DebitCard,
+            TransactionStatus.Pending,
+            Now.AddMinutes(1)));
+    }
+
+    [Fact]
     public void An_expense_can_be_recategorized_when_the_employee_corrects_the_AI()
     {
         var transaction = RegisterExpense(Money.From(4500m, Currency.ARS));
@@ -141,6 +179,27 @@ public class TransactionTests
         var transaction = RegisterExpense(Money.From(4500m, Currency.ARS));
 
         Should.Throw<DomainException>(() => transaction.RecategorizeIncome(IncomeCategory.Salario, Now));
+    }
+
+    [Fact]
+    public void Eliminating_a_transaction_keeps_it_for_auditing_with_an_eliminated_status()
+    {
+        var transaction = RegisterExpense(Money.From(4500m, Currency.ARS));
+        var deletedAt = Now.AddMinutes(8);
+
+        transaction.Eliminate(deletedAt);
+
+        transaction.Status.ShouldBe(TransactionStatus.Eliminated);
+        transaction.UpdatedAt.ShouldBe(deletedAt);
+    }
+
+    [Fact]
+    public void An_eliminated_transaction_cannot_be_eliminated_again()
+    {
+        var transaction = RegisterExpense(Money.From(4500m, Currency.ARS));
+        transaction.Eliminate(Now);
+
+        Should.Throw<DomainException>(() => transaction.Eliminate(Now.AddMinutes(1)));
     }
 
     private static Transaction RegisterExpense(Money amount) => Transaction.RegisterExpense(

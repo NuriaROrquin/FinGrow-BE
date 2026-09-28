@@ -7,6 +7,7 @@ using FinGrow.Domain.Repositories;
 using FinGrow.Infrastructure.Ai;
 using FinGrow.Infrastructure.Identity;
 using FinGrow.Infrastructure.Integrations;
+using FinGrow.Infrastructure.Integrations.DolarApi;
 using FinGrow.Infrastructure.Integrations.MercadoPago;
 using FinGrow.Infrastructure.Integrations.Telegram;
 using FinGrow.Infrastructure.Integrations.Twilio;
@@ -18,6 +19,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Polly;
@@ -35,6 +37,7 @@ public static class DependencyInjection
         services.AddTwilio(configuration);
         services.AddTelegram(configuration);
         services.AddMercadoPago(configuration);
+        services.AddDolarApi(configuration);
 
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, CurrentUser>();
@@ -72,6 +75,11 @@ public static class DependencyInjection
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<ITransactionReadRepository, TransactionReadRepository>();
         services.AddScoped<IGoalRepository, GoalRepository>();
+        services.AddScoped<IInvestmentRepository, InvestmentRepository>();
+        services.AddScoped<IInvestmentReadRepository, InvestmentReadRepository>();
+        services.AddScoped<IJobRunRepository, JobRunRepository>();
+        services.AddScoped<IMetricsSnapshotRepository, MetricsSnapshotRepository>();
+        services.AddScoped<IPeriodActivityReadRepository, PeriodActivityReadRepository>();
 
         services.AddScoped<DatabaseSeeder>();
 
@@ -98,6 +106,9 @@ public static class DependencyInjection
                 client.DefaultRequestHeaders.Add(AiServiceOptions.ApiKeyHeader, options.ApiKey);
             })
             .AddPolicyHandler(GetRetryPolicy());
+
+        services.AddHealthChecks()
+            .AddCheck<AiServiceHealthCheck>("ai", HealthStatus.Degraded, timeout: TimeSpan.FromSeconds(5));
 
         return services;
     }
@@ -163,7 +174,25 @@ public static class DependencyInjection
         services.AddHttpClient<IMercadoPagoPaymentsClient, MercadoPagoPaymentsClient>(ConfigureMercadoPagoClient)
             .AddPolicyHandler(GetRetryPolicy());
 
-        services.AddHostedService<MercadoPagoSyncWorker>();
+        return services;
+    }
+
+    private static IServiceCollection AddDolarApi(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddMemoryCache();
+
+        services.AddOptions<DolarApiOptions>()
+            .Bind(configuration.GetSection(DolarApiOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddHttpClient<IExchangeRateProvider, DolarApiExchangeRateProvider>((provider, client) =>
+        {
+            var options = provider.GetRequiredService<IOptions<DolarApiOptions>>().Value;
+
+            client.BaseAddress = new Uri(options.BaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        });
 
         return services;
     }

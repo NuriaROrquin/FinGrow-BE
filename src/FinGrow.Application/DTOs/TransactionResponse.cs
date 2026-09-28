@@ -14,7 +14,8 @@ public sealed record TransactionResponse(
     PaymentMethod PaymentMethod,
     TransactionSource Source,
     TransactionStatus Status,
-    DateTimeOffset CreatedAt)
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt)
 {
     public static TransactionResponse FromEntity(Transaction transaction) => new(
         transaction.Id,
@@ -27,5 +28,6 @@ public sealed record TransactionResponse(
         transaction.PaymentMethod,
         transaction.Source,
         transaction.Status,
-        transaction.CreatedAt);
+        transaction.CreatedAt,
+        transaction.UpdatedAt);
 }

@@ -100,6 +100,31 @@ public class MercadoPagoSynchronizerTests
     }
 
     [Fact]
+    public async Task A_deleted_mercado_pago_transaction_is_not_recreated_on_next_sync()
+    {
+        var deleted = Transaction.RegisterExpense(
+            EmployeeId,
+            Money.From(10285m, Currency.ARS),
+            ExpenseCategory.Otros,
+            "Canva",
+            new DateOnly(2026, 9, 1),
+            PaymentMethod.DebitCard,
+            TransactionSource.MercadoPago,
+            TransactionStatus.Pending,
+            Now.AddDays(-2),
+            externalReference: "55");
+        deleted.Eliminate(Now.AddDays(-1));
+        _transactions.Transactions.Add(deleted);
+        _payments.Payments.Add(Purchase(55, "Canva", 10285m, "debit_card"));
+
+        var result = await Sync();
+
+        result.Value.Imported.ShouldBe(0);
+        result.Value.AlreadyKnown.ShouldBe(1);
+        _transactions.Transactions.Count.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task The_occurred_date_is_the_approval_date_in_argentina()
     {
         _payments.Payments.Add(Purchase(6, "Cena", 5000m, "credit_card") with
@@ -198,6 +223,51 @@ public class MercadoPagoSynchronizerTests
 
         result.Error.ShouldBe(MercadoPagoSynchronizer.GrantExpired);
         _payments.Searches.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_401_with_a_refresh_token_renews_the_authorization_and_retries()
+    {
+        _payments.UnauthorizedAccessToken = "access";
+        _oauth.Tokens = new MercadoPagoTokens("new-access", "new-refresh", TimeSpan.FromDays(180), MercadoPagoUserId);
+        _payments.Payments.Add(Purchase(30, "Canva", 10285m, "debit_card"));
+
+        var result = await Sync();
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Imported.ShouldBe(1);
+        _integration.Grant!.AccessToken.ShouldBe("new-access");
+        _payments.Searches.ShouldHaveSingleItem();
+        _unitOfWork.SaveCount.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task A_401_that_persists_after_renewing_is_reported_as_an_expired_authorization()
+    {
+        _payments.UnauthorizedAccessToken = "access";
+        _oauth.Tokens = new MercadoPagoTokens("access", "refresh", TimeSpan.FromDays(180), MercadoPagoUserId);
+        _payments.Payments.Add(Purchase(31, "Canva", 10285m, "debit_card"));
+
+        var result = await Sync();
+
+        result.Error.ShouldBe(MercadoPagoSynchronizer.GrantExpired);
+        _transactions.Transactions.ShouldBeEmpty();
+        _integration.LastSyncedAt.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task A_401_without_a_refresh_token_is_reported_as_an_expired_authorization()
+    {
+        _integration.Authorize(OAuthGrant.From("access", null, Now.AddDays(170)), Now);
+        _payments.UnauthorizedAccessToken = "access";
+        _payments.Payments.Add(Purchase(32, "Canva", 10285m, "debit_card"));
+
+        var result = await Sync();
+
+        result.Error.ShouldBe(MercadoPagoSynchronizer.GrantExpired);
+        _transactions.Transactions.ShouldBeEmpty();
+        _integration.LastSyncedAt.ShouldBeNull();
+        _unitOfWork.SaveCount.ShouldBe(0);
     }
 
     [Fact]

@@ -114,6 +114,8 @@ public sealed class Investment : AggregateRoot
         ? 0m
         : decimal.Round(ReturnAmount / InvestedAmount.Amount * 100m, 2, MidpointRounding.ToEven);
 
+    public bool HasMarketValuation => _valuations.Any(valuation => valuation.Source == ValuationSource.Feed);
+
     public InvestmentValuation RecordValuation(
         Money value,
         DateOnly valuedOn,
@@ -162,6 +164,40 @@ public sealed class Investment : AggregateRoot
             addedOn,
             ValuationSource.Manual,
             updatedAt));
+        UpdatedAt = updatedAt;
+    }
+
+    public void Correct(
+        string assetName,
+        InvestmentType type,
+        Money investedAmount,
+        DateOnly purchasedOn,
+        DateTimeOffset updatedAt)
+    {
+        ArgumentNullException.ThrowIfNull(investedAmount);
+
+        if (investedAmount.IsZero)
+        {
+            throw new DomainException("El capital invertido tiene que ser mayor a cero.");
+        }
+
+        var validAssetName = EnsureValidAssetName(assetName);
+
+        if (investedAmount != InvestedAmount || purchasedOn != PurchasedOn)
+        {
+            if (_valuations.Count > 1)
+            {
+                throw new DomainException(
+                    "La inversion ya tiene valuaciones posteriores a la compra: solo se puede corregir el nombre y el tipo.");
+            }
+
+            _valuations.Single().Correct(investedAmount, purchasedOn);
+            InvestedAmount = investedAmount;
+            PurchasedOn = purchasedOn;
+        }
+
+        AssetName = validAssetName;
+        Type = type;
         UpdatedAt = updatedAt;
     }
 
