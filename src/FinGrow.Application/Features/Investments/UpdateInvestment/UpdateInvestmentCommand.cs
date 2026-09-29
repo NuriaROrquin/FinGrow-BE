@@ -12,4 +12,6 @@ public sealed record UpdateInvestmentCommand(
     InvestmentType Type,
     decimal InvestedAmount,
     Currency Currency,
-    DateOnly PurchasedOn) : IRequest<Result<InvestmentResponse>>;
+    DateOnly PurchasedOn,
+    string? Symbol = null,
+    decimal? Quantity = null) : IRequest<Result<InvestmentResponse>>, IInvestmentTracking;
