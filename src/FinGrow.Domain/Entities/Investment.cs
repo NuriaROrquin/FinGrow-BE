@@ -12,6 +12,8 @@ public sealed class Investment : AggregateRoot
 {
     public const int MaxAssetNameLength = 120;
 
+    public const int MaxSymbolLength = 20;
+
     private readonly List<InvestmentValuation> _valuations = new();
 
     private Investment()
@@ -48,6 +50,10 @@ public sealed class Investment : AggregateRoot
     public Money InvestedAmount { get; private set; } = null!;
 
     public DateOnly PurchasedOn { get; private set; }
+
+    public string? Symbol { get; private set; }
+
+    public decimal? Quantity { get; private set; }
 
     public DateTimeOffset CreatedAt { get; private set; }
 
@@ -199,6 +205,58 @@ public sealed class Investment : AggregateRoot
         AssetName = validAssetName;
         Type = type;
         UpdatedAt = updatedAt;
+    }
+
+    public void Track(string? symbol, decimal? quantity, DateTimeOffset updatedAt)
+    {
+        var normalizedSymbol = string.IsNullOrWhiteSpace(symbol) ? null : symbol.Trim().ToUpperInvariant();
+
+        if ((normalizedSymbol is null) != (quantity is null))
+        {
+            throw new DomainException("El simbolo y la cantidad van juntos: se cargan los dos o ninguno.");
+        }
+
+        if (normalizedSymbol is not null && !Type.IsQuotedOnExchange())
+        {
+            throw new DomainException("Solo se cotizan por simbolo las acciones, los CEDEAR, los ETF y los bonos.");
+        }
+
+        if (normalizedSymbol is { Length: > MaxSymbolLength })
+        {
+            throw new DomainException($"El simbolo no puede superar los {MaxSymbolLength} caracteres.");
+        }
+
+        if (quantity is <= 0m)
+        {
+            throw new DomainException("La cantidad tiene que ser mayor a cero.");
+        }
+
+        Symbol = normalizedSymbol;
+        Quantity = quantity;
+        UpdatedAt = updatedAt;
+    }
+
+    public InvestmentValuation RecordMarketValuation(Money value, DateOnly valuedOn, DateTimeOffset recordedAt)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+
+        var sameDay = _valuations.SingleOrDefault(valuation =>
+            valuation.Source == ValuationSource.Feed && valuation.ValuedOn == valuedOn);
+
+        if (sameDay is null)
+        {
+            return RecordValuation(value, valuedOn, ValuationSource.Feed, recordedAt);
+        }
+
+        if (value.Currency != InvestedAmount.Currency)
+        {
+            throw new DomainException("La valuacion tiene que estar en la misma moneda que el capital invertido.");
+        }
+
+        sameDay.Correct(value, valuedOn);
+        UpdatedAt = recordedAt;
+
+        return sameDay;
     }
 
     public void Rename(string assetName, DateTimeOffset updatedAt)
