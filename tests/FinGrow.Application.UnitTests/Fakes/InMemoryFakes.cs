@@ -419,3 +419,23 @@ public sealed class FakeInvestmentReadRepository : IInvestmentReadRepository
             owned.Count));
     }
 }
+
+public sealed class FakeMarketPriceProvider : IMarketPriceProvider
+{
+    public List<MarketPrice> Prices { get; } = new();
+
+    public Exception? Failure { get; set; }
+
+    public int Calls { get; private set; }
+
+    public string Source => "BYMA";
+
+    public Task<IReadOnlyList<MarketPrice>> GetClosingPricesAsync(CancellationToken cancellationToken = default)
+    {
+        Calls++;
+
+        return Failure is null
+            ? Task.FromResult<IReadOnlyList<MarketPrice>>(Prices.ToList())
+            : Task.FromException<IReadOnlyList<MarketPrice>>(Failure);
+    }
+}
