@@ -97,6 +97,9 @@ variables de entorno usando `__` como separador de sección.
 | `DolarApi:BaseUrl` | `DolarApi__BaseUrl` | URL base de [DolarApi](https://dolarapi.com), de donde sale la cotización del dólar MEP que usa la pantalla de Inversiones (default `https://dolarapi.com/`). Es pública y no pide credenciales |
 | `DolarApi:TimeoutSeconds` | `DolarApi__TimeoutSeconds` | Timeout de la consulta de la cotización (default 10) |
 | `DolarApi:CacheMinutes` | `DolarApi__CacheMinutes` | Minutos que la API reutiliza la última cotización antes de volver a pedirla (default 5) |
+| `Byma:BaseUrl` | `Byma__BaseUrl` | Datos públicos del sitio de BYMA de los que salen los precios de cierre del trabajo `investment-quotes` (default `https://open.bymadata.com.ar/vanoms-be-core/rest/api/bymadata/free/`). No piden credenciales |
+| `Byma:TimeoutSeconds` | `Byma__TimeoutSeconds` | Timeout de cada consulta a BYMA (default 30) |
+| `Byma:MaxPagesPerPanel` | `Byma__MaxPagesPerPanel` | Tope de páginas que se leen de cada panel, de a 189 títulos (default 20) |
 | `Cors:AllowedOrigins` | `Cors__AllowedOrigins__0` | Orígenes habilitados para el frontend |
 
 Los secretos no se commitean. En desarrollo local:
@@ -125,6 +128,13 @@ todo lo que no depende de la IA.
 actualización) que la pantalla de Inversiones usa para mostrar el portafolio en una sola moneda.
 Si DolarApi no responde o devuelve algo que no se puede leer, el endpoint contesta `503` y el
 frontend muestra cada moneda por separado; una respuesta fallida nunca queda guardada en la caché.
+
+Las inversiones cargadas a mano con símbolo y cantidad se cotizan con los datos públicos del sitio
+de BYMA: acciones, CEDEARs, bonos y ONs, con liquidación a 24 hs. El símbolo tiene que ser la
+variante de la moneda de la inversión (AL30 en pesos, AL30D en dólares) y los bonos y ONs cotizan
+cada 100 nominales. Esos datos no son la API contratada de BYMA ni tienen garantía de servicio:
+antes de producción con empleados reales se reemplazan por la API EOD de BYMA (contrato con
+marketdata@byma.com.ar), implementando otro `IMarketPriceProvider`.
 
 ### WhatsApp (Twilio)
 
@@ -187,6 +197,7 @@ siguiente.
 |---|---|---|
 | `metrics-snapshot` | `0 4 1 * *` (el 1 de cada mes, 01:00 de Argentina) | Genera las fotos mensuales de métricas por empresa y por departamento (`company_metrics_snapshots` y `department_metrics_snapshots`) del último mes cerrado, y completa las de los meses anteriores que falten desde el alta de cada empresa. Es idempotente: correrlo de nuevo actualiza la foto del último mes cerrado en lugar de duplicarla |
 | `mercadopago-sync` | `0 * * * *` (cada hora) | Recorre las cuentas de Mercado Pago vinculadas y trae los movimientos nuevos como pendientes de revisión. Mercado Pago no avisa por webhook lo que un usuario paga, por eso se consulta |
+| `investment-quotes` | `30 21 * * 1-5` (días hábiles, 18:30 de Argentina) | Cotiza las inversiones cargadas con símbolo y cantidad con los precios de cierre de BYMA y les registra la valuación de mercado del día. Correrlo de nuevo el mismo día actualiza esa valuación en lugar de duplicarla. Si BYMA no responde, la corrida queda fallida y no toca ninguna inversión |
 
 Los endpoints viven bajo `/api/jobs` y se protegen con la cabecera `X-Jobs-Key`, que tiene que
 coincidir con `Jobs:ApiKey`. No usan JWT: los llama un cron, no una persona logueada.
