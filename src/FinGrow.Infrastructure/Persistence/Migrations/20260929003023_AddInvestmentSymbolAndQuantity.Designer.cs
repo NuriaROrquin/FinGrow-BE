@@ -3,6 +3,7 @@ using System;
 using FinGrow.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FinGrow.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(FinGrowDbContext))]
-    partial class FinGrowDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260929003023_AddInvestmentSymbolAndQuantity")]
+    partial class AddInvestmentSymbolAndQuantity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -613,6 +616,7 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("FinGrow.Domain.Entities.InvestmentValuation", b =>
                 {
                     b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 

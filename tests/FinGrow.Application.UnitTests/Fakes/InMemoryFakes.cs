@@ -370,6 +370,18 @@ public sealed class FakeInvestmentRepository : IInvestmentRepository
             .OrderByDescending(investment => investment.PurchasedOn)
             .ThenByDescending(investment => investment.CreatedAt)
             .ToList());
+
+    public Task<IReadOnlyList<Guid>> ListEmployeesWithTrackedInvestmentsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>(Investments
+            .Where(investment => investment.Symbol is not null)
+            .Select(investment => investment.EmployeeId)
+            .Distinct()
+            .ToList());
+
+    public Task<IReadOnlyList<Investment>> ListTrackedByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Investment>>(Investments
+            .Where(investment => investment.EmployeeId == employeeId && investment.Symbol is not null)
+            .ToList());
 }
 
 public sealed class FakeExchangeRateProvider : IExchangeRateProvider
@@ -405,5 +417,25 @@ public sealed class FakeInvestmentReadRepository : IInvestmentReadRepository
             filters.PageNumber,
             filters.PageSize,
             owned.Count));
+    }
+}
+
+public sealed class FakeMarketPriceProvider : IMarketPriceProvider
+{
+    public List<MarketPrice> Prices { get; } = new();
+
+    public Exception? Failure { get; set; }
+
+    public int Calls { get; private set; }
+
+    public string Source => "BYMA";
+
+    public Task<IReadOnlyList<MarketPrice>> GetClosingPricesAsync(CancellationToken cancellationToken = default)
+    {
+        Calls++;
+
+        return Failure is null
+            ? Task.FromResult<IReadOnlyList<MarketPrice>>(Prices.ToList())
+            : Task.FromException<IReadOnlyList<MarketPrice>>(Failure);
     }
 }

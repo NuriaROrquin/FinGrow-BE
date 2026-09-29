@@ -65,7 +65,9 @@ internal sealed class InvestmentReadRepository(FinGrowDbContext dbContext) : IIn
         if (!string.IsNullOrWhiteSpace(filters.Search))
         {
             var pattern = $"%{filters.Search.Trim()}%";
-            query = query.Where(investment => EF.Functions.ILike(investment.AssetName, pattern));
+            query = query.Where(investment =>
+                EF.Functions.ILike(investment.AssetName, pattern)
+                || (investment.Symbol != null && EF.Functions.ILike(investment.Symbol, pattern)));
         }
 
         if (filters.Types is { Count: > 0 })

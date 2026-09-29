@@ -19,4 +19,16 @@ internal sealed class InvestmentRepository(FinGrowDbContext dbContext) : IInvest
             .OrderByDescending(investment => investment.PurchasedOn)
             .ThenByDescending(investment => investment.CreatedAt)
             .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Guid>> ListEmployeesWithTrackedInvestmentsAsync(CancellationToken cancellationToken = default) =>
+        await dbContext.Investments
+            .Where(investment => investment.Symbol != null)
+            .Select(investment => investment.EmployeeId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Investment>> ListTrackedByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+        await dbContext.Investments
+            .Where(investment => investment.EmployeeId == employeeId && investment.Symbol != null)
+            .ToListAsync(cancellationToken);
 }

@@ -187,6 +187,119 @@ public class InvestmentTests
         investment.CurrentValue.Amount.ShouldBe(1600m);
     }
 
+    [Fact]
+    public void Tracking_stores_the_symbol_in_uppercase_with_its_quantity()
+    {
+        var investment = CreateInvestment();
+
+        investment.Track("  spy ", 5m, Now);
+
+        investment.Symbol.ShouldBe("SPY");
+        investment.Quantity.ShouldBe(5m);
+    }
+
+    [Fact]
+    public void Tracking_can_be_removed_by_clearing_both_values()
+    {
+        var investment = CreateInvestment();
+        investment.Track("SPY", 5m, Now);
+
+        investment.Track(null, null, Now);
+
+        investment.Symbol.ShouldBeNull();
+        investment.Quantity.ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData("SPY", null)]
+    [InlineData(null, 5.0)]
+    [InlineData("   ", 5.0)]
+    public void A_symbol_without_quantity_or_a_quantity_without_symbol_is_rejected(string? symbol, double? quantity)
+    {
+        var investment = CreateInvestment();
+
+        Should.Throw<DomainException>(() => investment.Track(symbol, (decimal?)quantity, Now));
+    }
+
+    [Theory]
+    [InlineData(0.0)]
+    [InlineData(-1.0)]
+    public void A_quantity_that_is_not_positive_is_rejected(double quantity)
+    {
+        var investment = CreateInvestment();
+
+        Should.Throw<DomainException>(() => investment.Track("SPY", (decimal)quantity, Now));
+    }
+
+    [Fact]
+    public void A_symbol_longer_than_the_maximum_is_rejected()
+    {
+        var investment = CreateInvestment();
+
+        Should.Throw<DomainException>(() => investment.Track(new string('A', Investment.MaxSymbolLength + 1), 1m, Now));
+    }
+
+    [Theory]
+    [InlineData(InvestmentType.MutualFund)]
+    [InlineData(InvestmentType.Crypto)]
+    public void Assets_that_do_not_trade_on_the_exchange_cannot_be_tracked_by_symbol(InvestmentType type)
+    {
+        var investment = Investment.Create(EmployeeId, "Activo", type, Money.From(1000m, Currency.USD), PurchasedOn, Now);
+
+        Should.Throw<DomainException>(() => investment.Track("BTC", 1m, Now));
+    }
+
+    [Fact]
+    public void A_market_valuation_is_recorded_as_coming_from_the_feed()
+    {
+        var investment = CreateInvestment();
+
+        investment.RecordMarketValuation(Money.From(1100m, Currency.USD), new DateOnly(2026, 7, 10), Now);
+
+        investment.Valuations.Count.ShouldBe(2);
+        investment.LatestValuation.Source.ShouldBe(ValuationSource.Feed);
+        investment.CurrentValue.Amount.ShouldBe(1100m);
+        investment.HasMarketValuation.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void A_second_market_valuation_on_the_same_day_replaces_the_first()
+    {
+        var investment = CreateInvestment();
+        var valuedOn = new DateOnly(2026, 7, 10);
+
+        investment.RecordMarketValuation(Money.From(1100m, Currency.USD), valuedOn, Now);
+        investment.RecordMarketValuation(Money.From(1150m, Currency.USD), valuedOn, Now.AddHours(1));
+
+        investment.Valuations.Count.ShouldBe(2);
+        investment.CurrentValue.Amount.ShouldBe(1150m);
+    }
+
+    [Fact]
+    public void Market_valuations_on_different_days_accumulate_as_history()
+    {
+        var investment = CreateInvestment();
+
+        investment.RecordMarketValuation(Money.From(1100m, Currency.USD), new DateOnly(2026, 7, 10), Now);
+        investment.RecordMarketValuation(Money.From(1150m, Currency.USD), new DateOnly(2026, 7, 11), Now);
+
+        investment.Valuations.Count.ShouldBe(3);
+        investment.CurrentValue.Amount.ShouldBe(1150m);
+    }
+
+    [Fact]
+    public void A_market_valuation_in_another_currency_is_rejected_even_when_it_replaces_one()
+    {
+        var investment = CreateInvestment();
+        var valuedOn = new DateOnly(2026, 7, 10);
+        investment.RecordMarketValuation(Money.From(1100m, Currency.USD), valuedOn, Now);
+
+        Should.Throw<DomainException>(() =>
+            investment.RecordMarketValuation(Money.From(1700000m, Currency.ARS), valuedOn, Now));
+        Should.Throw<DomainException>(() =>
+            investment.RecordMarketValuation(Money.From(1700000m, Currency.ARS), valuedOn.AddDays(1), Now));
+    }
+
     private static Investment CreateInvestment() => Investment.Create(
         EmployeeId,
         "S&P 500 ETF",
