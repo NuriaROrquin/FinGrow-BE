@@ -65,6 +65,30 @@ public class UpdateInvestmentHandlerTests
         _unitOfWork.SaveCount.ShouldBe(0);
     }
 
+    [Fact]
+    public async Task Editing_can_add_and_later_remove_the_symbol()
+    {
+        var investment = StoredInvestment(EmployeeId);
+        var command = new UpdateInvestmentCommand(
+            investment.Id,
+            EmployeeId,
+            investment.AssetName,
+            InvestmentType.Bond,
+            investment.InvestedAmount.Amount,
+            investment.InvestedAmount.Currency,
+            investment.PurchasedOn,
+            Symbol: "al30",
+            Quantity: 1000m);
+
+        var tracked = await _handler.Handle(command, CancellationToken.None);
+        var untracked = await _handler.Handle(command with { Symbol = null, Quantity = null }, CancellationToken.None);
+
+        tracked.Value.Symbol.ShouldBe("AL30");
+        tracked.Value.Quantity.ShouldBe(1000m);
+        untracked.Value.Symbol.ShouldBeNull();
+        investment.Quantity.ShouldBeNull();
+    }
+
     private Investment StoredInvestment(Guid employeeId)
     {
         var investment = Investment.Create(

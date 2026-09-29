@@ -60,6 +60,27 @@ public class CreateInvestmentHandlerTests
         result.Value.AssetName.ShouldBe("Bitcoin");
     }
 
+    [Fact]
+    public async Task The_symbol_and_quantity_are_stored_so_the_market_can_quote_it()
+    {
+        var result = await _handler.Handle(ValidCommand() with { Symbol = " spyd ", Quantity = 10m }, CancellationToken.None);
+
+        result.Value.Symbol.ShouldBe("SPYD");
+        result.Value.Quantity.ShouldBe(10m);
+        var stored = _investments.Investments.ShouldHaveSingleItem();
+        stored.Symbol.ShouldBe("SPYD");
+        stored.Quantity.ShouldBe(10m);
+    }
+
+    [Fact]
+    public async Task Without_symbol_the_investment_is_not_tracked()
+    {
+        var result = await _handler.Handle(ValidCommand(), CancellationToken.None);
+
+        result.Value.Symbol.ShouldBeNull();
+        result.Value.Quantity.ShouldBeNull();
+    }
+
     private static CreateInvestmentCommand ValidCommand() => new(
         Guid.CreateVersion7(),
         AssetName: "S&P 500 ETF",
