@@ -370,6 +370,18 @@ public sealed class FakeInvestmentRepository : IInvestmentRepository
             .OrderByDescending(investment => investment.PurchasedOn)
             .ThenByDescending(investment => investment.CreatedAt)
             .ToList());
+
+    public Task<IReadOnlyList<Guid>> ListEmployeesWithTrackedInvestmentsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>(Investments
+            .Where(investment => investment.Symbol is not null)
+            .Select(investment => investment.EmployeeId)
+            .Distinct()
+            .ToList());
+
+    public Task<IReadOnlyList<Investment>> ListTrackedByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Investment>>(Investments
+            .Where(investment => investment.EmployeeId == employeeId && investment.Symbol is not null)
+            .ToList());
 }
 
 public sealed class FakeExchangeRateProvider : IExchangeRateProvider
