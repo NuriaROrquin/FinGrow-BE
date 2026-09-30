@@ -154,6 +154,17 @@ public class BudgetTests
     }
 
     [Fact]
+    public void Duplicating_a_budget_does_not_share_money_instances_with_the_original()
+    {
+        var budget = CreateMonthlyBudget();
+        budget.SetLimit(ExpenseCategory.Alimentos, Money.From(50000m, Currency.ARS), Now);
+
+        var next = budget.Duplicate(new DateOnly(2026, 4, 1), Now.AddMonths(1));
+
+        next.LimitFor(ExpenseCategory.Alimentos).ShouldNotBeSameAs(budget.LimitFor(ExpenseCategory.Alimentos));
+    }
+
+    [Fact]
     public void Duplicating_a_budget_into_its_own_period_fails()
     {
         var budget = CreateMonthlyBudget();

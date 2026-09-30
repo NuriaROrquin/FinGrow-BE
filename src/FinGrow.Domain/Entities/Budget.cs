@@ -155,9 +155,14 @@ public sealed class Budget : AggregateRoot
             throw new DomainException("El presupuesto ya cubre ese periodo.");
         }
 
+        // Money se persiste como tipo owned y EF no admite que dos entidades compartan la
+        // misma instancia: cada tope nuevo necesita su propio Money.
         foreach (var limit in _limits)
         {
-            copy.SetLimit(limit.Category, limit.Limit, createdAt);
+            copy.SetLimit(
+                limit.Category,
+                Money.From(limit.Limit.Amount, limit.Limit.Currency),
+                createdAt);
         }
 
         return copy;
