@@ -462,3 +462,13 @@ public sealed class FakeBudgetRepository : IBudgetRepository
         Task.FromResult(Budgets.FirstOrDefault(budget =>
             budget.EmployeeId == employeeId && budget.Period == period && budget.PeriodStart == periodStart));
 }
+
+public sealed class FakeBudgetSpendingReadRepository : IBudgetSpendingReadRepository
+{
+    public Dictionary<ExpenseCategory, decimal> Spent { get; } = new();
+
+    public Task<IReadOnlyDictionary<ExpenseCategory, decimal>> GetSpentByCategoryAsync(
+        Budget budget,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyDictionary<ExpenseCategory, decimal>>(new Dictionary<ExpenseCategory, decimal>(Spent));
+}

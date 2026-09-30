@@ -84,6 +84,7 @@ public static class DependencyInjection
         services.AddScoped<IPeriodActivityReadRepository, PeriodActivityReadRepository>();
         services.AddScoped<IGoalRepository, GoalRepository>();
         services.AddScoped<IBudgetRepository, BudgetRepository>();
+        services.AddScoped<IBudgetSpendingReadRepository, BudgetSpendingReadRepository>();
 
         services.AddScoped<DatabaseSeeder>();
 
