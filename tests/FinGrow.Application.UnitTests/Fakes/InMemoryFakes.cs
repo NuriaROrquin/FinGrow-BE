@@ -1,6 +1,8 @@
 namespace FinGrow.Application.UnitTests.Fakes;
 
+using FinGrow.Application.Common;
 using FinGrow.Application.DTOs;
+using FinGrow.Application.Features.Investments.ListInvestments;
 using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
@@ -27,6 +29,9 @@ public sealed class FakeCompanyRepository : ICompanyRepository
 
     public Task<Company?> GetByEmailAsync(Email email, CancellationToken cancellationToken) =>
         Task.FromResult(Companies.FirstOrDefault(company => company.Email == email));
+
+    public Task<IReadOnlyList<Company>> ListActiveAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Company>>(Companies.Where(company => company.IsActive).ToList());
 }
 
 public sealed class FakeEmployeeIntegrationRepository : IEmployeeIntegrationRepository
@@ -208,8 +213,22 @@ public sealed class FakeMercadoPagoPaymentsClient : IMercadoPagoPaymentsClient
 
     public int PageSize { get; set; } = 50;
 
+    public string? BrokenAccessToken { get; set; }
+
+    public string? UnauthorizedAccessToken { get; set; }
+
     public Task<MercadoPagoPaymentsPage> SearchUpdatedBetweenAsync(string accessToken, DateTimeOffset from, DateTimeOffset to, int offset, CancellationToken cancellationToken = default)
     {
+        if (accessToken == BrokenAccessToken)
+        {
+            throw new InvalidOperationException("Mercado Pago devolvio una respuesta que no se pudo leer");
+        }
+
+        if (accessToken == UnauthorizedAccessToken)
+        {
+            throw new HttpRequestException("Response status code does not indicate success: 401 (Unauthorized).", null, System.Net.HttpStatusCode.Unauthorized);
+        }
+
         Searches.Add((from, to, offset));
 
         return Task.FromResult(new MercadoPagoPaymentsPage(Payments.Skip(offset).Take(PageSize).ToList(), Payments.Count));
@@ -276,6 +295,149 @@ public sealed class FakeGoalRepository : IGoalRepository
             .Where(goal => goal.EmployeeId == employeeId)
             .OrderByDescending(goal => goal.CreatedAt)
             .ToList());
+}
+
+public sealed class FakeJobRunRepository : IJobRunRepository
+{
+    public List<JobRun> Runs { get; } = new();
+
+    public void Add(JobRun run) => Runs.Add(run);
+
+    public Task<JobRun?> FindLastAsync(string jobName, CancellationToken cancellationToken = default) =>
+        Task.FromResult(MostRecentFirst(jobName).FirstOrDefault());
+
+    public Task<IReadOnlyList<JobRun>> ListRecentAsync(string jobName, int take, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<JobRun>>(MostRecentFirst(jobName).Take(take).ToList());
+
+    private IEnumerable<JobRun> MostRecentFirst(string jobName) =>
+        Runs.Where(run => run.JobName == jobName)
+            .OrderByDescending(run => run.StartedAt)
+            .ThenByDescending(run => run.Id);
+}
+
+public sealed class FakeMetricsSnapshotRepository : IMetricsSnapshotRepository
+{
+    public List<CompanyMetricsSnapshot> CompanySnapshots { get; } = new();
+
+    public List<DepartmentMetricsSnapshot> DepartmentSnapshots { get; } = new();
+
+    public Task<IReadOnlySet<DateOnly>> ListCompanyPeriodStartsAsync(Guid companyId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlySet<DateOnly>>(CompanySnapshots
+            .Where(snapshot => snapshot.CompanyId == companyId)
+            .Select(snapshot => snapshot.PeriodStart)
+            .ToHashSet());
+
+    public Task<CompanyMetricsSnapshot?> FindCompanyAsync(Guid companyId, DateOnly periodStart, CancellationToken cancellationToken = default) =>
+        Task.FromResult(CompanySnapshots.SingleOrDefault(snapshot => snapshot.CompanyId == companyId && snapshot.PeriodStart == periodStart));
+
+    public Task<DepartmentMetricsSnapshot?> FindDepartmentAsync(Guid departmentId, DateOnly periodStart, CancellationToken cancellationToken = default) =>
+        Task.FromResult(DepartmentSnapshots.SingleOrDefault(snapshot => snapshot.DepartmentId == departmentId && snapshot.PeriodStart == periodStart));
+
+    public void Add(CompanyMetricsSnapshot snapshot) => CompanySnapshots.Add(snapshot);
+
+    public void Add(DepartmentMetricsSnapshot snapshot) => DepartmentSnapshots.Add(snapshot);
+}
+
+public sealed class FakePeriodActivityReadRepository : IPeriodActivityReadRepository
+{
+    public Dictionary<(Guid CompanyId, DateOnly PeriodStart), List<EmployeePeriodActivity>> Activity { get; } = new();
+
+    public List<(Guid CompanyId, MetricsPeriod Period)> Requests { get; } = new();
+
+    public Task<IReadOnlyList<EmployeePeriodActivity>> ListByCompanyAsync(Guid companyId, MetricsPeriod period, CancellationToken cancellationToken = default)
+    {
+        Requests.Add((companyId, period));
+
+        return Task.FromResult<IReadOnlyList<EmployeePeriodActivity>>(
+            Activity.TryGetValue((companyId, period.Start), out var employees) ? employees : new List<EmployeePeriodActivity>());
+    }
+}
+
+public sealed class FakeInvestmentRepository : IInvestmentRepository
+{
+    public List<Investment> Investments { get; } = new();
+
+    public void Add(Investment investment) => Investments.Add(investment);
+
+    public void Remove(Investment investment) => Investments.Remove(investment);
+
+    public Task<Investment?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Investments.FirstOrDefault(investment => investment.Id == id));
+
+    public Task<IReadOnlyList<Investment>> ListByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Investment>>(Investments
+            .Where(investment => investment.EmployeeId == employeeId)
+            .OrderByDescending(investment => investment.PurchasedOn)
+            .ThenByDescending(investment => investment.CreatedAt)
+            .ToList());
+
+    public Task<IReadOnlyList<Guid>> ListEmployeesWithTrackedInvestmentsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>(Investments
+            .Where(investment => investment.Symbol is not null)
+            .Select(investment => investment.EmployeeId)
+            .Distinct()
+            .ToList());
+
+    public Task<IReadOnlyList<Investment>> ListTrackedByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Investment>>(Investments
+            .Where(investment => investment.EmployeeId == employeeId && investment.Symbol is not null)
+            .ToList());
+}
+
+public sealed class FakeExchangeRateProvider : IExchangeRateProvider
+{
+    public MepQuote Quote { get; set; } = new(1544.30m, 1557.30m, new DateTimeOffset(2026, 9, 27, 14, 57, 0, TimeSpan.Zero), "DolarApi");
+
+    public Exception? Failure { get; set; }
+
+    public Task<MepQuote> GetMepQuoteAsync(CancellationToken cancellationToken = default) =>
+        Failure is null ? Task.FromResult(Quote) : Task.FromException<MepQuote>(Failure);
+}
+
+public sealed class FakeInvestmentReadRepository : IInvestmentReadRepository
+{
+    public List<Investment> Investments { get; } = new();
+
+    public Guid? RequestedEmployeeId { get; private set; }
+
+    public InvestmentFilters? RequestedFilters { get; private set; }
+
+    public Task<PagedResult<Investment>> GetPageAsync(Guid employeeId, InvestmentFilters filters, CancellationToken cancellationToken = default)
+    {
+        RequestedEmployeeId = employeeId;
+        RequestedFilters = filters;
+
+        var owned = Investments
+            .Where(investment => investment.EmployeeId == employeeId)
+            .OrderByDescending(investment => investment.PurchasedOn)
+            .ToList();
+
+        return Task.FromResult(new PagedResult<Investment>(
+            owned.Skip((filters.PageNumber - 1) * filters.PageSize).Take(filters.PageSize).ToList(),
+            filters.PageNumber,
+            filters.PageSize,
+            owned.Count));
+    }
+}
+
+public sealed class FakeMarketPriceProvider : IMarketPriceProvider
+{
+    public List<MarketPrice> Prices { get; } = new();
+
+    public Exception? Failure { get; set; }
+
+    public int Calls { get; private set; }
+
+    public string Source => "BYMA";
+
+    public Task<IReadOnlyList<MarketPrice>> GetClosingPricesAsync(CancellationToken cancellationToken = default)
+    {
+        Calls++;
+
+        return Failure is null
+            ? Task.FromResult<IReadOnlyList<MarketPrice>>(Prices.ToList())
+            : Task.FromException<IReadOnlyList<MarketPrice>>(Failure);
+    }
 }
 
 public sealed class FakeBudgetRepository : IBudgetRepository
