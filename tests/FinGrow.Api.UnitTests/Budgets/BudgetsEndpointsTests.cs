@@ -18,6 +18,7 @@ public class BudgetsEndpointsTests
 {
     private const string BudgetsPath = "/api/budgets";
     private const string DuplicatePath = "/api/budgets/duplicate-previous";
+    private const string SeptemberLimitsPath = "/api/budgets/2026/9/limits";
 
     [Fact]
     public async Task Creating_a_budget_persists_it_for_the_authenticated_employee()
@@ -129,6 +130,70 @@ public class BudgetsEndpointsTests
         factory.Budgets.ShouldBeEmpty();
     }
 
+    [Fact]
+public async Task Editing_a_limit_saves_it_and_returns_the_recalculated_budget()
+{
+    using var factory = new BudgetsWebApplicationFactory();
+    var client = CreateAuthenticatedClient(factory, Rol.Empleado);
+    await client.PostAsJsonAsync(new Uri(BudgetsPath, UriKind.Relative), SeptemberBudget());
+    factory.Spent[ExpenseCategory.Alimentos] = 90000m;
+
+    var response = await client.PutAsJsonAsync(
+        new Uri(SeptemberLimitsPath, UriKind.Relative),
+        new { category = "Alimentos", amount = 100000m });
+
+    response.StatusCode.ShouldBe(HttpStatusCode.OK);
+    factory.Budgets.Single().LimitFor(ExpenseCategory.Alimentos)!.Amount.ShouldBe(100000m);
+    var body = await response.Content.ReadAsStringAsync();
+    body.ShouldContain("\"spent\":90000");
+    body.ShouldContain("\"health\":\"Warning\"");
+}
+
+[Fact]
+public async Task A_negative_limit_responds_400_with_a_clear_message()
+{
+    using var factory = new BudgetsWebApplicationFactory();
+    var client = CreateAuthenticatedClient(factory, Rol.Empleado);
+    await client.PostAsJsonAsync(new Uri(BudgetsPath, UriKind.Relative), SeptemberBudget());
+
+    var response = await client.PutAsJsonAsync(
+        new Uri(SeptemberLimitsPath, UriKind.Relative),
+        new { category = "Alimentos", amount = -500m });
+
+    response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    (await response.Content.ReadAsStringAsync()).ShouldContain("tiene que ser un numero mayor a cero");
+    factory.Budgets.Single().LimitFor(ExpenseCategory.Alimentos)!.Amount.ShouldBe(150000m);
+}
+
+[Fact]
+public async Task A_non_numeric_limit_responds_400_with_a_clear_message()
+{
+    using var factory = new BudgetsWebApplicationFactory();
+    var client = CreateAuthenticatedClient(factory, Rol.Empleado);
+    await client.PostAsJsonAsync(new Uri(BudgetsPath, UriKind.Relative), SeptemberBudget());
+
+    var response = await client.PutAsJsonAsync(
+        new Uri(SeptemberLimitsPath, UriKind.Relative),
+        new { category = "Alimentos", amount = "mucho" });
+
+    response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    (await response.Content.ReadAsStringAsync()).ShouldContain("El campo 'amount' tiene que ser un numero.");
+    factory.Budgets.Single().LimitFor(ExpenseCategory.Alimentos)!.Amount.ShouldBe(150000m);
+}
+
+[Fact]
+public async Task Editing_a_limit_of_a_month_without_a_budget_responds_404()
+{
+    using var factory = new BudgetsWebApplicationFactory();
+    var client = CreateAuthenticatedClient(factory, Rol.Empleado);
+
+    var response = await client.PutAsJsonAsync(
+        new Uri(SeptemberLimitsPath, UriKind.Relative),
+        new { category = "Alimentos", amount = 100000m });
+
+    response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+}
+
     private static object SeptemberBudget() => new
     {
         year = 2026,
@@ -159,6 +224,8 @@ public class BudgetsEndpointsTests
 
         public List<Budget> Budgets { get; } = new();
 
+        public Dictionary<ExpenseCategory, decimal> Spent { get; } = new();
+
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.ConfigureAppConfiguration((_, configuration) =>
@@ -181,6 +248,7 @@ public class BudgetsEndpointsTests
             builder.ConfigureTestServices(services =>
             {
                 services.AddScoped<IBudgetRepository>(_ => new InMemoryBudgetRepository(Budgets));
+                services.AddScoped<IBudgetSpendingReadRepository>(_ => new InMemoryBudgetSpendingReadRepository(Spent));
                 services.AddScoped<IUnitOfWork, NoOpUnitOfWork>();
             });
         }
@@ -205,6 +273,15 @@ public class BudgetsEndpointsTests
             CancellationToken cancellationToken = default) =>
             Task.FromResult(budgets.FirstOrDefault(budget =>
                 budget.EmployeeId == employeeId && budget.Period == period && budget.PeriodStart == periodStart));
+    }
+
+    private sealed class InMemoryBudgetSpendingReadRepository(Dictionary<ExpenseCategory, decimal> spent)
+        : IBudgetSpendingReadRepository
+    {
+        public Task<IReadOnlyDictionary<ExpenseCategory, decimal>> GetSpentByCategoryAsync(
+            Budget budget,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyDictionary<ExpenseCategory, decimal>>(spent);
     }
 
     private sealed class NoOpUnitOfWork : IUnitOfWork

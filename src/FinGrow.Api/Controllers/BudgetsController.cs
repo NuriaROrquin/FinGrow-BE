@@ -10,6 +10,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Application.Features.Budgets.GetBudget;
+using Application.Features.Budgets.SetCategoryLimit;
 
 [ApiController]
 [Route("api/budgets")]
@@ -44,6 +45,22 @@ public sealed class BudgetsController(ISender sender, ICurrentUser currentUser) 
         CancellationToken cancellationToken)
     {
         command = command with { EmployeeId = currentUser.UserId!.Value };
+
+        return (await sender.Send(command, cancellationToken)).ToActionResult();
+    }
+
+    /// <summary>Define o edita el tope de una categoria. Si la categoria no tenia tope, lo agrega.</summary>
+    [HttpPut("{year:int}/{month:int}/limits")]
+    [ProducesResponseType<BudgetResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SetLimit(
+        int year,
+        int month,
+        SetBudgetCategoryLimitCommand command,
+        CancellationToken cancellationToken)
+    {
+        command = command with { EmployeeId = currentUser.UserId!.Value, Year = year, Month = month };
 
         return (await sender.Send(command, cancellationToken)).ToActionResult();
     }
