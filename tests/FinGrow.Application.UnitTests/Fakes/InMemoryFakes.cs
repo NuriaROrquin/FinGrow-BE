@@ -277,3 +277,26 @@ public sealed class FakeGoalRepository : IGoalRepository
             .OrderByDescending(goal => goal.CreatedAt)
             .ToList());
 }
+
+public sealed class FakeBudgetRepository : IBudgetRepository
+{
+    public List<Budget> Budgets { get; } = new();
+
+    public void Add(Budget budget) => Budgets.Add(budget);
+
+    public Task<bool> ExistsForPeriodAsync(
+        Guid employeeId,
+        BudgetPeriod period,
+        DateOnly periodStart,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Budgets.Exists(budget =>
+            budget.EmployeeId == employeeId && budget.Period == period && budget.PeriodStart == periodStart));
+
+    public Task<Budget?> FindForPeriodAsync(
+        Guid employeeId,
+        BudgetPeriod period,
+        DateOnly periodStart,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Budgets.FirstOrDefault(budget =>
+            budget.EmployeeId == employeeId && budget.Period == period && budget.PeriodStart == periodStart));
+}
