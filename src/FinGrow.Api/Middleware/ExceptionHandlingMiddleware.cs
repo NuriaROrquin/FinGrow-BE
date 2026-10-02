@@ -21,6 +21,10 @@ public sealed class ExceptionHandlingMiddleware
         {
             await _next(context);
         }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+            _logger.LogDebug("Request cancelado por el cliente.");
+        }
         catch (Exception exception)
         {
             _logger.LogError(exception, "Excepcion no manejada en {Path}", context.Request.Path);

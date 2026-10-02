@@ -176,6 +176,30 @@ public sealed class GetTransactionHistoryQueryTests
 
         public PaymentMethod? RequestedPaymentMethod { get; private set; }
 
+        public Task<IReadOnlyList<MonthlyExpenseTotal>> GetMonthlyExpensesAsync(
+            Guid employeeId,
+            Currency currency,
+            DateOnly fromDate,
+            DateOnly toDate,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<MonthlyExpenseTotal>>(Array.Empty<MonthlyExpenseTotal>());
+
+        public Task<IReadOnlyList<MonthlyIncomeExpenseTotal>> GetMonthlyIncomeExpensesAsync(
+            Guid employeeId,
+            Currency currency,
+            DateOnly fromDate,
+            DateOnly toDate,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<MonthlyIncomeExpenseTotal>>(Array.Empty<MonthlyIncomeExpenseTotal>());
+
+        public Task<IReadOnlyList<CategoryExpenseTotal>> GetExpensesByCategoryAsync(
+            Guid employeeId,
+            Currency currency,
+            DateOnly fromDate,
+            DateOnly toDate,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<CategoryExpenseTotal>>(Array.Empty<CategoryExpenseTotal>());
+
         public Task<TransactionSummary> GetSummaryAsync(
             Guid employeeId,
             DateOnly? fromDate = null,
@@ -260,6 +284,30 @@ public sealed class GetTransactionSummaryQueryTests
 
     private sealed class FakeTransactionReadRepository : ITransactionReadRepository
     {
+        public Task<IReadOnlyList<MonthlyExpenseTotal>> GetMonthlyExpensesAsync(
+            Guid employeeId,
+            Currency currency,
+            DateOnly fromDate,
+            DateOnly toDate,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<MonthlyExpenseTotal>>(Array.Empty<MonthlyExpenseTotal>());
+
+        public Task<IReadOnlyList<MonthlyIncomeExpenseTotal>> GetMonthlyIncomeExpensesAsync(
+            Guid employeeId,
+            Currency currency,
+            DateOnly fromDate,
+            DateOnly toDate,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<MonthlyIncomeExpenseTotal>>(Array.Empty<MonthlyIncomeExpenseTotal>());
+
+        public Task<IReadOnlyList<CategoryExpenseTotal>> GetExpensesByCategoryAsync(
+            Guid employeeId,
+            Currency currency,
+            DateOnly fromDate,
+            DateOnly toDate,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<CategoryExpenseTotal>>(Array.Empty<CategoryExpenseTotal>());
+
         public Task<TransactionSummary> GetSummaryAsync(
             Guid employeeId,
             DateOnly? fromDate = null,

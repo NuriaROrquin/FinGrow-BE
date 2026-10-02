@@ -5,6 +5,27 @@ using FinGrow.Domain.Enums;
 
 public interface ITransactionReadRepository
 {
+    Task<IReadOnlyList<MonthlyExpenseTotal>> GetMonthlyExpensesAsync(
+        Guid employeeId,
+        Currency currency,
+        DateOnly fromDate,
+        DateOnly toDate,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<MonthlyIncomeExpenseTotal>> GetMonthlyIncomeExpensesAsync(
+        Guid employeeId,
+        Currency currency,
+        DateOnly fromDate,
+        DateOnly toDate,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<CategoryExpenseTotal>> GetExpensesByCategoryAsync(
+        Guid employeeId,
+        Currency currency,
+        DateOnly fromDate,
+        DateOnly toDate,
+        CancellationToken cancellationToken = default);
+
     Task<TransactionSummary> GetSummaryAsync(
         Guid employeeId,
         DateOnly? fromDate = null,
@@ -44,3 +65,13 @@ public sealed record TransactionPage(
 {
     public int TotalPages => (int)Math.Ceiling(TotalCount / (double)PageSize);
 }
+
+public sealed record MonthlyExpenseTotal(int Year, int Month, decimal Total);
+
+public sealed record MonthlyIncomeExpenseTotal(
+    int Year,
+    int Month,
+    decimal TotalIncome,
+    decimal TotalExpense);
+
+public sealed record CategoryExpenseTotal(ExpenseCategory Category, decimal Total);
