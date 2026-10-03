@@ -5,17 +5,8 @@ using FinGrow.Domain.Enums;
 using FinGrow.Domain.Errors;
 using FinGrow.Domain.ValueObjects;
 
-/// <summary>
-/// El plan de gastos del empleado para un periodo: un tope por categoria.
-/// </summary>
-/// <remarks>
-/// Lo gastado no se guarda: se calcula sumando las transacciones del periodo. Un contador
-/// persistido se desincroniza en cuanto alguien edita o borra un movimiento, y despues nadie
-/// sabe cual de los dos numeros es el bueno.
-/// </remarks>
 public sealed class Budget : AggregateRoot
 {
-    /// <summary>A partir de este porcentaje del limite la categoria pasa a estado de advertencia.</summary>
     public const decimal WarningThresholdPercentage = 80m;
 
     private readonly List<BudgetCategoryLimit> _limits = new();
@@ -43,7 +34,6 @@ public sealed class Budget : AggregateRoot
 
     public BudgetPeriod Period { get; private set; }
 
-    /// <summary>Primer dia del periodo. Se normaliza para que dos presupuestos del mismo mes colisionen.</summary>
     public DateOnly PeriodStart { get; private set; }
 
     public DateTimeOffset CreatedAt { get; private set; }
@@ -75,7 +65,6 @@ public sealed class Budget : AggregateRoot
 
     public Currency? Currency => _limits.Count == 0 ? null : _limits[0].Limit.Currency;
 
-    /// <summary>Ultimo dia cubierto por el presupuesto, inclusive.</summary>
     public DateOnly PeriodEnd => Period == BudgetPeriod.Monthly
         ? PeriodStart.AddMonths(1).AddDays(-1)
         : PeriodStart.AddYears(1).AddDays(-1);
@@ -120,15 +109,16 @@ public sealed class Budget : AggregateRoot
         UpdatedAt = updatedAt;
     }
 
-    /// <summary>
-    /// Estado de una categoria frente a lo gastado. Los umbrales (80 % advertencia, 100 % excedido)
-    /// son la regla R1 que hoy vive suelta en el frontend; queda aca para que haya una sola version.
-    /// </summary>
-    /// <remarks>
-    /// La comparacion se hace multiplicando y no dividiendo: si primero se calculara el porcentaje
-    /// y se redondeara a dos decimales, gastar 39.999 de un limite de 50.000 daria 80,00 % y
-    /// dispararia una advertencia por un redondeo, no por haber llegado al umbral.
-    /// </remarks>
+    public void ChangeCurrency(Currency currency, DateTimeOffset updatedAt)
+    {
+        foreach (var limit in _limits)
+        {
+            limit.Change(Money.From(limit.Limit.Amount, currency), updatedAt);
+        }
+
+        UpdatedAt = updatedAt;
+    }
+
     public BudgetHealth Evaluate(ExpenseCategory category, Money spent)
     {
         ArgumentNullException.ThrowIfNull(spent);
@@ -155,8 +145,6 @@ public sealed class Budget : AggregateRoot
             throw new DomainException("El presupuesto ya cubre ese periodo.");
         }
 
-        // Money se persiste como tipo owned y EF no admite que dos entidades compartan la
-        // misma instancia: cada tope nuevo necesita su propio Money.
         foreach (var limit in _limits)
         {
             copy.SetLimit(
