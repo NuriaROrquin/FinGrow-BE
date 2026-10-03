@@ -177,6 +177,19 @@ public sealed class FakeTokenService : ITokenService
         new($"token-for-{userId}", ExpiresAt);
 }
 
+public sealed class FakeTotpService : ITotpService
+{
+    public const string ValidCode = "123456";
+
+    public string NextSecret { get; set; } = "SECRETBASE32";
+
+    public string GenerateSecret() => NextSecret;
+
+    public bool VerifyCode(string secret, string code, DateTimeOffset now) => code == ValidCode;
+
+    public string BuildProvisioningUri(string secret, string accountName) => $"otpauth://totp/FinGrow:{accountName}?secret={secret}";
+}
+
 public sealed class FakeMercadoPagoOAuthClient : IMercadoPagoOAuthClient
 {
     public static readonly Uri AuthorizationBase = new("https://auth.mercadopago.test/authorization");
