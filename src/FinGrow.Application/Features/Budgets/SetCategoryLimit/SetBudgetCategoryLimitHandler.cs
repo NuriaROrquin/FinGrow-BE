@@ -31,8 +31,6 @@ internal sealed class SetBudgetCategoryLimitHandler(
             return Result.Failure<BudgetResponse>(BudgetErrors.NotFound(periodStart));
         }
 
-        // Por la API no se puede crear un presupuesto sin topes. Si quedo vacio por una carga
-        // manual no hay moneda de la cual heredar, y se usa ARS como en el resto de la API.
         var currency = budget.Currency ?? Currency.ARS;
 
         budget.SetLimit(request.Category, Money.From(request.Amount, currency), dateTimeProvider.UtcNow);

@@ -5,7 +5,6 @@ using DTOs;
 using Domain.Enums;
 using MediatR;
 
-/// <summary>Presupuesto mensual: <see cref="Year"/> y <see cref="Month"/> identifican el periodo.</summary>
 public sealed record CreateBudgetCommand(
     Guid EmployeeId,
     int Year,

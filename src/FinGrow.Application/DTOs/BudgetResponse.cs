@@ -13,11 +13,6 @@ public sealed record BudgetResponse(
     IReadOnlyList<BudgetLimitResponse> Limits,
     DateTimeOffset CreatedAt)
 {
-    /// <param name="budget">El presupuesto.</param>
-    /// <param name="spentByCategory">
-    /// Gasto del periodo por categoria. Sin el, la respuesta lleva solo los topes y los campos
-    /// calculados quedan en <c>null</c>.
-    /// </param>
     public static BudgetResponse FromEntity(
         Budget budget,
         IReadOnlyDictionary<ExpenseCategory, decimal>? spentByCategory = null) => new(
@@ -43,10 +38,6 @@ public sealed record BudgetLimitResponse(
     decimal? UsedPercentage = null,
     BudgetHealth? Health = null)
 {
-    /// <remarks>
-    /// <see cref="Remaining"/> va con signo: negativo es cuanto se paso del tope, un dato que el
-    /// empleado necesita ver y no un error.
-    /// </remarks>
     public static BudgetLimitResponse WithSpending(Budget budget, BudgetCategoryLimit limit, decimal spentAmount)
     {
         ArgumentNullException.ThrowIfNull(budget);
