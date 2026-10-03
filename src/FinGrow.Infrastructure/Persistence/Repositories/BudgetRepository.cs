@@ -9,6 +9,8 @@ internal sealed class BudgetRepository(FinGrowDbContext dbContext) : IBudgetRepo
 {
     public void Add(Budget budget) => dbContext.Budgets.Add(budget);
 
+    public void Remove(Budget budget) => dbContext.Budgets.Remove(budget);
+
     public Task<bool> ExistsForPeriodAsync(
         Guid employeeId,
         BudgetPeriod period,

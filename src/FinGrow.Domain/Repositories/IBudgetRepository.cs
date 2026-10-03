@@ -7,6 +7,8 @@ public interface IBudgetRepository
 {
     void Add(Budget budget);
 
+    void Remove(Budget budget);
+
     Task<bool> ExistsForPeriodAsync(
         Guid employeeId,
         BudgetPeriod period,

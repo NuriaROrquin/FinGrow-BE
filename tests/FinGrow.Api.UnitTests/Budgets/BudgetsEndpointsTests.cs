@@ -194,6 +194,122 @@ public async Task Editing_a_limit_of_a_month_without_a_budget_responds_404()
     response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
 }
 
+        [Fact]
+    public async Task Removing_a_category_takes_it_out_of_the_budget()
+    {
+        using var factory = new BudgetsWebApplicationFactory();
+        var client = CreateAuthenticatedClient(factory, Rol.Empleado);
+        await client.PostAsJsonAsync(new Uri(BudgetsPath, UriKind.Relative), SeptemberBudget());
+
+        var response = await client.DeleteAsync(new Uri(SeptemberLimitsPath + "/Transporte", UriKind.Relative));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var stored = factory.Budgets.Single();
+        stored.LimitFor(ExpenseCategory.Transporte).ShouldBeNull();
+        stored.LimitFor(ExpenseCategory.Alimentos)!.Amount.ShouldBe(150000m);
+        (await response.Content.ReadAsStringAsync()).ShouldNotContain("Transporte");
+    }
+
+    [Fact]
+    public async Task Removing_the_last_category_responds_409()
+    {
+        using var factory = new BudgetsWebApplicationFactory();
+        var client = CreateAuthenticatedClient(factory, Rol.Empleado);
+        await client.PostAsJsonAsync(new Uri(BudgetsPath, UriKind.Relative), SeptemberBudget());
+        await client.DeleteAsync(new Uri(SeptemberLimitsPath + "/Transporte", UriKind.Relative));
+
+        var response = await client.DeleteAsync(new Uri(SeptemberLimitsPath + "/Alimentos", UriKind.Relative));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        factory.Budgets.Single().Limits.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Removing_a_category_that_is_not_in_the_budget_responds_404()
+    {
+        using var factory = new BudgetsWebApplicationFactory();
+        var client = CreateAuthenticatedClient(factory, Rol.Empleado);
+        await client.PostAsJsonAsync(new Uri(BudgetsPath, UriKind.Relative), SeptemberBudget());
+
+        var response = await client.DeleteAsync(new Uri(SeptemberLimitsPath + "/Salud", UriKind.Relative));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        factory.Budgets.Single().Limits.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task Deleting_a_budget_removes_it_and_the_month_can_be_created_again()
+    {
+        using var factory = new BudgetsWebApplicationFactory();
+        var client = CreateAuthenticatedClient(factory, Rol.Empleado);
+        await client.PostAsJsonAsync(new Uri(BudgetsPath, UriKind.Relative), SeptemberBudget());
+
+        var response = await client.DeleteAsync(new Uri(BudgetsPath + "/2026/9", UriKind.Relative));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        factory.Budgets.ShouldBeEmpty();
+
+        var recreated = await client.PostAsJsonAsync(new Uri(BudgetsPath, UriKind.Relative), SeptemberBudget());
+        recreated.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Deleting_the_budget_of_a_month_without_one_responds_404()
+    {
+        using var factory = new BudgetsWebApplicationFactory();
+        var client = CreateAuthenticatedClient(factory, Rol.Empleado);
+
+        var response = await client.DeleteAsync(new Uri(BudgetsPath + "/2026/9", UriKind.Relative));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Changing_the_currency_keeps_the_amounts_and_returns_the_budget_in_the_new_one()
+    {
+        using var factory = new BudgetsWebApplicationFactory();
+        var client = CreateAuthenticatedClient(factory, Rol.Empleado);
+        await client.PostAsJsonAsync(new Uri(BudgetsPath, UriKind.Relative), SeptemberBudget());
+
+        var response = await client.PutAsJsonAsync(
+            new Uri(BudgetsPath + "/2026/9/currency", UriKind.Relative),
+            new { currency = "USD" });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var stored = factory.Budgets.Single();
+        stored.Currency.ShouldBe(Currency.USD);
+        stored.LimitFor(ExpenseCategory.Alimentos)!.Amount.ShouldBe(150000m);
+        (await response.Content.ReadAsStringAsync()).ShouldContain("\"currency\":\"USD\"");
+    }
+
+    [Fact]
+    public async Task An_unknown_currency_responds_400()
+    {
+        using var factory = new BudgetsWebApplicationFactory();
+        var client = CreateAuthenticatedClient(factory, Rol.Empleado);
+        await client.PostAsJsonAsync(new Uri(BudgetsPath, UriKind.Relative), SeptemberBudget());
+
+        var response = await client.PutAsJsonAsync(
+            new Uri(BudgetsPath + "/2026/9/currency", UriKind.Relative),
+            new { currency = "XYZ" });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        factory.Budgets.Single().Currency.ShouldBe(Currency.ARS);
+    }
+
+    [Fact]
+    public async Task Changing_the_currency_of_a_month_without_a_budget_responds_404()
+    {
+        using var factory = new BudgetsWebApplicationFactory();
+        var client = CreateAuthenticatedClient(factory, Rol.Empleado);
+
+        var response = await client.PutAsJsonAsync(
+            new Uri(BudgetsPath + "/2026/9/currency", UriKind.Relative),
+            new { currency = "USD" });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
     private static object SeptemberBudget() => new
     {
         year = 2026,
@@ -257,6 +373,8 @@ public async Task Editing_a_limit_of_a_month_without_a_budget_responds_404()
     private sealed class InMemoryBudgetRepository(List<Budget> budgets) : IBudgetRepository
     {
         public void Add(Budget budget) => budgets.Add(budget);
+
+        public void Remove(Budget budget) => budgets.Remove(budget);
 
         public Task<bool> ExistsForPeriodAsync(
             Guid employeeId,

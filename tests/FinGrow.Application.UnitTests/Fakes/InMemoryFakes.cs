@@ -446,6 +446,8 @@ public sealed class FakeBudgetRepository : IBudgetRepository
 
     public void Add(Budget budget) => Budgets.Add(budget);
 
+    public void Remove(Budget budget) => Budgets.Remove(budget);
+
     public Task<bool> ExistsForPeriodAsync(
         Guid employeeId,
         BudgetPeriod period,
