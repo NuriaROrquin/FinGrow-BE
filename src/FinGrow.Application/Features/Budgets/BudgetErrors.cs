@@ -25,4 +25,13 @@ internal static class BudgetErrors
             string.Create(
                 CultureInfo.InvariantCulture,
                 $"No hay un presupuesto de {previousPeriodStart:MM/yyyy} para duplicar."));
+
+    public static Error LimitNotFound() =>
+        Error.NotFound("Budget.LimitNotFound", "El presupuesto no tiene un tope para esa categoría.");
+
+    public static Error LastLimit() =>
+        Error.Conflict(
+            "Budget.LastLimit",
+            "Es la única categoría del presupuesto. Si no lo querés, eliminá el presupuesto completo.");
+
 }
