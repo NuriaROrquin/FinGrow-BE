@@ -173,8 +173,21 @@ public sealed class FakeTokenService : ITokenService
 {
     public static readonly DateTimeOffset ExpiresAt = new(2026, 9, 15, 12, 0, 0, TimeSpan.Zero);
 
+    public static readonly DateTimeOffset ChallengeExpiresAt = new(2026, 9, 15, 10, 5, 0, TimeSpan.Zero);
+
+    private const string ChallengePrefix = "challenge-for-";
+
     public AuthToken GenerateToken(Guid userId, Guid companyId, string role, string fullName) =>
         new($"token-for-{userId}", ExpiresAt);
+
+    public AuthToken GenerateTwoFactorChallenge(Guid employeeId) =>
+        new($"{ChallengePrefix}{employeeId}", ChallengeExpiresAt);
+
+    public Guid? ReadTwoFactorChallenge(string challengeToken) =>
+        challengeToken.StartsWith(ChallengePrefix, StringComparison.Ordinal)
+        && Guid.TryParse(challengeToken[ChallengePrefix.Length..], out var employeeId)
+            ? employeeId
+            : null;
 }
 
 public sealed class FakeTotpService : ITotpService
