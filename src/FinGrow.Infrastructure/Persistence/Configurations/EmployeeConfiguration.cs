@@ -2,6 +2,7 @@ namespace FinGrow.Infrastructure.Persistence.Configurations;
 
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.ValueObjects;
+using FinGrow.Infrastructure.Persistence.Protection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -34,6 +35,12 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
             .HasConversion<string>()
             .HasMaxLength(3)
             .IsRequired();
+
+        builder.Property(employee => employee.TwoFactorSecret)
+            .HasAnnotation(EncryptedStringConverter.Annotation, true);
+
+        builder.Property(employee => employee.TwoFactorEnabledAt);
+        builder.Ignore(employee => employee.IsTwoFactorEnabled);
 
         builder.Property(employee => employee.HiredOn).IsRequired();
         builder.Property(employee => employee.IsActive).IsRequired();
