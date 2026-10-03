@@ -38,7 +38,19 @@ public interface ITransactionReadRepository
         int pageSize,
         string? search,
         TransactionType? type,
-        TransactionStatus? status,
+        IReadOnlyCollection<TransactionStatus> statuses,
+        ExpenseCategory? expenseCategory,
+        IncomeCategory? incomeCategory,
+        PaymentMethod? paymentMethod,
+        DateOnly? fromDate,
+        DateOnly? toDate,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Transaction>> GetFilteredAsync(
+        Guid employeeId,
+        string? search,
+        TransactionType? type,
+        IReadOnlyCollection<TransactionStatus> statuses,
         ExpenseCategory? expenseCategory,
         IncomeCategory? incomeCategory,
         PaymentMethod? paymentMethod,

@@ -9,7 +9,13 @@ public sealed record TransactionFilters(
     TransactionType? Type = null,
     ExpenseCategory? ExpenseCategory = null,
     IncomeCategory? IncomeCategory = null,
-    TransactionStatus? Status = null,
+    IReadOnlyCollection<TransactionStatus>? Status = null,
     PaymentMethod? PaymentMethod = null,
     DateOnly? DateFrom = null,
-    DateOnly? DateTo = null);
+    DateOnly? DateTo = null)
+{
+    public IReadOnlyCollection<TransactionStatus> EffectiveStatuses =>
+        Status is { Count: > 0 }
+            ? Status
+            : new[] { TransactionStatus.Confirmed };
+}

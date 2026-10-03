@@ -172,7 +172,7 @@ public sealed class TransactionChartQueryTests
             int pageSize,
             string? search,
             TransactionType? type,
-            TransactionStatus? status,
+            IReadOnlyCollection<TransactionStatus> statuses,
             ExpenseCategory? expenseCategory,
             IncomeCategory? incomeCategory,
             PaymentMethod? paymentMethod,
@@ -180,6 +180,19 @@ public sealed class TransactionChartQueryTests
             DateOnly? toDate,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(new TransactionPage(Array.Empty<Domain.Entities.Transaction>(), pageNumber, pageSize, 0));
+
+        public Task<IReadOnlyList<Domain.Entities.Transaction>> GetFilteredAsync(
+            Guid employeeId,
+            string? search,
+            TransactionType? type,
+            IReadOnlyCollection<TransactionStatus> statuses,
+            ExpenseCategory? expenseCategory,
+            IncomeCategory? incomeCategory,
+            PaymentMethod? paymentMethod,
+            DateOnly? fromDate,
+            DateOnly? toDate,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Domain.Entities.Transaction>>(Array.Empty<Domain.Entities.Transaction>());
 
         private void Capture(Guid employeeId, Currency currency, DateOnly fromDate, DateOnly toDate)
         {

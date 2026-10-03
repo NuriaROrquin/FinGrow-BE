@@ -172,7 +172,7 @@ internal sealed class TransactionReadRepository : ITransactionReadRepository
         int pageSize,
         string? search,
         TransactionType? type,
-        TransactionStatus? status,
+        IReadOnlyCollection<TransactionStatus> statuses,
         ExpenseCategory? expenseCategory,
         IncomeCategory? incomeCategory,
         PaymentMethod? paymentMethod,
@@ -180,12 +180,69 @@ internal sealed class TransactionReadRepository : ITransactionReadRepository
         DateOnly? toDate,
         CancellationToken cancellationToken = default)
     {
+        var filteredQuery = BuildFilteredQuery(
+            employeeId,
+            search,
+            type,
+            statuses,
+            expenseCategory,
+            incomeCategory,
+            paymentMethod,
+            fromDate,
+            toDate);
+
+        var totalCount = await filteredQuery.CountAsync(cancellationToken);
+
+        var items = await filteredQuery
+            .OrderByDescending(transaction => transaction.OccurredOn)
+            .ThenByDescending(transaction => transaction.Id)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        return new TransactionPage(items, pageNumber, pageSize, totalCount);
+    }
+
+    public async Task<IReadOnlyList<Transaction>> GetFilteredAsync(
+        Guid employeeId,
+        string? search,
+        TransactionType? type,
+        IReadOnlyCollection<TransactionStatus> statuses,
+        ExpenseCategory? expenseCategory,
+        IncomeCategory? incomeCategory,
+        PaymentMethod? paymentMethod,
+        DateOnly? fromDate,
+        DateOnly? toDate,
+        CancellationToken cancellationToken = default) =>
+        await BuildFilteredQuery(
+                employeeId,
+                search,
+                type,
+                statuses,
+                expenseCategory,
+                incomeCategory,
+                paymentMethod,
+                fromDate,
+                toDate)
+            .OrderByDescending(transaction => transaction.OccurredOn)
+            .ThenByDescending(transaction => transaction.Id)
+            .ToListAsync(cancellationToken);
+
+    private IQueryable<Transaction> BuildFilteredQuery(
+        Guid employeeId,
+        string? search,
+        TransactionType? type,
+        IReadOnlyCollection<TransactionStatus> statuses,
+        ExpenseCategory? expenseCategory,
+        IncomeCategory? incomeCategory,
+        PaymentMethod? paymentMethod,
+        DateOnly? fromDate,
+        DateOnly? toDate)
+    {
         var filteredQuery = _dbContext.Transactions
             .AsNoTracking()
             .Where(transaction => transaction.EmployeeId == employeeId)
-            .Where(transaction =>
-                transaction.Status == TransactionStatus.Pending
-                || transaction.Status == TransactionStatus.Confirmed);
+            .Where(transaction => statuses.Contains(transaction.Status));
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -200,11 +257,6 @@ internal sealed class TransactionReadRepository : ITransactionReadRepository
         {
             filteredQuery = filteredQuery.Where(transaction => transaction.Type == type.Value);
         }
-
-            if (status.HasValue)
-            {
-                filteredQuery = filteredQuery.Where(transaction => transaction.Status == status.Value);
-            }
 
         if (expenseCategory.HasValue)
         {
@@ -231,16 +283,7 @@ internal sealed class TransactionReadRepository : ITransactionReadRepository
             filteredQuery = filteredQuery.Where(transaction => transaction.OccurredOn <= toDate.Value);
         }
 
-        var totalCount = await filteredQuery.CountAsync(cancellationToken);
-
-        var items = await filteredQuery
-            .OrderByDescending(transaction => transaction.OccurredOn)
-            .ThenByDescending(transaction => transaction.Id)
-            .Skip((pageNumber - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(cancellationToken);
-
-        return new TransactionPage(items, pageNumber, pageSize, totalCount);
+        return filteredQuery;
     }
 
     private static decimal GetTotal(IEnumerable<TypeCurrencyTotal> totals, TransactionType type, Currency currency) =>

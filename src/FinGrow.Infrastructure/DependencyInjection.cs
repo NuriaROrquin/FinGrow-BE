@@ -76,6 +76,7 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<FinGrowDbContext>());
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<ITransactionReadRepository, TransactionReadRepository>();
+        services.AddScoped<ITransactionExcelExporter, TransactionExcelExporter>();
         services.AddScoped<IGoalRepository, GoalRepository>();
         services.AddScoped<IInvestmentRepository, InvestmentRepository>();
         services.AddScoped<IInvestmentReadRepository, InvestmentReadRepository>();

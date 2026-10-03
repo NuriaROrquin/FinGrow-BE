@@ -4,19 +4,12 @@ using FinGrow.Application.Features.Transactions.GetHistory;
 using FinGrow.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
 
-/// <summary>Agrupa los query params de GET /api/transactions para no inflar la firma del controller.</summary>
-public sealed class TransactionQueryParameters
+public sealed class TransactionExportQueryParameters
 {
-    [FromQuery]
-    public int PageNumber { get; init; } = 1;
-
-    [FromQuery]
-    public int PageSize { get; init; } = 20;
-
     [FromQuery]
     public string? Search { get; init; }
 
-    [FromQuery]
+    [FromQuery(Name = "transactionType")]
     public TransactionType? Type { get; init; }
 
     [FromQuery]
@@ -25,7 +18,7 @@ public sealed class TransactionQueryParameters
     [FromQuery]
     public IncomeCategory? IncomeCategory { get; init; }
 
-    [FromQuery]
+    [FromQuery(Name = "transactionStatus")]
     public TransactionStatus[]? Status { get; init; }
 
     [FromQuery]
@@ -38,5 +31,12 @@ public sealed class TransactionQueryParameters
     public DateOnly? DateTo { get; init; }
 
     public TransactionFilters ToFilters() =>
-        new(PageNumber, PageSize, Search, Type, ExpenseCategory, IncomeCategory, Status, PaymentMethod, DateFrom, DateTo);
+        new(Search: Search,
+            Type: Type,
+            ExpenseCategory: ExpenseCategory,
+            IncomeCategory: IncomeCategory,
+            Status: Status,
+            PaymentMethod: PaymentMethod,
+            DateFrom: DateFrom,
+            DateTo: DateTo);
 }

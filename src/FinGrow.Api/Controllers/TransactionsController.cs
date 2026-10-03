@@ -20,7 +20,10 @@ using Microsoft.AspNetCore.Mvc;
 [ApiController]
 [Route("api/transactions")]
 [Authorize]
-public sealed class TransactionsController(ISender sender, ICurrentUser currentUser) : ControllerBase
+public sealed class TransactionsController(
+    ISender sender,
+    ICurrentUser currentUser,
+    ITransactionExcelExporter transactionExcelExporter) : ControllerBase
 {
     [HttpPost]
     public async Task<IActionResult> Create(CreateTransactionCommand command, CancellationToken cancellationToken)
@@ -71,6 +74,25 @@ public sealed class TransactionsController(ISender sender, ICurrentUser currentU
         [FromQuery] TransactionQueryParameters parameters,
         CancellationToken cancellationToken = default) =>
         (await sender.Send(new GetTransactionHistoryQuery(parameters.ToFilters()), cancellationToken)).ToActionResult();
+
+    [HttpGet("export")]
+    [Produces("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")]
+    public async Task<IActionResult> Export(
+        [FromQuery] TransactionExportQueryParameters parameters,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await transactionExcelExporter.ExportAsync(
+            currentUser.UserId!.Value,
+            parameters.ToFilters(),
+            cancellationToken);
+
+        return result.IsSuccess
+            ? File(
+                result.Value,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "transacciones.xlsx")
+            : result.ToActionResult();
+    }
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken) =>
