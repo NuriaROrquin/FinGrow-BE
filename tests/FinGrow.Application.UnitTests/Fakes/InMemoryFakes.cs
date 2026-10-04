@@ -454,7 +454,9 @@ public sealed class FakeMarketPriceProvider : IMarketPriceProvider
 
     public int Calls { get; private set; }
 
-    public string Source => "BYMA";
+    public PriceMarket Market { get; set; } = PriceMarket.Exchange;
+
+    public string Source { get; set; } = "BYMA";
 
     public Task<IReadOnlyList<MarketPrice>> GetClosingPricesAsync(CancellationToken cancellationToken = default)
     {
@@ -470,8 +472,15 @@ public sealed class FakeSecurityPriceRepository : ISecurityPriceRepository
 {
     public List<SecurityPrice> Prices { get; } = new();
 
-    public Task<SecurityPrice?> FindAsync(string symbol, Currency currency, CancellationToken cancellationToken = default) =>
-        Task.FromResult(Prices.FirstOrDefault(price => price.Symbol == symbol && price.Currency == currency));
+    public Task<SecurityPrice?> FindAsync(
+        PriceMarket market,
+        string symbol,
+        Currency currency,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Prices.FirstOrDefault(price =>
+            price.Market == market
+            && price.Symbol == symbol
+            && (market.IgnoresCurrency() || price.Currency == currency)));
 
     public Task<IReadOnlyList<SecurityPrice>> ListAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<SecurityPrice>>(Prices.ToList());
