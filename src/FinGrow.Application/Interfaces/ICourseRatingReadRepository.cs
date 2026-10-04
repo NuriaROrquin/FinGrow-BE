@@ -11,4 +11,6 @@ public interface ICourseRatingReadRepository
 public sealed record CourseRatingSummary(int Count, decimal? Average, int? EmployeeScore)
 {
     public static readonly CourseRatingSummary None = new(0, null, null);
+
+    public decimal? RoundedAverage => Average is null ? null : decimal.Round(Average.Value, 1, MidpointRounding.AwayFromZero);
 }

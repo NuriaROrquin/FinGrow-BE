@@ -16,6 +16,7 @@ public class ListCoursesHandlerTests
     private static readonly string[] SlugsByLevel = { "basico", "intermedio", "avanzado" };
 
     private readonly FakeCourseRepository _courses = new();
+    private readonly FakeCourseRatingRepository _ratings = new();
 
     private Course StoreCourse(string slug, CourseLevel level = CourseLevel.Beginner, params int[] lessonMinutes) =>
         StoreCourse(slug, level, published: true, lessonMinutes);
@@ -50,7 +51,7 @@ public class ListCoursesHandlerTests
         CourseLevel? level = null,
         int? maxDuration = null,
         CourseProgressStatus? status = null) =>
-        new ListCoursesHandler(_courses).Handle(
+        new ListCoursesHandler(_courses, _ratings).Handle(
             new ListCoursesQuery(EmployeeId, level, maxDuration, status),
             CancellationToken.None);
 
