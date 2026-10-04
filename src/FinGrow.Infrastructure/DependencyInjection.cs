@@ -77,9 +77,13 @@ public static class DependencyInjection
 
         services.AddSingleton<ISecretProtector, AesGcmSecretProtector>();
 
-        services.AddDbContext<FinGrowDbContext>(options =>
-            options.UseNpgsql(connectionString, npgsql =>
-                npgsql.MigrationsAssembly(typeof(FinGrowDbContext).Assembly.FullName)));
+        services.AddScoped<DomainEventsInterceptor>();
+
+        services.AddDbContext<FinGrowDbContext>((provider, options) =>
+            options
+                .UseNpgsql(connectionString, npgsql =>
+                    npgsql.MigrationsAssembly(typeof(FinGrowDbContext).Assembly.FullName))
+                .AddInterceptors(provider.GetRequiredService<DomainEventsInterceptor>()));
 
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<FinGrowDbContext>());
         services.AddScoped<ITransactionRepository, TransactionRepository>();
