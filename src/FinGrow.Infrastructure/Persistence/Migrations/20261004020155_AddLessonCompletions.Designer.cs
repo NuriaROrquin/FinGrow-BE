@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FinGrow.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(FinGrowDbContext))]
-    [Migration("20260927195144_AddLessonCompletions")]
+    [Migration("20261004020155_AddLessonCompletions")]
     partial class AddLessonCompletions
     {
         /// <inheritdoc />
@@ -144,7 +144,6 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("FinGrow.Domain.Entities.BudgetCategoryLimit", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -492,6 +491,15 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(3)")
                         .HasColumnName("preferred_currency");
 
+                    b.Property<DateTimeOffset?>("TwoFactorEnabledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("two_factor_enabled_at");
+
+                    b.Property<string>("TwoFactorSecret")
+                        .HasColumnType("text")
+                        .HasColumnName("two_factor_secret")
+                        .HasAnnotation("FinGrow:Encrypted", true);
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -724,6 +732,16 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("date")
                         .HasColumnName("purchased_on");
 
+                    b.Property<decimal?>("Quantity")
+                        .HasPrecision(20, 6)
+                        .HasColumnType("numeric(20,6)")
+                        .HasColumnName("quantity");
+
+                    b.Property<string>("Symbol")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("symbol");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -743,13 +761,16 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                     b.ToTable("investments", null, t =>
                         {
                             t.HasCheckConstraint("ck_investments_invested_positive", "invested_amount > 0");
+
+                            t.HasCheckConstraint("ck_investments_quantity_positive", "quantity IS NULL OR quantity > 0");
+
+                            t.HasCheckConstraint("ck_investments_symbol_with_quantity", "(symbol IS NULL) = (quantity IS NULL)");
                         });
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.InvestmentValuation", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
