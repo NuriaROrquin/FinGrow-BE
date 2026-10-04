@@ -136,17 +136,48 @@ de BYMA, con liquidación a 24 hs. Se pueden cotizar las acciones, los CEDEAR, l
 obligaciones negociables y las letras del Tesoro (LECAP y BONCAP, del panel `lebacs`); los fondos
 comunes, las criptomonedas, los plazos fijos, las cauciones y las cuentas remuneradas no cotizan en
 BYMA y quedan valuados al costo. El símbolo tiene que ser la variante de la moneda de la inversión
-(AL30 en pesos, AL30D en dólares) y los bonos, las ONs y las letras cotizan cada 100 nominales. Esos datos no son la API contratada de BYMA ni tienen garantía de servicio:
-antes de producción con empleados reales se reemplazan por la API EOD de BYMA (contrato con
-marketdata@byma.com.ar), implementando otro `IMarketPriceProvider`.
+(AL30 en pesos, AL30D en dólares) y los bonos, las ONs y las letras cotizan cada 100 nominales.
+Esos datos no son la API contratada de BYMA ni tienen garantía de servicio: antes de producción con
+empleados reales se reemplazan por la API EOD de BYMA (contrato con marketdata@byma.com.ar),
+implementando otro `IMarketPriceProvider`.
 
 `GET /api/security-prices/{symbol}?currency=ARS` cotiza un símbolo mientras se carga el formulario
-de inversiones: devuelve el precio por unidad (por nominal en bonos y ONs), la fecha del precio y
+de inversiones: devuelve el precio por unidad (por nominal en bonos, ONs y letras), la fecha del precio y
 la fuente. Primero busca en los paneles de BYMA, que la API reutiliza `Byma:CacheMinutes`; si BYMA
 no tiene precio para ese símbolo (los fines de semana y feriados el feed público viene todo en 0) o
 no responde en 10 segundos, usa el último cierre que guardó `investment-quotes` en `security_prices`
 con su fecha. Sin precio en ninguno de los dos contesta `404` si BYMA respondió y `503` si no.
 Solo acepta `ARS` y `USD`, las monedas en las que cotiza BYMA.
+
+### Fuente de cotización de cada instrumento
+
+| Instrumento | `InvestmentType` | Fuente | De dónde sale el precio | Precio por |
+|---|---|---|---|---|
+| Acción | `Stock` | BYMA, datos públicos | Paneles `leading-equity` y `general-equity` | Acción |
+| CEDEAR | `Cedear` | BYMA, datos públicos | Panel `cedears` | CEDEAR |
+| ETF | `Etf` | BYMA, datos públicos | Panel `cedears`: los ETF del exterior (SPY, QQQ) se operan como CEDEAR | Unidad |
+| Bono | `Bond` | BYMA, datos públicos | Panel `public-bonds` | Nominal (BYMA cotiza cada 100) |
+| Obligación negociable | `CorporateBond` | BYMA, datos públicos | Panel `negociable-obligations` | Nominal (BYMA cotiza cada 100) |
+| Letra del Tesoro | `TreasuryBill` | BYMA, datos públicos | Panel `lebacs` (LECAP y BONCAP) | Nominal (BYMA cotiza cada 100) |
+| Fondo común | `MutualFund` | Ninguna | Se valúa al costo | — |
+| Plazo fijo | `FixedTermDeposit` | Ninguna | Se valúa al costo | — |
+| Caución | `Repo` | Ninguna | Se valúa al costo; BYMA publica una tasa, no un precio | — |
+| Cuenta remunerada | `RemuneratedAccount` | Ninguna | Se valúa al costo | — |
+| Criptomoneda | `Crypto` | Ninguna | Se valúa al costo | — |
+| Dólar MEP | — | [DolarApi](https://dolarapi.com) | `GET v1/dolares/bolsa`; convierte el portafolio a una sola moneda, no valúa inversiones | Dólar |
+
+- **Todo lo de BYMA sale de la misma descarga.** `BymaMarketPriceProvider` baja todos los paneles
+  con `POST {Byma:BaseUrl}{panel}` y liquidación a 24 hs, y el precio se busca por símbolo y
+  moneda, no por tipo: el tipo de activo solo decide si la inversión acepta símbolo. La moneda
+  elige la variante: AL30 en pesos, AL30D en dólares; las variantes en dólar cable (AL30C) se
+  descartan.
+- **Quién la usa.** `investment-quotes` valúa una vez por día hábil las inversiones con símbolo y
+  guarda el último cierre en `security_prices`; `GET /api/security-prices/{symbol}` cotiza mientras
+  se carga el formulario y, si BYMA viene en 0 o no responde, usa ese último cierre.
+- **Lo que no tiene fuente** queda con el valor que cargó el empleado. Para los fondos comunes y
+  las criptomonedas ya hay fuentes públicas probadas (ArgentinaDatos publica la cuotaparte diaria
+  de cada fondo por nombre; CoinGecko y CriptoYa, el precio de cada cripto en pesos y dólares),
+  pero todavía no están integradas. Las cuentas vinculadas a IOL se cotizan aparte con T-19.
 
 ### WhatsApp (Twilio)
 
