@@ -14,10 +14,23 @@ using Microsoft.AspNetCore.Mvc;
 public sealed class AuthController(IMediator mediator) : ControllerBase
 {
     [HttpPost("empleado")]
-    public async Task<IActionResult> LoginEmpleado(LoginEmployeeCommand command, CancellationToken cancellationToken)
-    {
-        var result = await mediator.Send(command, cancellationToken);
+    public async Task<IActionResult> LoginEmpleado(LoginEmployeeCommand command, CancellationToken cancellationToken) =>
+        StartSessionOrChallenge(await mediator.Send(command, cancellationToken));
 
+    [HttpPost("empleado/2fa")]
+    public async Task<IActionResult> VerificarDobleFactor(VerifyTwoFactorLoginCommand command, CancellationToken cancellationToken) =>
+        StartSession(await mediator.Send(command, cancellationToken));
+
+    [HttpPost("empresa")]
+    public async Task<IActionResult> LoginEmpresa(LoginCompanyCommand command, CancellationToken cancellationToken) =>
+        StartSessionOrChallenge(await mediator.Send(command, cancellationToken));
+
+    [HttpPost("empresa/2fa")]
+    public async Task<IActionResult> VerificarDobleFactorEmpresa(VerifyCompanyTwoFactorLoginCommand command, CancellationToken cancellationToken) =>
+        StartSession(await mediator.Send(command, cancellationToken));
+
+    private IActionResult StartSessionOrChallenge(Result<LoginResult> result)
+    {
         if (result.IsFailure)
         {
             return result.ToActionResult();
@@ -30,14 +43,6 @@ public sealed class AuthController(IMediator mediator) : ControllerBase
 
         return StartSession(Result.Success(result.Value.Session!));
     }
-
-    [HttpPost("empleado/2fa")]
-    public async Task<IActionResult> VerificarDobleFactor(VerifyTwoFactorLoginCommand command, CancellationToken cancellationToken) =>
-        StartSession(await mediator.Send(command, cancellationToken));
-
-    [HttpPost("empresa")]
-    public async Task<IActionResult> LoginEmpresa(LoginCompanyCommand command, CancellationToken cancellationToken) =>
-        StartSession(await mediator.Send(command, cancellationToken));
 
     private IActionResult StartSession(Result<LoginResponse> result)
     {

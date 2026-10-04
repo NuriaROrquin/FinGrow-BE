@@ -11,6 +11,7 @@ using FluentValidation;
 using Jobs;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
+using Features.Account.TwoFactor;
 
 public static class DependencyInjection
 {
@@ -25,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<LinkCodeRedeemer>();
         services.AddScoped<MercadoPagoSynchronizer>();
         services.AddScoped<SessionIssuer>();
+        services.AddScoped<TwoFactorAccountFinder>();
 
         services.AddSingleton<RunningJobs>();
         services.AddScoped<JobRunner>();

@@ -3,26 +3,22 @@ namespace FinGrow.Application.Features.Account.TwoFactor;
 using FinGrow.Application.Common;
 using FinGrow.Application.DTOs;
 using FinGrow.Application.Interfaces;
-using FinGrow.Domain.Repositories;
 using MediatR;
 
 internal sealed class SetupTwoFactorCommandHandler : IRequestHandler<SetupTwoFactorCommand, Result<TwoFactorSetupResponse>>
 {
-    private readonly ICurrentUser _currentUser;
-    private readonly IEmployeeRepository _employees;
+    private readonly TwoFactorAccountFinder _accounts;
     private readonly ITotpService _totp;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _clock;
 
     public SetupTwoFactorCommandHandler(
-        ICurrentUser currentUser,
-        IEmployeeRepository employees,
+        TwoFactorAccountFinder accounts,
         ITotpService totp,
         IUnitOfWork unitOfWork,
         IDateTimeProvider clock)
     {
-        _currentUser = currentUser;
-        _employees = employees;
+        _accounts = accounts;
         _totp = totp;
         _unitOfWork = unitOfWork;
         _clock = clock;
@@ -30,28 +26,23 @@ internal sealed class SetupTwoFactorCommandHandler : IRequestHandler<SetupTwoFac
 
     public async Task<Result<TwoFactorSetupResponse>> Handle(SetupTwoFactorCommand request, CancellationToken cancellationToken)
     {
-        if (_currentUser.UserId is not { } employeeId)
+        var account = await _accounts.FindCurrentAsync(cancellationToken);
+
+        if (account is null)
         {
             return Result.Failure<TwoFactorSetupResponse>(TwoFactorErrors.NoAutenticado);
         }
 
-        var employee = await _employees.GetByIdAsync(employeeId, cancellationToken);
-
-        if (employee is null)
-        {
-            return Result.Failure<TwoFactorSetupResponse>(TwoFactorErrors.NoAutenticado);
-        }
-
-        if (employee.IsTwoFactorEnabled)
+        if (account.IsTwoFactorEnabled)
         {
             return Result.Failure<TwoFactorSetupResponse>(TwoFactorErrors.YaActivo);
         }
 
         var secret = _totp.GenerateSecret();
-        employee.StartTwoFactorEnrollment(secret, _clock.UtcNow);
+        account.StartTwoFactorEnrollment(secret, _clock.UtcNow);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(new TwoFactorSetupResponse(secret, _totp.BuildProvisioningUri(secret, employee.Email.Value)));
+        return Result.Success(new TwoFactorSetupResponse(secret, _totp.BuildProvisioningUri(secret, account.Email.Value)));
     }
 }

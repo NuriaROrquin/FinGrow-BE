@@ -4,4 +4,4 @@ using FinGrow.Application.Common;
 using FinGrow.Application.DTOs;
 using MediatR;
 
-public sealed record LoginCompanyCommand(string Email, string Password) : IRequest<Result<LoginResult>>;
+public sealed record VerifyCompanyTwoFactorLoginCommand(string ChallengeToken, string Code) : IRequest<Result<LoginResponse>>;

@@ -5,7 +5,7 @@ using FinGrow.Domain.Enums;
 using FinGrow.Domain.Errors;
 using FinGrow.Domain.ValueObjects;
 
-public sealed class Employee : AggregateRoot
+public sealed class Employee : AggregateRoot, ITwoFactorAccount
 {
     public const int MaxFullNameLength = 200;
     public const int MaxPhoneNumberLength = 30;
@@ -182,6 +182,13 @@ public sealed class Employee : AggregateRoot
     public void Activate(DateTimeOffset updatedAt)
     {
         IsActive = true;
+        UpdatedAt = updatedAt;
+    }
+
+    public void DisableTwoFactor(DateTimeOffset updatedAt)
+    {
+        TwoFactorSecret = null;
+        TwoFactorEnabledAt = null;
         UpdatedAt = updatedAt;
     }
 

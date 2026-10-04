@@ -33,13 +33,36 @@ public class TwoFactorEnrollmentHandlerTests
         return employee;
     }
 
+    private readonly FakeCompanyRepository _companies = new();
+
+    private TwoFactorAccountFinder CreateFinder() => new(_currentUser, _employees, _companies);
+
     private SetupTwoFactorCommandHandler CreateSetupHandler() =>
-        new(_currentUser, _employees, _totp, _unitOfWork, new FakeDateTimeProvider(Now));
+        new(CreateFinder(), _totp, _unitOfWork, new FakeDateTimeProvider(Now));
 
     private EnableTwoFactorCommandHandler CreateEnableHandler() =>
-        new(_currentUser, _employees, _totp, _unitOfWork, new FakeDateTimeProvider(Now));
+        new(CreateFinder(), _totp, _unitOfWork, new FakeDateTimeProvider(Now));
 
-    private GetTwoFactorStatusQueryHandler CreateStatusHandler() => new(_currentUser, _employees);
+    private DisableTwoFactorCommandHandler CreateDisableHandler() =>
+        new(CreateFinder(), _totp, _unitOfWork, new FakeDateTimeProvider(Now));
+
+    private GetTwoFactorStatusQueryHandler CreateStatusHandler() => new(CreateFinder());
+
+    private Company AddLoggedInCompany()
+    {
+        var company = Company.Create(
+            "Empresa Demo S.A.",
+            TaxId.From("20123456786"),
+            Email.From("empresa@empresa.com"),
+            "1234",
+            Currency.ARS,
+            Now);
+
+        _companies.Companies.Add(company);
+        _currentUser.UserId = company.Id;
+        _currentUser.Role = "Empresa";
+        return company;
+    }
 
     [Fact]
     public async Task Status_is_disabled_until_the_enrollment_is_confirmed()
@@ -163,5 +186,57 @@ public class TwoFactorEnrollmentHandlerTests
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("Account.DobleFactorYaActivo");
+    }
+
+    [Fact]
+    public async Task A_company_can_set_up_and_enable_two_factor()
+    {
+        var company = AddLoggedInCompany();
+
+        var setup = await CreateSetupHandler().Handle(new SetupTwoFactorCommand(), CancellationToken.None);
+        var enable = await CreateEnableHandler().Handle(new EnableTwoFactorCommand(FakeTotpService.ValidCode), CancellationToken.None);
+        var status = await CreateStatusHandler().Handle(new GetTwoFactorStatusQuery(), CancellationToken.None);
+
+        setup.IsSuccess.ShouldBeTrue();
+        enable.IsSuccess.ShouldBeTrue();
+        company.IsTwoFactorEnabled.ShouldBeTrue();
+        status.Value.Enabled.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Disable_with_a_valid_code_turns_two_factor_off()
+    {
+        var company = AddLoggedInCompany();
+        company.StartTwoFactorEnrollment("SECRETBASE32", Now);
+        company.EnableTwoFactor(Now);
+
+        var result = await CreateDisableHandler().Handle(new DisableTwoFactorCommand(FakeTotpService.ValidCode), CancellationToken.None);
+
+        result.IsSuccess.ShouldBeTrue();
+        company.IsTwoFactorEnabled.ShouldBeFalse();
+        company.TwoFactorSecret.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Disable_with_an_invalid_code_keeps_two_factor_on()
+    {
+        var employee = AddLoggedInEmployee();
+        employee.StartTwoFactorEnrollment("SECRETBASE32", Now);
+        employee.EnableTwoFactor(Now);
+
+        var result = await CreateDisableHandler().Handle(new DisableTwoFactorCommand("000000"), CancellationToken.None);
+
+        result.Error.Code.ShouldBe("Account.CodigoInvalido");
+        employee.IsTwoFactorEnabled.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Disable_is_rejected_when_two_factor_is_not_enabled()
+    {
+        AddLoggedInCompany();
+
+        var result = await CreateDisableHandler().Handle(new DisableTwoFactorCommand(FakeTotpService.ValidCode), CancellationToken.None);
+
+        result.Error.Code.ShouldBe("Account.DobleFactorNoActivo");
     }
 }

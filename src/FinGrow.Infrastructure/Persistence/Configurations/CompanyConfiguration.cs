@@ -4,6 +4,7 @@ using FinGrow.Domain.Entities;
 using FinGrow.Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using FinGrow.Infrastructure.Persistence.Protection;
 
 internal sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
 {
@@ -17,7 +18,6 @@ internal sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
             .HasMaxLength(Company.MaxNameLength)
             .IsRequired();
 
-        // TaxId y Email son value objects de una sola propiedad: se aplastan a una columna.
         builder.Property(company => company.TaxId)
             .HasColumnName("tax_id")
             .HasConversion(taxId => taxId.Value, value => TaxId.From(value))
@@ -33,6 +33,12 @@ internal sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
         builder.Property(company => company.PasswordHash)
             .HasMaxLength(200)
             .IsRequired();
+
+        builder.Property(company => company.TwoFactorSecret)
+            .HasAnnotation(EncryptedStringConverter.Annotation, true);
+
+        builder.Property(company => company.TwoFactorEnabledAt);
+        builder.Ignore(company => company.IsTwoFactorEnabled);
 
         builder.Property(company => company.DefaultCurrency)
             .HasConversion<string>()

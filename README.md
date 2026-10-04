@@ -307,7 +307,7 @@ Siete entidades y tres value objects. El esquema se crea con la migración `Init
 
 | Tabla | Raíz de agregado | Qué guarda |
 |---|---|---|
-| `companies` | Company | Empresa contratante: razón social, CUIT, credenciales, moneda por defecto |
+| `companies` | Company | Empresa contratante: razón social, CUIT, credenciales (contraseña y secreto del doble factor, cifrado), moneda por defecto |
 | `departments` | (parte de Company) | Departamentos de la empresa; se desactivan, no se borran |
 | `employees` | Employee | La persona que usa la app; pertenece a una empresa y opcionalmente a un departamento |
 | `transactions` | Transaction | Ingresos y gastos, con importe siempre positivo y el signo dado por `type` |

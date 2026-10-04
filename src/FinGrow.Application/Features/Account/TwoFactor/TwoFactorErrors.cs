@@ -15,4 +15,7 @@ internal static class TwoFactorErrors
 
     public static readonly Error CodigoInvalido =
         Error.Validation("Account.CodigoInvalido", "El código de verificación no es correcto.");
+
+    public static readonly Error NoActivo =
+        Error.Conflict("Account.DobleFactorNoActivo", "El doble factor no está activo en tu cuenta.");
 }

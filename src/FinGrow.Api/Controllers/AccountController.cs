@@ -28,17 +28,18 @@ public sealed class AccountController(IMediator mediator) : ControllerBase
     }
 
     [HttpGet("2fa")]
-    [Authorize(Roles = Rol.Empleado)]
     public async Task<IActionResult> GetTwoFactorStatus(CancellationToken cancellationToken) =>
         (await mediator.Send(new GetTwoFactorStatusQuery(), cancellationToken)).ToActionResult();
 
     [HttpPost("2fa/setup")]
-    [Authorize(Roles = Rol.Empleado)]
     public async Task<IActionResult> SetupTwoFactor(CancellationToken cancellationToken) =>
         (await mediator.Send(new SetupTwoFactorCommand(), cancellationToken)).ToActionResult();
 
     [HttpPost("2fa/enable")]
-    [Authorize(Roles = Rol.Empleado)]
     public async Task<IActionResult> EnableTwoFactor(EnableTwoFactorCommand command, CancellationToken cancellationToken) =>
+        (await mediator.Send(command, cancellationToken)).ToActionResult();
+
+    [HttpPost("2fa/disable")]
+    public async Task<IActionResult> DisableTwoFactor(DisableTwoFactorCommand command, CancellationToken cancellationToken) =>
         (await mediator.Send(command, cancellationToken)).ToActionResult();
 }

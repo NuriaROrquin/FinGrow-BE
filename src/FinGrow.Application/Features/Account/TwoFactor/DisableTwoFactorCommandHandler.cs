@@ -1,17 +1,17 @@
-namespace FinGrow.Application.Features.Account.TwoFactor;
+﻿namespace FinGrow.Application.Features.Account.TwoFactor;
 
 using FinGrow.Application.Common;
 using FinGrow.Application.Interfaces;
 using MediatR;
 
-internal sealed class EnableTwoFactorCommandHandler : IRequestHandler<EnableTwoFactorCommand, Result>
+internal sealed class DisableTwoFactorCommandHandler : IRequestHandler<DisableTwoFactorCommand, Result>
 {
     private readonly TwoFactorAccountFinder _accounts;
     private readonly ITotpService _totp;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _clock;
 
-    public EnableTwoFactorCommandHandler(
+    public DisableTwoFactorCommandHandler(
         TwoFactorAccountFinder accounts,
         ITotpService totp,
         IUnitOfWork unitOfWork,
@@ -23,7 +23,7 @@ internal sealed class EnableTwoFactorCommandHandler : IRequestHandler<EnableTwoF
         _clock = clock;
     }
 
-    public async Task<Result> Handle(EnableTwoFactorCommand request, CancellationToken cancellationToken)
+    public async Task<Result> Handle(DisableTwoFactorCommand request, CancellationToken cancellationToken)
     {
         var account = await _accounts.FindCurrentAsync(cancellationToken);
 
@@ -32,24 +32,20 @@ internal sealed class EnableTwoFactorCommandHandler : IRequestHandler<EnableTwoF
             return Result.Failure(TwoFactorErrors.NoAutenticado);
         }
 
-        if (account.IsTwoFactorEnabled)
+        if (!account.IsTwoFactorEnabled)
         {
-            return Result.Failure(TwoFactorErrors.YaActivo);
-        }
-
-        if (account.TwoFactorSecret is not { } secret)
-        {
-            return Result.Failure(TwoFactorErrors.AltaNoIniciada);
+            return Result.Failure(TwoFactorErrors.NoActivo);
         }
 
         var now = _clock.UtcNow;
 
-        if (!_totp.VerifyCode(secret, request.Code, now))
+        // Pide el codigo aunque haya sesion: una sesion abierta sola no debe poder quitar la proteccion.
+        if (!_totp.VerifyCode(account.TwoFactorSecret!, request.Code, now))
         {
             return Result.Failure(TwoFactorErrors.CodigoInvalido);
         }
 
-        account.EnableTwoFactor(now);
+        account.DisableTwoFactor(now);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
