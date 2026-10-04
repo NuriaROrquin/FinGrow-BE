@@ -12,6 +12,7 @@ using FinGrow.Domain.Common;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.Repositories;
+using FinGrow.Infrastructure.Integrations.Byma;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -34,13 +35,15 @@ public class SecurityPriceEndpointTests
 
     private static readonly DateOnly LastFriday = new(2026, 10, 2);
 
+    private static readonly string[] SearchedBonds = { "AL30", "AL30D" };
+
     [Fact]
     public async Task A_bond_is_quoted_per_nominal_with_the_price_byma_publishes_today()
     {
         using var factory = new SecurityPricesWebApplicationFactory(Byma(PublicBonds));
         var client = AuthenticatedClient(factory);
 
-        var response = await client.GetAsync(new Uri("/api/security-prices/al30d?currency=USD", UriKind.Relative));
+        var response = await client.GetAsync(new Uri("/api/security-prices?symbol=al30d&currency=USD&type=Bond", UriKind.Relative));
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -57,9 +60,9 @@ public class SecurityPriceEndpointTests
         using var factory = new SecurityPricesWebApplicationFactory(Byma(PublicBonds));
         var client = AuthenticatedClient(factory);
 
-        await client.GetAsync(new Uri("/api/security-prices/AL30?currency=ARS", UriKind.Relative));
+        await client.GetAsync(new Uri("/api/security-prices?symbol=AL30&currency=ARS&type=Bond", UriKind.Relative));
         var downloaded = factory.Byma.Requests;
-        await client.GetAsync(new Uri("/api/security-prices/AL30D?currency=USD", UriKind.Relative));
+        await client.GetAsync(new Uri("/api/security-prices?symbol=AL30D&currency=USD&type=Bond", UriKind.Relative));
 
         downloaded.ShouldBeGreaterThan(0);
         factory.Byma.Requests.ShouldBe(downloaded);
@@ -69,10 +72,10 @@ public class SecurityPriceEndpointTests
     public async Task On_a_weekend_byma_comes_in_zero_and_the_last_stored_close_is_served_with_its_date()
     {
         using var factory = new SecurityPricesWebApplicationFactory(Byma(WeekendPublicBonds));
-        factory.StoredPrices.Prices.Add(SecurityPrice.Create("AL30", Currency.ARS, 839.40m, LastFriday, "BYMA", DateTimeOffset.UtcNow));
+        factory.StoredPrices.Prices.Add(SecurityPrice.Create(PriceMarket.Exchange, "AL30", Currency.ARS, 839.40m, LastFriday, "BYMA", DateTimeOffset.UtcNow));
         var client = AuthenticatedClient(factory);
 
-        var response = await client.GetAsync(new Uri("/api/security-prices/AL30?currency=ARS", UriKind.Relative));
+        var response = await client.GetAsync(new Uri("/api/security-prices?symbol=AL30&currency=ARS&type=Bond", UriKind.Relative));
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -86,7 +89,7 @@ public class SecurityPriceEndpointTests
         using var factory = new SecurityPricesWebApplicationFactory(Byma(PublicBonds));
         var client = AuthenticatedClient(factory);
 
-        var response = await client.GetAsync(new Uri("/api/security-prices/AL30?currency=USD", UriKind.Relative));
+        var response = await client.GetAsync(new Uri("/api/security-prices?symbol=AL30&currency=USD&type=Bond", UriKind.Relative));
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -100,7 +103,7 @@ public class SecurityPriceEndpointTests
         using var factory = new SecurityPricesWebApplicationFactory((_, _) => (HttpStatusCode.InternalServerError, "{}"));
         var client = AuthenticatedClient(factory);
 
-        var response = await client.GetAsync(new Uri("/api/security-prices/AL30?currency=ARS", UriKind.Relative));
+        var response = await client.GetAsync(new Uri("/api/security-prices?symbol=AL30&currency=ARS&type=Bond", UriKind.Relative));
 
         response.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -108,10 +111,13 @@ public class SecurityPriceEndpointTests
     }
 
     [Theory]
-    [InlineData("/api/security-prices/AL30?currency=EUR")]
-    [InlineData("/api/security-prices/AL30")]
-    [InlineData("/api/security-prices/AL30?currency=XYZ")]
-    [InlineData("/api/security-prices/AL-30?currency=ARS")]
+    [InlineData("/api/security-prices?symbol=AL30&currency=EUR&type=Bond")]
+    [InlineData("/api/security-prices?symbol=AL30&type=Bond")]
+    [InlineData("/api/security-prices?symbol=AL30&currency=ARS")]
+    [InlineData("/api/security-prices?symbol=AL30&currency=ARS&type=FixedTermDeposit")]
+    [InlineData("/api/security-prices?currency=ARS&type=Bond")]
+    [InlineData("/api/security-prices?symbol=AL30&currency=XYZ&type=Bond")]
+    [InlineData("/api/security-prices?symbol=AL-30&currency=ARS&type=Bond")]
     public async Task A_currency_byma_does_not_quote_or_an_invalid_symbol_is_rejected_without_calling_byma(string path)
     {
         using var factory = new SecurityPricesWebApplicationFactory(Byma(PublicBonds));
@@ -124,12 +130,37 @@ public class SecurityPriceEndpointTests
     }
 
     [Fact]
+    public async Task The_search_returns_the_symbols_of_the_market_that_contain_the_text()
+    {
+        using var factory = new SecurityPricesWebApplicationFactory(Byma(PublicBonds));
+        var client = AuthenticatedClient(factory);
+
+        var response = await client.GetAsync(new Uri("/api/security-prices/search?type=Bond&query=al30", UriKind.Relative));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.EnumerateArray().Select(price => price.GetProperty("symbol").GetString()).ShouldBe(SearchedBonds);
+    }
+
+    [Fact]
+    public async Task A_search_with_a_single_character_is_rejected_without_calling_byma()
+    {
+        using var factory = new SecurityPricesWebApplicationFactory(Byma(PublicBonds));
+        var client = AuthenticatedClient(factory);
+
+        var response = await client.GetAsync(new Uri("/api/security-prices/search?type=Bond&query=a", UriKind.Relative));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        factory.Byma.Requests.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task Without_a_session_the_price_is_not_served()
     {
         using var factory = new SecurityPricesWebApplicationFactory(Byma(PublicBonds));
         var client = factory.CreateClient();
 
-        var response = await client.GetAsync(new Uri("/api/security-prices/AL30?currency=ARS", UriKind.Relative));
+        var response = await client.GetAsync(new Uri("/api/security-prices?symbol=AL30&currency=ARS&type=Bond", UriKind.Relative));
 
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
         factory.Byma.Requests.ShouldBe(0);
@@ -174,8 +205,13 @@ public class SecurityPriceEndpointTests
     {
         public List<SecurityPrice> Prices { get; } = new();
 
-        public Task<SecurityPrice?> FindAsync(string symbol, Currency currency, CancellationToken cancellationToken = default) =>
-            Task.FromResult(Prices.FirstOrDefault(price => price.Symbol == symbol && price.Currency == currency));
+        public Task<SecurityPrice?> FindAsync(
+            PriceMarket market,
+            string symbol,
+            Currency currency,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(Prices.FirstOrDefault(price =>
+                price.Market == market && price.Symbol == symbol && price.Currency == currency));
 
         public Task<IReadOnlyList<SecurityPrice>> ListAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<SecurityPrice>>(Prices.ToList());
@@ -211,7 +247,7 @@ public class SecurityPriceEndpointTests
 
             builder.ConfigureTestServices(services =>
             {
-                services.AddHttpClient(nameof(IMarketPriceProvider))
+                services.AddHttpClient(BymaOptions.HttpClientName)
                     .ConfigurePrimaryHttpMessageHandler(() => Byma);
 
                 services.RemoveAll<ISecurityPriceRepository>();

@@ -9,7 +9,7 @@ using MediatR;
 using Microsoft.Extensions.Logging;
 
 internal sealed partial class GetSecurityPriceHandler(
-    IMarketPriceProvider marketPrices,
+    IEnumerable<IMarketPriceProvider> marketPrices,
     ISecurityPriceRepository storedPrices,
     IDateTimeProvider clock,
     ILogger<GetSecurityPriceHandler> logger) : IRequestHandler<GetSecurityPriceQuery, Result<SecurityPriceResponse>>
@@ -18,20 +18,23 @@ internal sealed partial class GetSecurityPriceHandler(
 
     public async Task<Result<SecurityPriceResponse>> Handle(GetSecurityPriceQuery request, CancellationToken cancellationToken)
     {
-        var symbol = request.Symbol.Trim().ToUpperInvariant();
-        var (livePrice, sourceAnswered) = await FindLivePriceAsync(symbol, request.Currency, cancellationToken);
+        if (request.Type.QuotedOn() is not { } market)
+        {
+            return Result.Failure<SecurityPriceResponse>(SecurityPriceErrors.NotQuoted());
+        }
+
+        var symbol = market.NormalizeSymbol(request.Symbol);
+        var provider = marketPrices.FirstOrDefault(candidate => candidate.Market == market);
+        var (livePrice, sourceAnswered) = provider is null
+            ? (null, false)
+            : await FindLivePriceAsync(provider, symbol, request.Currency, cancellationToken);
 
         if (livePrice is not null)
         {
-            return Result.Success(new SecurityPriceResponse(
-                livePrice.Symbol,
-                livePrice.Currency,
-                livePrice.UnitPrice,
-                clock.Today,
-                marketPrices.Source));
+            return Result.Success(SecurityPriceResponse.FromMarketPrice(livePrice.Price, livePrice.Source, clock.Today));
         }
 
-        var stored = await storedPrices.FindAsync(symbol, request.Currency, cancellationToken);
+        var stored = await storedPrices.FindAsync(market, symbol, request.Currency, cancellationToken);
 
         if (stored is not null)
         {
@@ -39,11 +42,12 @@ internal sealed partial class GetSecurityPriceHandler(
         }
 
         return Result.Failure<SecurityPriceResponse>(sourceAnswered
-            ? SecurityPriceErrors.NotFound(symbol, request.Currency)
-            : SecurityPriceErrors.Unavailable());
+            ? SecurityPriceErrors.NotFound(market, provider!.Source, symbol, request.Currency)
+            : SecurityPriceErrors.Unavailable(provider?.Source ?? "la fuente de precios"));
     }
 
-    private async Task<(MarketPrice? Price, bool SourceAnswered)> FindLivePriceAsync(
+    private async Task<(IndexedPrice? Price, bool SourceAnswered)> FindLivePriceAsync(
+        IMarketPriceProvider provider,
         string symbol,
         Currency currency,
         CancellationToken cancellationToken)
@@ -53,19 +57,19 @@ internal sealed partial class GetSecurityPriceHandler(
 
         try
         {
-            var prices = await marketPrices.GetClosingPricesAsync(timeout.Token);
+            var prices = await provider.GetClosingPricesAsync(timeout.Token);
 
-            return (prices.FirstOrDefault(price => price.Symbol == symbol && price.Currency == currency), true);
+            return (MarketPriceIndex.Of(provider, prices).Find(provider.Market, symbol, currency), true);
         }
         catch (HttpRequestException exception)
         {
-            LogSourceUnavailable(logger, exception, marketPrices.Source);
+            LogSourceUnavailable(logger, exception, provider.Source);
 
             return (null, false);
         }
         catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
-            LogSourceUnavailable(logger, exception, marketPrices.Source);
+            LogSourceUnavailable(logger, exception, provider.Source);
 
             return (null, false);
         }

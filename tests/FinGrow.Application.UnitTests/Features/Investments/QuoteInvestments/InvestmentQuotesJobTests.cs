@@ -19,6 +19,8 @@ public class InvestmentQuotesJobTests
     private readonly FakeInvestmentRepository _investments = new();
     private readonly FakeSecurityPriceRepository _securityPrices = new();
     private readonly FakeMarketPriceProvider _prices = new();
+    private readonly FakeMarketPriceProvider _funds = new() { Market = PriceMarket.MutualFund, Source = "ArgentinaDatos" };
+    private readonly FakeMarketPriceProvider _crypto = new() { Market = PriceMarket.Crypto, Source = "CoinGecko" };
     private readonly FakeUnitOfWork _unitOfWork = new();
     private readonly FakeDateTimeProvider _clock = new(Now);
     private readonly ServiceProvider _provider;
@@ -126,8 +128,8 @@ public class InvestmentQuotesJobTests
     public async Task A_new_run_overwrites_the_stored_closing_price_and_keeps_the_ones_byma_did_not_send()
     {
         var friday = Today.AddDays(-3);
-        _securityPrices.Prices.Add(SecurityPrice.Create("YPFD", Currency.ARS, 8305m, friday, "BYMA", Now.AddDays(-3)));
-        _securityPrices.Prices.Add(SecurityPrice.Create("GGAL", Currency.ARS, 6000m, friday, "BYMA", Now.AddDays(-3)));
+        _securityPrices.Prices.Add(SecurityPrice.Create(PriceMarket.Exchange, "YPFD", Currency.ARS, 8305m, friday, "BYMA", Now.AddDays(-3)));
+        _securityPrices.Prices.Add(SecurityPrice.Create(PriceMarket.Exchange, "GGAL", Currency.ARS, 6000m, friday, "BYMA", Now.AddDays(-3)));
         _prices.Prices.Add(new MarketPrice("YPFD", Currency.ARS, 8400m));
 
         await Job().ExecuteAsync(CancellationToken.None);
@@ -170,6 +172,71 @@ public class InvestmentQuotesJobTests
     }
 
     [Fact]
+    public async Task Funds_and_cryptos_are_valued_with_the_price_of_their_own_source()
+    {
+        var fund = Tracked("Money market", InvestmentType.MutualFund, 100000m, Currency.ARS, "1810 ahorro", 500m);
+        var bitcoin = Tracked("Bitcoin", InvestmentType.Crypto, 800m, Currency.USD, "BTC", 0.01m);
+        _funds.Prices.Add(new MarketPrice("1810 Ahorro", Currency.ARS, 240.424543m, PricedOn: Today.AddDays(-1)));
+        _crypto.Prices.Add(new MarketPrice("BTC", Currency.USD, 84805m, "Bitcoin"));
+
+        var result = await Job(_prices, _funds, _crypto).ExecuteAsync(CancellationToken.None);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Summary.ShouldBe(
+            "2 precio(s) de cierre guardado(s), 2 inversion(es) cotizada(s) con BYMA, ArgentinaDatos, CoinGecko, 0 sin precio, 0 error(es).");
+        fund.CurrentValue.ShouldBe(Money.From(120212.27m, Currency.ARS));
+        bitcoin.CurrentValue.ShouldBe(Money.From(848.05m, Currency.USD));
+    }
+
+    [Fact]
+    public async Task The_same_symbol_is_priced_by_the_market_of_each_investment()
+    {
+        var cedear = Tracked("Coinbase", InvestmentType.Cedear, 100m, Currency.USD, "COIN", 10m);
+        var token = Tracked("Coin token", InvestmentType.Crypto, 100m, Currency.USD, "COIN", 10m);
+        _prices.Prices.Add(new MarketPrice("COIN", Currency.USD, 9.80m));
+        _crypto.Prices.Add(new MarketPrice("COIN", Currency.USD, 0.5m));
+
+        await Job(_prices, _crypto).ExecuteAsync(CancellationToken.None);
+
+        cedear.CurrentValue.ShouldBe(Money.From(98m, Currency.USD));
+        token.CurrentValue.ShouldBe(Money.From(5m, Currency.USD));
+        _securityPrices.Prices.Select(price => (price.Market, price.Symbol)).ShouldBe(
+            new[] { (PriceMarket.Exchange, "COIN"), (PriceMarket.Crypto, "COIN") },
+            ignoreOrder: true);
+    }
+
+    [Fact]
+    public async Task A_source_that_does_not_answer_does_not_stop_the_others()
+    {
+        var stock = Tracked("YPF", InvestmentType.Stock, 90000m, Currency.ARS, "YPFD", 10m);
+        var bitcoin = Tracked("Bitcoin", InvestmentType.Crypto, 800m, Currency.USD, "BTC", 0.01m);
+        _prices.Prices.Add(new MarketPrice("YPFD", Currency.ARS, 8305m));
+        _crypto.Failure = new HttpRequestException("429 Too Many Requests");
+
+        var result = await Job(_prices, _crypto).ExecuteAsync(CancellationToken.None);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldNotBeNull().ShouldContain("CoinGecko");
+        result.Summary.ShouldBe("1 precio(s) de cierre guardado(s), 1 inversion(es) cotizada(s) con BYMA, 1 sin precio, 1 error(es).");
+        stock.HasMarketValuation.ShouldBeTrue();
+        bitcoin.HasMarketValuation.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task A_stored_fund_price_keeps_the_date_of_its_quote()
+    {
+        _funds.Prices.Add(new MarketPrice("1810 Ahorro", Currency.ARS, 240.424543m, PricedOn: Today.AddDays(-1)));
+
+        await Job(_funds).ExecuteAsync(CancellationToken.None);
+
+        var stored = _securityPrices.Prices.ShouldHaveSingleItem();
+        stored.Market.ShouldBe(PriceMarket.MutualFund);
+        stored.Symbol.ShouldBe("1810 Ahorro");
+        stored.PricedOn.ShouldBe(Today.AddDays(-1));
+        stored.Source.ShouldBe("ArgentinaDatos");
+    }
+
+    [Fact]
     public void The_job_runs_after_the_close_on_business_days()
     {
         var job = Job();
@@ -179,11 +246,11 @@ public class InvestmentQuotesJobTests
         job.Description.ShouldNotBeNullOrWhiteSpace();
     }
 
-    private InvestmentQuotesJob Job() => new(
+    private InvestmentQuotesJob Job(params IMarketPriceProvider[] providers) => new(
         _investments,
         _securityPrices,
         _unitOfWork,
-        _prices,
+        providers.Length == 0 ? new[] { _prices } : providers,
         _provider.GetRequiredService<IServiceScopeFactory>(),
         _clock,
         NullLogger<InvestmentQuotesJob>.Instance);

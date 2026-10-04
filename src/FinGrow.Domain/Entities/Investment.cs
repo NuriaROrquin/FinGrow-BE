@@ -14,6 +14,12 @@ public sealed class Investment : AggregateRoot
 
     public const int MaxSymbolLength = 20;
 
+    public const int MaxFundNameLength = 150;
+
+    public const string NotQuotedMessage =
+        "Solo se cotizan por simbolo las acciones, los CEDEAR, los ETF, los bonos, las obligaciones negociables, "
+        + "las letras, los fondos comunes y las criptomonedas.";
+
     private readonly List<InvestmentValuation> _valuations = new();
 
     private Investment()
@@ -209,21 +215,24 @@ public sealed class Investment : AggregateRoot
 
     public void Track(string? symbol, decimal? quantity, DateTimeOffset updatedAt)
     {
-        var normalizedSymbol = string.IsNullOrWhiteSpace(symbol) ? null : symbol.Trim().ToUpperInvariant();
+        var hasSymbol = !string.IsNullOrWhiteSpace(symbol);
 
-        if ((normalizedSymbol is null) != (quantity is null))
+        if (hasSymbol != (quantity is not null))
         {
             throw new DomainException("El simbolo y la cantidad van juntos: se cargan los dos o ninguno.");
         }
 
-        if (normalizedSymbol is not null && !Type.IsQuotedOnExchange())
-        {
-            throw new DomainException("Solo se cotizan por simbolo las acciones, los CEDEAR, los ETF, los bonos, las obligaciones negociables y las letras.");
-        }
+        string? normalizedSymbol = null;
 
-        if (normalizedSymbol is { Length: > MaxSymbolLength })
+        if (hasSymbol)
         {
-            throw new DomainException($"El simbolo no puede superar los {MaxSymbolLength} caracteres.");
+            var market = Type.QuotedOn() ?? throw new DomainException(NotQuotedMessage);
+            normalizedSymbol = market.NormalizeSymbol(symbol!);
+
+            if (normalizedSymbol.Length > market.MaxSymbolLength())
+            {
+                throw new DomainException($"El simbolo no puede superar los {market.MaxSymbolLength()} caracteres.");
+            }
         }
 
         if (quantity is <= 0m)

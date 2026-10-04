@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Enums;
+using FinGrow.Infrastructure.Integrations.Byma;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -63,7 +64,7 @@ public class BymaMarketPriceProviderTests
     {
         using var factory = new BymaWebApplicationFactory(HealthyByma);
 
-        var prices = await factory.Services.GetRequiredService<IMarketPriceProvider>().GetClosingPricesAsync();
+        var prices = await Byma(factory).GetClosingPricesAsync();
 
         prices.ShouldBe(
             new[]
@@ -86,7 +87,7 @@ public class BymaMarketPriceProviderTests
     {
         using var factory = new BymaWebApplicationFactory(HealthyByma);
 
-        await factory.Services.GetRequiredService<IMarketPriceProvider>().GetClosingPricesAsync();
+        await Byma(factory).GetClosingPricesAsync();
 
         factory.Byma.Requests.Select(request => $"{request.Panel}:{request.PageNumber}").ShouldBe(ExpectedRequests);
         factory.Byma.Requests.ShouldAllBe(request => request.NextDay && !request.SameDay && !request.TwoDays);
@@ -99,7 +100,7 @@ public class BymaMarketPriceProviderTests
             panel == "cedears" ? (HttpStatusCode.InternalServerError, "{}") : HealthyByma(panel, 1));
 
         await Should.ThrowAsync<HttpRequestException>(() =>
-            factory.Services.GetRequiredService<IMarketPriceProvider>().GetClosingPricesAsync());
+            Byma(factory).GetClosingPricesAsync());
     }
 
     [Fact]
@@ -109,7 +110,7 @@ public class BymaMarketPriceProviderTests
             panel == "public-bonds" ? (HttpStatusCode.OK, "<html>mantenimiento</html>") : HealthyByma(panel, page));
 
         var exception = await Should.ThrowAsync<HttpRequestException>(() =>
-            factory.Services.GetRequiredService<IMarketPriceProvider>().GetClosingPricesAsync());
+            Byma(factory).GetClosingPricesAsync());
 
         exception.Message.ShouldContain("public-bonds");
     }
@@ -119,8 +120,8 @@ public class BymaMarketPriceProviderTests
     {
         using var factory = new BymaWebApplicationFactory(HealthyByma);
 
-        var first = await factory.Services.GetRequiredService<IMarketPriceProvider>().GetClosingPricesAsync();
-        var second = await factory.Services.GetRequiredService<IMarketPriceProvider>().GetClosingPricesAsync();
+        var first = await Byma(factory).GetClosingPricesAsync();
+        var second = await Byma(factory).GetClosingPricesAsync();
 
         second.ShouldBe(first);
         factory.Byma.Requests.Count.ShouldBe(ExpectedRequests.Length);
@@ -134,13 +135,16 @@ public class BymaMarketPriceProviderTests
             bymaIsDown ? (HttpStatusCode.InternalServerError, "{}") : HealthyByma(panel, page));
 
         await Should.ThrowAsync<HttpRequestException>(() =>
-            factory.Services.GetRequiredService<IMarketPriceProvider>().GetClosingPricesAsync());
+            Byma(factory).GetClosingPricesAsync());
 
         bymaIsDown = false;
-        var prices = await factory.Services.GetRequiredService<IMarketPriceProvider>().GetClosingPricesAsync();
+        var prices = await Byma(factory).GetClosingPricesAsync();
 
         prices.ShouldContain(new MarketPrice("AL30", Currency.ARS, 839.40m));
     }
+
+    private static IMarketPriceProvider Byma(BymaWebApplicationFactory factory) =>
+        factory.Services.GetServices<IMarketPriceProvider>().Single(provider => provider.Market == PriceMarket.Exchange);
 
     private static (HttpStatusCode Status, string Body) HealthyByma(string panel, int page) => panel switch
     {
@@ -206,7 +210,7 @@ public class BymaMarketPriceProviderTests
                 }));
 
             builder.ConfigureTestServices(services =>
-                services.AddHttpClient(nameof(IMarketPriceProvider))
+                services.AddHttpClient(BymaOptions.HttpClientName)
                     .ConfigurePrimaryHttpMessageHandler(() => Byma));
         }
     }

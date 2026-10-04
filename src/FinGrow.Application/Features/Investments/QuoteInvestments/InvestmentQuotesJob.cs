@@ -1,6 +1,7 @@
 namespace FinGrow.Application.Features.Investments.QuoteInvestments;
 
 using System.Globalization;
+using FinGrow.Application.Features.SecurityPrices;
 using FinGrow.Application.Interfaces;
 using FinGrow.Application.Jobs;
 using FinGrow.Domain.Entities;
@@ -17,7 +18,7 @@ internal sealed partial class InvestmentQuotesJob : IScheduledJob
     private readonly IInvestmentRepository _investments;
     private readonly ISecurityPriceRepository _securityPrices;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IMarketPriceProvider _marketPrices;
+    private readonly IReadOnlyList<IMarketPriceProvider> _marketPrices;
     private readonly IServiceScopeFactory _scopes;
     private readonly IDateTimeProvider _clock;
     private readonly ILogger<InvestmentQuotesJob> _logger;
@@ -26,7 +27,7 @@ internal sealed partial class InvestmentQuotesJob : IScheduledJob
         IInvestmentRepository investments,
         ISecurityPriceRepository securityPrices,
         IUnitOfWork unitOfWork,
-        IMarketPriceProvider marketPrices,
+        IEnumerable<IMarketPriceProvider> marketPrices,
         IServiceScopeFactory scopes,
         IDateTimeProvider clock,
         ILogger<InvestmentQuotesJob> logger)
@@ -34,7 +35,7 @@ internal sealed partial class InvestmentQuotesJob : IScheduledJob
         _investments = investments;
         _securityPrices = securityPrices;
         _unitOfWork = unitOfWork;
-        _marketPrices = marketPrices;
+        _marketPrices = marketPrices.ToList();
         _scopes = scopes;
         _clock = clock;
         _logger = logger;
@@ -43,41 +44,47 @@ internal sealed partial class InvestmentQuotesJob : IScheduledJob
     public string Name => JobName;
 
     public string Description =>
-        "Guarda los precios de cierre de BYMA como ultimo cierre de cada simbolo y cotiza con ellos "
-        + "las inversiones cargadas con simbolo y cantidad, registrandoles una valuacion de mercado del dia.";
+        "Guarda el ultimo precio de cada simbolo de BYMA, de cada fondo comun y de cada criptomoneda y cotiza con "
+        + "ellos las inversiones cargadas con simbolo y cantidad, registrandoles una valuacion de mercado del dia.";
 
     public string Schedule => "30 21 * * 1-5";
 
     public async Task<JobResult> ExecuteAsync(CancellationToken cancellationToken)
     {
-        IReadOnlyList<MarketPrice> prices;
+        var index = new MarketPriceIndex();
+        var answered = new List<string>();
+        var failures = new List<string>();
 
-        try
+        foreach (var provider in _marketPrices)
         {
-            prices = await _marketPrices.GetClosingPricesAsync(cancellationToken);
-        }
-        catch (HttpRequestException exception)
-        {
-            return SourceUnavailable(exception);
-        }
-        catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
-        {
-            return SourceUnavailable(exception);
+            try
+            {
+                index.Add(provider, await provider.GetClosingPricesAsync(cancellationToken));
+                answered.Add(provider.Source);
+            }
+            catch (HttpRequestException exception)
+            {
+                failures.Add(SourceUnavailable(provider, exception));
+            }
+            catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                failures.Add(SourceUnavailable(provider, exception));
+            }
         }
 
-        var unitPrices = prices
-            .GroupBy(price => (price.Symbol, price.Currency))
-            .ToDictionary(group => group.Key, group => group.First().UnitPrice);
+        if (answered.Count == 0)
+        {
+            return JobResult.Failure(string.Join(Environment.NewLine, failures), "No se cotizo ninguna inversion.");
+        }
 
         var today = _clock.Today;
         var quoted = 0;
         var withoutPrice = 0;
-        var failures = new List<string>();
         var stored = 0;
 
         try
         {
-            stored = await StoreClosingPricesAsync(unitPrices, today, cancellationToken);
+            stored = await StoreClosingPricesAsync(index, today, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -95,7 +102,7 @@ internal sealed partial class InvestmentQuotesJob : IScheduledJob
         {
             try
             {
-                var (quotedForEmployee, missingForEmployee) = await QuoteEmployeeAsync(employeeId, unitPrices, today, cancellationToken);
+                var (quotedForEmployee, missingForEmployee) = await QuoteEmployeeAsync(employeeId, index, today, cancellationToken);
                 quoted += quotedForEmployee;
                 withoutPrice += missingForEmployee;
             }
@@ -112,7 +119,7 @@ internal sealed partial class InvestmentQuotesJob : IScheduledJob
 
         var summary = string.Create(
             CultureInfo.InvariantCulture,
-            $"{stored} precio(s) de cierre guardado(s), {quoted} inversion(es) cotizada(s) con {_marketPrices.Source}, "
+            $"{stored} precio(s) de cierre guardado(s), {quoted} inversion(es) cotizada(s) con {string.Join(", ", answered)}, "
             + $"{withoutPrice} sin precio, {failures.Count} error(es).");
 
         return failures.Count == 0
@@ -120,13 +127,10 @@ internal sealed partial class InvestmentQuotesJob : IScheduledJob
             : JobResult.Failure(string.Join(Environment.NewLine, failures), summary);
     }
 
-    private async Task<int> StoreClosingPricesAsync(
-        Dictionary<(string Symbol, Currency Currency), decimal> unitPrices,
-        DateOnly today,
-        CancellationToken cancellationToken)
+    private async Task<int> StoreClosingPricesAsync(MarketPriceIndex index, DateOnly today, CancellationToken cancellationToken)
     {
-        var storable = unitPrices
-            .Where(price => price.Key.Symbol.Length <= Investment.MaxSymbolLength)
+        var storable = index.Prices
+            .Where(indexed => indexed.Market.NormalizeSymbol(indexed.Price.Symbol).Length <= indexed.Market.MaxSymbolLength())
             .ToList();
 
         if (storable.Count == 0)
@@ -134,20 +138,30 @@ internal sealed partial class InvestmentQuotesJob : IScheduledJob
             return 0;
         }
 
-        var existing = (await _securityPrices.ListAsync(cancellationToken))
-            .ToDictionary(price => (price.Symbol, price.Currency));
+        var existing = new Dictionary<(PriceMarket Market, string Key, Currency Currency), SecurityPrice>();
+
+        foreach (var price in await _securityPrices.ListAsync(cancellationToken))
+        {
+            existing.TryAdd((price.Market, MarketPriceIndex.KeyOf(price.Market, price.Symbol), price.Currency), price);
+        }
+
         var now = _clock.UtcNow;
         var added = new List<SecurityPrice>();
 
-        foreach (var ((symbol, currency), unitPrice) in storable)
+        foreach (var (market, source, price) in storable)
         {
-            if (existing.TryGetValue((symbol, currency), out var price))
+            var key = (market, MarketPriceIndex.KeyOf(market, price.Symbol), price.Currency);
+            var pricedOn = price.PricedOn ?? today;
+
+            if (existing.TryGetValue(key, out var stored))
             {
-                price.Update(unitPrice, today, _marketPrices.Source, now);
+                stored.Update(price.UnitPrice, pricedOn, source, now);
             }
             else
             {
-                added.Add(SecurityPrice.Create(symbol, currency, unitPrice, today, _marketPrices.Source, now));
+                var created = SecurityPrice.Create(market, price.Symbol, price.Currency, price.UnitPrice, pricedOn, source, now);
+                existing[key] = created;
+                added.Add(created);
             }
         }
 
@@ -159,7 +173,7 @@ internal sealed partial class InvestmentQuotesJob : IScheduledJob
 
     private async Task<(int Quoted, int WithoutPrice)> QuoteEmployeeAsync(
         Guid employeeId,
-        Dictionary<(string Symbol, Currency Currency), decimal> unitPrices,
+        MarketPriceIndex index,
         DateOnly today,
         CancellationToken cancellationToken)
     {
@@ -177,13 +191,14 @@ internal sealed partial class InvestmentQuotesJob : IScheduledJob
             if (investment.Symbol is null
                 || investment.Quantity is not { } quantity
                 || investment.PurchasedOn > today
-                || !unitPrices.TryGetValue((investment.Symbol, currency), out var unitPrice))
+                || investment.Type.QuotedOn() is not { } market
+                || index.Find(market, investment.Symbol, currency) is not { } found)
             {
                 withoutPrice++;
                 continue;
             }
 
-            investment.RecordMarketValuation(Money.From(unitPrice * quantity, currency), today, _clock.UtcNow);
+            investment.RecordMarketValuation(Money.From(found.Price.UnitPrice * quantity, currency), today, _clock.UtcNow);
             quoted++;
         }
 
@@ -192,13 +207,11 @@ internal sealed partial class InvestmentQuotesJob : IScheduledJob
         return (quoted, withoutPrice);
     }
 
-    private JobResult SourceUnavailable(Exception exception)
+    private string SourceUnavailable(IMarketPriceProvider provider, Exception exception)
     {
-        LogSourceUnavailable(_logger, exception, _marketPrices.Source);
+        LogSourceUnavailable(_logger, exception, provider.Source);
 
-        return JobResult.Failure(
-            $"{_marketPrices.Source} no devolvio precios: {exception.Message}",
-            "No se cotizo ninguna inversion.");
+        return $"{provider.Source} no devolvio precios: {exception.Message}";
     }
 
     [LoggerMessage(Level = LogLevel.Error, Message = "No se pudieron obtener los precios de cierre de {Source}.")]
