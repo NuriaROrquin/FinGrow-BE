@@ -15,7 +15,6 @@ internal static class GoalErrors
 
     public static Error Cancelled() =>
         Error.Conflict("Goal.Cancelled", "Una meta cancelada no se puede editar.");
-
     public static Error CurrencyMismatch() =>
         Error.Validation(
             "Goal.CurrencyMismatch",

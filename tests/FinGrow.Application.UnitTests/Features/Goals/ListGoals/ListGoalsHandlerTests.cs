@@ -105,4 +105,15 @@ public class ListGoalsHandlerTests
         goal.IsOverdue.ShouldBeFalse();
         goal.RemainingAmount.ShouldBe(0m);
     }
+
+    [Fact]
+    public async Task A_deleted_goal_is_not_listed()
+    {
+        StoreGoal().Cancel(Now);
+        var kept = StoreGoal();
+
+        var goal = (await ListAsync()).Value.ShouldHaveSingleItem();
+
+        goal.Id.ShouldBe(kept.Id);
+    }
 }

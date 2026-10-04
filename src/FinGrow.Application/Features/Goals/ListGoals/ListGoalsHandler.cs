@@ -3,6 +3,7 @@ namespace FinGrow.Application.Features.Goals.ListGoals;
 using Common;
 using DTOs;
 using Interfaces;
+using Domain.Enums;
 using Domain.Repositories;
 using MediatR;
 
@@ -15,6 +16,9 @@ internal sealed class ListGoalsHandler(IGoalRepository goalRepository, IDateTime
         var today = dateTimeProvider.Today;
 
         return Result.Success<IReadOnlyList<GoalResponse>>(
-            goals.Select(goal => GoalResponse.FromEntity(goal, today)).ToList());
+            goals
+                .Where(goal => goal.Status != GoalStatus.Cancelled)
+                .Select(goal => GoalResponse.FromEntity(goal, today))
+                .ToList());
     }
 }

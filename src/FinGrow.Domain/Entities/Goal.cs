@@ -224,6 +224,11 @@ public sealed class Goal : AggregateRoot
             throw new DomainException("El monto objetivo tiene que ser mayor a cero.");
         }
 
+        if (deadline < ArgentinaTime.DateOf(updatedAt))
+        {
+            throw new DomainException("La fecha limite de una meta no puede estar en el pasado.");
+        }
+
         Name = EnsureValidName(name);
         TargetAmount = targetAmount;
         Deadline = deadline;
@@ -234,11 +239,6 @@ public sealed class Goal : AggregateRoot
 
     public void Cancel(DateTimeOffset updatedAt)
     {
-        if (Status == GoalStatus.Achieved)
-        {
-            throw new DomainException("Una meta ya alcanzada no se cancela.");
-        }
-
         Status = GoalStatus.Cancelled;
         UpdatedAt = updatedAt;
     }

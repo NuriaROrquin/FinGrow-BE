@@ -123,12 +123,15 @@ public class GoalTests
     }
 
     [Fact]
-    public void An_already_achieved_goal_cannot_be_cancelled()
+    public void An_achieved_goal_can_be_cancelled_and_keeps_its_contributions()
     {
         var goal = CreateGoal();
         goal.AddContribution(Money.From(1000000m, Currency.ARS), Today, null, Now);
 
-        Should.Throw<DomainException>(() => goal.Cancel(Now));
+        goal.Cancel(Now);
+
+        goal.Status.ShouldBe(GoalStatus.Cancelled);
+        goal.Contributions.ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -162,6 +165,17 @@ public class GoalTests
             Money.From(1000000m, Currency.ARS),
             new DateOnly(2026, 1, 1),
             Now));
+    }
+
+    [Fact]
+    public void A_goal_cannot_be_edited_to_a_past_deadline()
+    {
+        var goal = CreateGoal();
+
+        Should.Throw<DomainException>(() =>
+            goal.UpdateDetails("Viaje", Money.From(1000000m, Currency.ARS), Today.AddDays(-1), Now));
+
+        goal.Deadline.ShouldBe(Deadline);
     }
 
     [Fact]

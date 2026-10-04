@@ -3,9 +3,11 @@ namespace FinGrow.Api.Controllers;
 using Extensions;
 using Application.Features.Goals.AddContribution;
 using Application.Features.Goals.CreateGoal;
+using Application.Features.Goals.DeleteGoal;
 using Application.Features.Goals.ListContributions;
 using Application.Features.Goals.ListGoals;
 using Application.Features.Goals.RemoveContribution;
+using Application.Features.Goals.UpdateGoal;
 using Application.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -27,6 +29,18 @@ public sealed class GoalsController(ISender sender, ICurrentUser currentUser) : 
 
         return (await sender.Send(command, cancellationToken)).ToActionResult();
     }
+
+    [HttpPut("{goalId:guid}")]
+    public async Task<IActionResult> Update(Guid goalId, UpdateGoalCommand command, CancellationToken cancellationToken)
+    {
+        command = command with { EmployeeId = currentUser.UserId!.Value, GoalId = goalId };
+
+        return (await sender.Send(command, cancellationToken)).ToActionResult();
+    }
+
+    [HttpDelete("{goalId:guid}")]
+    public async Task<IActionResult> Delete(Guid goalId, CancellationToken cancellationToken) =>
+        (await sender.Send(new DeleteGoalCommand(currentUser.UserId!.Value, goalId), cancellationToken)).ToActionResult();
 
     [HttpGet("{goalId:guid}/contributions")]
     public async Task<IActionResult> ListContributions(Guid goalId, CancellationToken cancellationToken) =>
