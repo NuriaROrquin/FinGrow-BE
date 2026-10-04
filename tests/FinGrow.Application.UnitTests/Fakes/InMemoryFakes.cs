@@ -524,11 +524,16 @@ public sealed class FakeCourseRepository : ICourseRepository
             .ThenBy(course => course.Title)
             .ToList());
 
+    public Task<Course?> GetPublishedBySlugAsync(string slug, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Courses.FirstOrDefault(course => course.Slug == slug && course.IsPublished));
+
     public Task<IReadOnlySet<Guid>> ListCompletedLessonIdsAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlySet<Guid>>(Completions
             .Where(completion => completion.EmployeeId == employeeId)
             .Select(completion => completion.LessonId)
             .ToHashSet());
+
+    public void AddCompletion(LessonCompletion completion) => Completions.Add(completion);
 }
 
 public sealed class FakeArticleRepository : IArticleRepository

@@ -34,6 +34,11 @@ internal sealed class CourseRepository(FinGrowDbContext dbContext) : ICourseRepo
             .ToList();
     }
 
+    public Task<Course?> GetPublishedBySlugAsync(string slug, CancellationToken cancellationToken = default) =>
+        dbContext.Courses
+            .AsNoTracking()
+            .FirstOrDefaultAsync(course => course.Slug == slug && course.PublishedAt != null, cancellationToken);
+
     public async Task<IReadOnlySet<Guid>> ListCompletedLessonIdsAsync(
         Guid employeeId,
         CancellationToken cancellationToken = default)
@@ -45,4 +50,6 @@ internal sealed class CourseRepository(FinGrowDbContext dbContext) : ICourseRepo
 
         return lessonIds.ToHashSet();
     }
+
+    public void AddCompletion(LessonCompletion completion) => dbContext.LessonCompletions.Add(completion);
 }

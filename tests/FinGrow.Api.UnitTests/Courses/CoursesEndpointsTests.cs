@@ -151,12 +151,17 @@ public class CoursesEndpointsTests
             return Task.FromResult<IReadOnlyList<Course>>(Courses.ToList());
         }
 
+        public Task<Course?> GetPublishedBySlugAsync(string slug, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Courses.FirstOrDefault(course => course.Slug == slug));
+
         public Task<IReadOnlySet<Guid>> ListCompletedLessonIdsAsync(Guid employeeId, CancellationToken cancellationToken = default)
         {
             RequestedEmployeeId = employeeId;
 
             return Task.FromResult<IReadOnlySet<Guid>>(CompletedLessonIds.ToHashSet());
         }
+
+        public void AddCompletion(LessonCompletion completion) => CompletedLessonIds.Add(completion.LessonId);
     }
 
     private sealed class CoursesWebApplicationFactory : WebApplicationFactory<Program>
