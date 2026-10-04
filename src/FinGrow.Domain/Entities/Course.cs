@@ -3,6 +3,7 @@ namespace FinGrow.Domain.Entities;
 using FinGrow.Domain.Common;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.Errors;
+using FinGrow.Domain.ValueObjects;
 
 public sealed class Course : AggregateRoot
 {
@@ -85,6 +86,14 @@ public sealed class Course : AggregateRoot
 
         return lesson;
     }
+
+    public Lesson? FindLesson(Guid lessonId) => _lessons.FirstOrDefault(lesson => lesson.Id == lessonId);
+
+    public CourseProgress ProgressFor(IReadOnlySet<Guid> completedLessonIds) =>
+        new(_lessons.Count(lesson => completedLessonIds.Contains(lesson.Id)), _lessons.Count);
+
+    public Lesson? ResumeLessonFor(IReadOnlySet<Guid> completedLessonIds) =>
+        Lessons.FirstOrDefault(lesson => !completedLessonIds.Contains(lesson.Id)) ?? Lessons.FirstOrDefault();
 
     public void Publish(DateTimeOffset publishedAt)
     {
