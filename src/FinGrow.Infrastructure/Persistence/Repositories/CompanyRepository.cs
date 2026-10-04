@@ -14,6 +14,11 @@ internal sealed class CompanyRepository : ICompanyRepository
     public Task<Company?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         _dbContext.Companies.FirstOrDefaultAsync(company => company.Id == id, cancellationToken);
 
+    public Task<Company?> GetWithDepartmentsAsync(Guid id, CancellationToken cancellationToken = default) =>
+        _dbContext.Companies
+            .Include(company => company.Departments)
+            .FirstOrDefaultAsync(company => company.Id == id, cancellationToken);
+
     public Task<Company?> GetByEmailAsync(Email email, CancellationToken cancellationToken) =>
         _dbContext.Set<Company>().SingleOrDefaultAsync(company => company.Email == email, cancellationToken);
 
