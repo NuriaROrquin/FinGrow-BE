@@ -21,7 +21,7 @@ internal sealed partial class InvestmentTrackingValidator : AbstractValidator<II
 
         RuleFor(tracking => tracking.Symbol)
             .Must((tracking, symbol) => string.IsNullOrWhiteSpace(symbol) || tracking.Type.IsQuotedOnExchange())
-            .WithMessage("Solo se cotizan por simbolo las acciones, los CEDEAR, los ETF y los bonos.");
+            .WithMessage("Solo se cotizan por simbolo las acciones, los CEDEAR, los ETF, los bonos, las obligaciones negociables y las letras.");
 
         RuleFor(tracking => tracking.Quantity)
             .GreaterThan(0m)

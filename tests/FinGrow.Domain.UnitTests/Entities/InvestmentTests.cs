@@ -242,11 +242,31 @@ public class InvestmentTests
     [Theory]
     [InlineData(InvestmentType.MutualFund)]
     [InlineData(InvestmentType.Crypto)]
+    [InlineData(InvestmentType.FixedTermDeposit)]
+    [InlineData(InvestmentType.Repo)]
+    [InlineData(InvestmentType.RemuneratedAccount)]
     public void Assets_that_do_not_trade_on_the_exchange_cannot_be_tracked_by_symbol(InvestmentType type)
     {
         var investment = Investment.Create(EmployeeId, "Activo", type, Money.From(1000m, Currency.USD), PurchasedOn, Now);
 
         Should.Throw<DomainException>(() => investment.Track("BTC", 1m, Now));
+    }
+
+    [Theory]
+    [InlineData(InvestmentType.Stock, "YPFD")]
+    [InlineData(InvestmentType.Cedear, "AAPL")]
+    [InlineData(InvestmentType.Etf, "SPY")]
+    [InlineData(InvestmentType.Bond, "AL30")]
+    [InlineData(InvestmentType.CorporateBond, "YMCXO")]
+    [InlineData(InvestmentType.TreasuryBill, "S30N6")]
+    public void Assets_that_trade_on_the_exchange_can_be_tracked_by_symbol(InvestmentType type, string symbol)
+    {
+        var investment = Investment.Create(EmployeeId, "Activo", type, Money.From(1000m, Currency.ARS), PurchasedOn, Now);
+
+        investment.Track(symbol, 100m, Now);
+
+        investment.Symbol.ShouldBe(symbol);
+        investment.Quantity.ShouldBe(100m);
     }
 
     [Fact]

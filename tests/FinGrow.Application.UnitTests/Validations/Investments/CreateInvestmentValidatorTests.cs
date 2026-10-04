@@ -53,12 +53,26 @@ public class CreateInvestmentValidatorTests
     [Theory]
     [InlineData(InvestmentType.MutualFund)]
     [InlineData(InvestmentType.Crypto)]
+    [InlineData(InvestmentType.FixedTermDeposit)]
+    [InlineData(InvestmentType.Repo)]
+    [InlineData(InvestmentType.RemuneratedAccount)]
     public void A_symbol_on_an_asset_that_does_not_trade_on_the_exchange_is_rejected(InvestmentType type)
     {
         var result = _validator.Validate(ValidCommand() with { Type = type, Symbol = "BTC", Quantity = 1m });
 
         result.IsValid.ShouldBeFalse();
         result.Errors.ShouldContain(error => error.ErrorMessage.Contains("acciones", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(InvestmentType.Cedear, "AAPL")]
+    [InlineData(InvestmentType.CorporateBond, "YMCXO")]
+    [InlineData(InvestmentType.TreasuryBill, "S30N6")]
+    public void The_new_exchange_traded_types_accept_a_symbol_and_a_quantity(InvestmentType type, string symbol)
+    {
+        var result = _validator.Validate(ValidCommand() with { Type = type, Symbol = symbol, Quantity = 100m });
+
+        result.IsValid.ShouldBeTrue();
     }
 
     private static CreateInvestmentCommand ValidCommand() => new(
@@ -83,6 +97,12 @@ public class CreateInvestmentValidatorTests
     [InlineData(InvestmentType.Bond)]
     [InlineData(InvestmentType.MutualFund)]
     [InlineData(InvestmentType.Crypto)]
+    [InlineData(InvestmentType.Cedear)]
+    [InlineData(InvestmentType.CorporateBond)]
+    [InlineData(InvestmentType.TreasuryBill)]
+    [InlineData(InvestmentType.FixedTermDeposit)]
+    [InlineData(InvestmentType.Repo)]
+    [InlineData(InvestmentType.RemuneratedAccount)]
     public void Every_supported_asset_type_is_accepted(InvestmentType type)
     {
         var result = _validator.Validate(ValidCommand() with { Type = type });

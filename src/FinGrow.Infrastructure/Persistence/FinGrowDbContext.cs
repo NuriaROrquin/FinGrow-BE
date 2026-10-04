@@ -33,6 +33,8 @@ public sealed class FinGrowDbContext : DbContext, IUnitOfWork
 
     public DbSet<InvestmentValuation> InvestmentValuations => Set<InvestmentValuation>();
 
+    public DbSet<SecurityPrice> SecurityPrices => Set<SecurityPrice>();
+
     public DbSet<EmployeeIntegration> EmployeeIntegrations => Set<EmployeeIntegration>();
 
     public DbSet<IntegrationLinkCode> IntegrationLinkCodes => Set<IntegrationLinkCode>();

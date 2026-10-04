@@ -101,6 +101,7 @@ variables de entorno usando `__` como separador de sección.
 | `Byma:BaseUrl` | `Byma__BaseUrl` | Datos públicos del sitio de BYMA de los que salen los precios de cierre del trabajo `investment-quotes` (default `https://open.bymadata.com.ar/vanoms-be-core/rest/api/bymadata/free/`). No piden credenciales |
 | `Byma:TimeoutSeconds` | `Byma__TimeoutSeconds` | Timeout de cada consulta a BYMA (default 30) |
 | `Byma:MaxPagesPerPanel` | `Byma__MaxPagesPerPanel` | Tope de páginas que se leen de cada panel, de a 189 títulos (default 20) |
+| `Byma:CacheMinutes` | `Byma__CacheMinutes` | Minutos que la API reutiliza los precios bajados de BYMA antes de volver a pedirlos, para que cotizar un símbolo desde el formulario no descargue los paneles en cada consulta (default 5) |
 | `Cors:AllowedOrigins` | `Cors__AllowedOrigins__0` | Orígenes habilitados para el frontend |
 
 Los secretos no se commitean. En desarrollo local:
@@ -131,11 +132,21 @@ Si DolarApi no responde o devuelve algo que no se puede leer, el endpoint contes
 frontend muestra cada moneda por separado; una respuesta fallida nunca queda guardada en la caché.
 
 Las inversiones cargadas a mano con símbolo y cantidad se cotizan con los datos públicos del sitio
-de BYMA: acciones, CEDEARs, bonos y ONs, con liquidación a 24 hs. El símbolo tiene que ser la
-variante de la moneda de la inversión (AL30 en pesos, AL30D en dólares) y los bonos y ONs cotizan
-cada 100 nominales. Esos datos no son la API contratada de BYMA ni tienen garantía de servicio:
+de BYMA, con liquidación a 24 hs. Se pueden cotizar las acciones, los CEDEAR, los ETF, los bonos, las
+obligaciones negociables y las letras del Tesoro (LECAP y BONCAP, del panel `lebacs`); los fondos
+comunes, las criptomonedas, los plazos fijos, las cauciones y las cuentas remuneradas no cotizan en
+BYMA y quedan valuados al costo. El símbolo tiene que ser la variante de la moneda de la inversión
+(AL30 en pesos, AL30D en dólares) y los bonos, las ONs y las letras cotizan cada 100 nominales. Esos datos no son la API contratada de BYMA ni tienen garantía de servicio:
 antes de producción con empleados reales se reemplazan por la API EOD de BYMA (contrato con
 marketdata@byma.com.ar), implementando otro `IMarketPriceProvider`.
+
+`GET /api/security-prices/{symbol}?currency=ARS` cotiza un símbolo mientras se carga el formulario
+de inversiones: devuelve el precio por unidad (por nominal en bonos y ONs), la fecha del precio y
+la fuente. Primero busca en los paneles de BYMA, que la API reutiliza `Byma:CacheMinutes`; si BYMA
+no tiene precio para ese símbolo (los fines de semana y feriados el feed público viene todo en 0) o
+no responde en 10 segundos, usa el último cierre que guardó `investment-quotes` en `security_prices`
+con su fecha. Sin precio en ninguno de los dos contesta `404` si BYMA respondió y `503` si no.
+Solo acepta `ARS` y `USD`, las monedas en las que cotiza BYMA.
 
 ### WhatsApp (Twilio)
 
@@ -198,7 +209,7 @@ siguiente.
 |---|---|---|
 | `metrics-snapshot` | `0 4 1 * *` (el 1 de cada mes, 01:00 de Argentina) | Genera las fotos mensuales de métricas por empresa y por departamento (`company_metrics_snapshots` y `department_metrics_snapshots`) del último mes cerrado, y completa las de los meses anteriores que falten desde el alta de cada empresa. Es idempotente: correrlo de nuevo actualiza la foto del último mes cerrado en lugar de duplicarla |
 | `mercadopago-sync` | `0 * * * *` (cada hora) | Recorre las cuentas de Mercado Pago vinculadas y trae los movimientos nuevos como pendientes de revisión. Mercado Pago no avisa por webhook lo que un usuario paga, por eso se consulta |
-| `investment-quotes` | `30 21 * * 1-5` (días hábiles, 18:30 de Argentina) | Cotiza las inversiones cargadas con símbolo y cantidad con los precios de cierre de BYMA y les registra la valuación de mercado del día. Correrlo de nuevo el mismo día actualiza esa valuación en lugar de duplicarla. Si BYMA no responde, la corrida queda fallida y no toca ninguna inversión |
+| `investment-quotes` | `30 21 * * 1-5` (días hábiles, 18:30 de Argentina) | Guarda en `security_prices` el último cierre de cada símbolo y moneda que trae BYMA (aunque nadie tenga inversiones con símbolo) y cotiza con esos precios las inversiones cargadas con símbolo y cantidad, registrándoles la valuación de mercado del día. Correrlo de nuevo el mismo día actualiza esa valuación en lugar de duplicarla. Si BYMA no responde, la corrida queda fallida y no toca ni los precios guardados ni ninguna inversión |
 
 Los endpoints viven bajo `/api/jobs` y se protegen con la cabecera `X-Jobs-Key`, que tiene que
 coincidir con `Jobs:ApiKey`. No usan JWT: los llama un cron, no una persona logueada.
@@ -314,6 +325,7 @@ Siete entidades y tres value objects. El esquema se crea con la migración `Init
 | `budgets` | Budget | Tope por categoría y período |
 | `goals` | Goal | Metas de ahorro con objetivo, avance y fecha límite |
 | `investments` | Investment | Posiciones del portafolio: capital invertido y valuación actual |
+| `security_prices` | SecurityPrice | El último precio de cierre por unidad de cada símbolo y moneda que trajo BYMA; una fila por símbolo y moneda que `investment-quotes` pisa en cada corrida. Es lo que cotiza el formulario de inversiones cuando BYMA no publica precios (fines de semana y feriados) |
 | `job_runs` | JobRun | Registro de cada corrida de un trabajo programado: inicio, fin, resultado y error |
 | `company_metrics_snapshots` | CompanyMetricsSnapshot | Foto mensual de métricas agregadas de una empresa: empleados activos, cuántos participaron, movimientos confirmados, presupuestos, metas e integraciones |
 | `department_metrics_snapshots` | DepartmentMetricsSnapshot | La misma foto, por departamento |

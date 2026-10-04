@@ -195,6 +195,137 @@ internal static class EducationCatalog
             Para la mayoría de las personas, una porción chica del portafolio y solo después de
             tener un fondo de emergencia.
             """),
+        new(
+            "cedears-para-principiantes",
+            "CEDEAR: acciones del exterior desde Argentina",
+            "Cómo comprar Apple, Mercado Libre o el S&P 500 en pesos o en dólares sin abrir una cuenta afuera.",
+            EducationCategory.Investments,
+            3,
+            InvestmentType.Cedear,
+            """
+            Un CEDEAR es un **certificado** que representa acciones o ETFs que cotizan en el exterior,
+            y se compra y se vende en BYMA como cualquier acción local.
+
+            ## Cómo se mueve su precio
+            - Sigue al precio de la acción original **en dólares**.
+            - Y al tipo de cambio implícito: si sube el dólar, sube el CEDEAR en pesos.
+
+            ## El ratio
+            Cada CEDEAR equivale a una fracción de la acción original. Por eso su precio no es el
+            mismo que ves en Nueva York.
+
+            ## Pesos o dólares
+            El mismo CEDEAR tiene una variante en pesos (AAPL) y otra en dólares (AAPLD). Elegí la
+            de la moneda con la que lo compraste.
+            """),
+        new(
+            "obligaciones-negociables",
+            "Obligaciones negociables: prestarle a una empresa",
+            "Qué son las ON, por qué muchas pagan en dólares y qué mirar antes de comprar una.",
+            EducationCategory.Investments,
+            3,
+            InvestmentType.CorporateBond,
+            """
+            Una obligación negociable (ON) es un **bono emitido por una empresa**: le prestás plata
+            y te la devuelve con intereses.
+
+            ## Cómo pagan
+            - **Cupones** periódicos, muchas veces en dólares.
+            - **Amortización** del capital al vencimiento o en cuotas.
+
+            ## Qué mirar
+            - **Quién emite**: la capacidad de pago de la empresa es tu principal riesgo.
+            - **Lámina mínima**: la cantidad mínima de nominales que se puede comprar.
+            - **Liquidez**: algunas ON se operan poco y cuesta venderlas antes de tiempo.
+
+            Como los bonos, cotizan cada 100 nominales.
+            """),
+        new(
+            "letras-del-tesoro",
+            "Letras del Tesoro: LECAP y BONCAP",
+            "Cómo funciona una tasa fija en pesos a corto plazo y en qué se diferencia de un plazo fijo.",
+            EducationCategory.Investments,
+            3,
+            InvestmentType.TreasuryBill,
+            """
+            Las LECAP y los BONCAP son títulos del Tesoro en pesos con **tasa fija**: capitalizan
+            intereses y pagan todo junto al vencimiento.
+
+            ## Cómo se gana
+            Comprás por debajo del valor que vas a cobrar al final. Esa diferencia, llevada a un
+            mes, es la tasa efectiva mensual (TEM) que estás consiguiendo.
+
+            ## Frente a un plazo fijo
+            - Se pueden **vender antes** de que venzan.
+            - Su precio cambia todos los días: si suben las tasas, baja.
+
+            ## Riesgos
+            Que la inflación termine siendo más alta que la tasa que fijaste. Cotizan cada 100
+            nominales, con símbolos como S30N6.
+            """),
+        new(
+            "plazo-fijo",
+            "Plazo fijo: una tasa conocida desde el primer día",
+            "TNA, TEA, plazo fijo UVA y qué pasa con tu plata si la inflación le gana a la tasa.",
+            EducationCategory.Savings,
+            3,
+            InvestmentType.FixedTermDeposit,
+            """
+            En un plazo fijo depositás plata en un banco por un plazo y a una **tasa pactada**.
+            Sabés desde el primer día cuánto vas a cobrar.
+
+            ## TNA y TEA
+            La TNA es la tasa anual sin capitalizar. Si renovás cada mes con los intereses, lo que
+            ganás en el año se acerca a la TEA, que es mayor.
+
+            ## Plazo fijo UVA
+            Ajusta el capital por inflación y suma una tasa chica. Pide un plazo mínimo más largo.
+
+            ## A tener en cuenta
+            - No podés retirar la plata antes, salvo que sea precancelable.
+            - Si la inflación supera la tasa, perdés poder de compra aunque el número crezca.
+            """),
+        new(
+            "caucion-bursatil",
+            "Caución: prestar a pocos días en la bolsa",
+            "Una forma de hacer rendir pesos por días con la garantía del mercado.",
+            EducationCategory.Investments,
+            3,
+            InvestmentType.Repo,
+            """
+            En una caución **colocadora** le prestás pesos a otro inversor por unos pocos días, a una
+            tasa. El préstamo está garantizado por títulos y por el mercado.
+
+            ## Para qué sirve
+            Para plata que vas a usar pronto: se puede colocar a 1, 7 o 30 días y renovar.
+
+            ## A tener en cuenta
+            - La tasa cambia todos los días según la oferta y la demanda.
+            - Las comisiones del broker y los derechos de mercado pesan mucho en plazos cortos:
+              hacé la cuenta del rendimiento neto.
+            """),
+        new(
+            "cuentas-remuneradas",
+            "Cuentas remuneradas: rendimiento diario sin plazo",
+            "Cómo rinden las cuentas de bancos y billeteras y por qué no todas tienen la misma protección.",
+            EducationCategory.Savings,
+            3,
+            InvestmentType.RemuneratedAccount,
+            """
+            Muchas cuentas de bancos y billeteras virtuales **pagan intereses todos los días** sobre
+            tu saldo, y la plata sigue disponible para usarla cuando quieras.
+
+            ## Cómo rinden
+            La tasa es variable y puede tener un tope de saldo. Lo que ganás hoy se suma al saldo y
+            mañana también rinde.
+
+            ## No son todas iguales
+            En los bancos es una cuenta remunerada. En muchas billeteras, el saldo se invierte en
+            un fondo money market: rinde parecido, pero no tiene la garantía de los depósitos.
+
+            ## Para qué usarla
+            Es un buen lugar para el fondo de emergencia, no para el ahorro de largo plazo.
+            """),
     };
 }
 

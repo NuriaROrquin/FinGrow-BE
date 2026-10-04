@@ -82,6 +82,7 @@ public static class DependencyInjection
         services.AddScoped<IGoalRepository, GoalRepository>();
         services.AddScoped<IInvestmentRepository, InvestmentRepository>();
         services.AddScoped<IInvestmentReadRepository, InvestmentReadRepository>();
+        services.AddScoped<ISecurityPriceRepository, SecurityPriceRepository>();
         services.AddScoped<ICourseRepository, CourseRepository>();
         services.AddScoped<ICourseRatingRepository, CourseRatingRepository>();
         services.AddScoped<ICourseRatingReadRepository, CourseRatingReadRepository>();
@@ -212,6 +213,8 @@ public static class DependencyInjection
 
     private static IServiceCollection AddByma(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddMemoryCache();
+
         services.AddOptions<BymaOptions>()
             .Bind(configuration.GetSection(BymaOptions.SectionName))
             .ValidateDataAnnotations()
