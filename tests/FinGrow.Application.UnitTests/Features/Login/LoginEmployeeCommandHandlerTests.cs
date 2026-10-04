@@ -1,4 +1,4 @@
-﻿namespace FinGrow.Application.UnitTests.Features.Login;
+namespace FinGrow.Application.UnitTests.Features.Login;
 
 using FinGrow.Application.Features.Login;
 using FinGrow.Application.Features.Session;
@@ -35,6 +35,15 @@ public class LoginEmployeeCommandHandlerTests
     private static SessionIssuer CreateSessionIssuer() =>
         new(new FakeTokenService(), new FakeRefreshTokenRepository(), new FakeDateTimeProvider(Now));
 
+    private static LoginEmployeeCommandHandler CreateHandler(FakeEmployeeRepository employees, FakeUnitOfWork? unitOfWork = null) =>
+        new(
+            employees,
+            new FakePasswordHasher(),
+            CreateSessionIssuer(),
+            new FakeTokenService(),
+            unitOfWork ?? new FakeUnitOfWork(),
+            new FakeDateTimeProvider(Now));
+
     [Fact]
     public async Task Valid_credentials_log_the_employee_in_and_return_a_token()
     {
@@ -43,25 +52,63 @@ public class LoginEmployeeCommandHandlerTests
         employeeRepository.Employees.Add(employee);
         var unitOfWork = new FakeUnitOfWork();
 
-        var handler = new LoginEmployeeCommandHandler(
-            employeeRepository,
-            new FakePasswordHasher(),
-            CreateSessionIssuer(),
-            unitOfWork,
-            new FakeDateTimeProvider(Now));
+        var handler = CreateHandler(employeeRepository, unitOfWork);
 
         var result = await handler.Handle(
             new LoginEmployeeCommand("empleado@empresa.com", "1234"),
             CancellationToken.None);
 
         result.IsSuccess.ShouldBeTrue();
-        result.Value.EmployeeId.ShouldBe(employee.Id);
-        result.Value.Token.ShouldBe($"token-for-{employee.Id}");
-        result.Value.ExpiresAt.ShouldBe(FakeTokenService.ExpiresAt);
-        result.Value.Role.ShouldBe("Empleado");
-        result.Value.CompanyId.ShouldBe(employee.CompanyId);
+        result.Value.TwoFactorChallenge.ShouldBeNull();
+        var session = result.Value.Session.ShouldNotBeNull();
+        session.EmployeeId.ShouldBe(employee.Id);
+        session.Token.ShouldBe($"token-for-{employee.Id}");
+        session.ExpiresAt.ShouldBe(FakeTokenService.ExpiresAt);
+        session.Role.ShouldBe("Empleado");
+        session.CompanyId.ShouldBe(employee.CompanyId);
         employee.LastLoginAt.ShouldBe(Now);
         unitOfWork.SaveCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task With_two_factor_enabled_the_password_only_returns_a_challenge()
+    {
+        var employee = CreateEmployee(plainPassword: "1234");
+        employee.StartTwoFactorEnrollment("SECRETBASE32", Now);
+        employee.EnableTwoFactor(Now);
+        var employeeRepository = new FakeEmployeeRepository();
+        employeeRepository.Employees.Add(employee);
+        var unitOfWork = new FakeUnitOfWork();
+
+        var handler = CreateHandler(employeeRepository, unitOfWork);
+
+        var result = await handler.Handle(
+            new LoginEmployeeCommand("empleado@empresa.com", "1234"),
+            CancellationToken.None);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Session.ShouldBeNull();
+        var challenge = result.Value.TwoFactorChallenge.ShouldNotBeNull();
+        challenge.Value.ShouldBe($"challenge-for-{employee.Id}");
+        employee.LastLoginAt.ShouldBeNull();
+        unitOfWork.SaveCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task A_started_but_unconfirmed_enrollment_does_not_ask_for_a_code()
+    {
+        var employee = CreateEmployee(plainPassword: "1234");
+        employee.StartTwoFactorEnrollment("SECRETBASE32", Now);
+        var employeeRepository = new FakeEmployeeRepository();
+        employeeRepository.Employees.Add(employee);
+
+        var result = await CreateHandler(employeeRepository).Handle(
+            new LoginEmployeeCommand("empleado@empresa.com", "1234"),
+            CancellationToken.None);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Session.ShouldNotBeNull();
+        result.Value.TwoFactorChallenge.ShouldBeNull();
     }
 
     [Fact]
@@ -71,14 +118,7 @@ public class LoginEmployeeCommandHandlerTests
         var employeeRepository = new FakeEmployeeRepository();
         employeeRepository.Employees.Add(employee);
 
-        var handler = new LoginEmployeeCommandHandler(
-            employeeRepository,
-            new FakePasswordHasher(),
-            CreateSessionIssuer(),
-            new FakeUnitOfWork(),
-            new FakeDateTimeProvider(Now));
-
-        var result = await handler.Handle(
+        var result = await CreateHandler(employeeRepository).Handle(
             new LoginEmployeeCommand("empleado@empresa.com", "123"),
             CancellationToken.None);
 
@@ -89,14 +129,7 @@ public class LoginEmployeeCommandHandlerTests
     [Fact]
     public async Task Nonexistent_email_returns_the_same_generic_error_as_wrong_password()
     {
-        var handler = new LoginEmployeeCommandHandler(
-            new FakeEmployeeRepository(),
-            new FakePasswordHasher(),
-            CreateSessionIssuer(),
-            new FakeUnitOfWork(),
-            new FakeDateTimeProvider(Now));
-
-        var result = await handler.Handle(
+        var result = await CreateHandler(new FakeEmployeeRepository()).Handle(
             new LoginEmployeeCommand("nadie@empresa.com", "1234"),
             CancellationToken.None);
 
@@ -111,14 +144,7 @@ public class LoginEmployeeCommandHandlerTests
         var employeeRepository = new FakeEmployeeRepository();
         employeeRepository.Employees.Add(employee);
 
-        var handler = new LoginEmployeeCommandHandler(
-            employeeRepository,
-            new FakePasswordHasher(),
-            CreateSessionIssuer(),
-            new FakeUnitOfWork(),
-            new FakeDateTimeProvider(Now));
-
-        var result = await handler.Handle(
+        var result = await CreateHandler(employeeRepository).Handle(
             new LoginEmployeeCommand("empleado@empresa.com", "1234"),
             CancellationToken.None);
 
