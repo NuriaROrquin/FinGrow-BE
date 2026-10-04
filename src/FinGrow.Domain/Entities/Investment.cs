@@ -218,7 +218,7 @@ public sealed class Investment : AggregateRoot
 
         if (normalizedSymbol is not null && !Type.IsQuotedOnExchange())
         {
-            throw new DomainException("Solo se cotizan por simbolo las acciones, los CEDEAR, los ETF y los bonos.");
+            throw new DomainException("Solo se cotizan por simbolo las acciones, los CEDEAR, los ETF, los bonos, las obligaciones negociables y las letras.");
         }
 
         if (normalizedSymbol is { Length: > MaxSymbolLength })
