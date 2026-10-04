@@ -2,6 +2,7 @@ namespace FinGrow.Application;
 
 using System.Reflection;
 using Common.Behaviors;
+using Events;
 using Features.Integrations.Linking;
 using Features.Integrations.MercadoPago.Sync;
 using Features.Investments.QuoteInvestments;
@@ -25,6 +26,8 @@ public static class DependencyInjection
         services.AddScoped<LinkCodeRedeemer>();
         services.AddScoped<MercadoPagoSynchronizer>();
         services.AddScoped<SessionIssuer>();
+
+        services.AddSingleton<IDomainEventDispatcher, DomainEventDispatcher>();
 
         services.AddSingleton<RunningJobs>();
         services.AddScoped<JobRunner>();
