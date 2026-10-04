@@ -28,15 +28,8 @@ public sealed partial class EducationCatalogSeeder
             .Select(article => article.Slug)
             .ToListAsync(cancellationToken);
 
-        var courses = EducationCatalog.Courses
-            .Where(seed => !existingCourses.Contains(seed.Slug))
-            .Select(ToCourse)
-            .ToList();
-
-        var articles = EducationCatalog.Articles
-            .Where(seed => !existingArticles.Contains(seed.Slug))
-            .Select(ToArticle)
-            .ToList();
+        var courses = MissingCourses(existingCourses);
+        var articles = MissingArticles(existingArticles);
 
         if (courses.Count == 0 && articles.Count == 0)
         {
@@ -52,6 +45,18 @@ public sealed partial class EducationCatalogSeeder
         var lessons = courses.Sum(course => course.Lessons.Count);
         LogSeeded(_logger, courses.Count, lessons, articles.Count);
     }
+
+    internal static List<Course> MissingCourses(IReadOnlyCollection<string> existingSlugs) =>
+        EducationCatalog.Courses
+            .Where(seed => !existingSlugs.Contains(seed.Slug))
+            .Select(ToCourse)
+            .ToList();
+
+    internal static List<Article> MissingArticles(IReadOnlyCollection<string> existingSlugs) =>
+        EducationCatalog.Articles
+            .Where(seed => !existingSlugs.Contains(seed.Slug))
+            .Select(ToArticle)
+            .ToList();
 
     internal static Course ToCourse(CourseSeed seed)
     {
