@@ -22,6 +22,83 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("FinGrow.Domain.Entities.Article", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("category");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(50000)
+                        .HasColumnType("character varying(50000)")
+                        .HasColumnName("content");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<int>("ReadingTimeMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("reading_time_minutes");
+
+                    b.Property<string>("RelatedInvestmentType")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("related_investment_type");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("slug");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("summary");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_articles");
+
+                    b.HasIndex("Category")
+                        .HasDatabaseName("ix_articles_category");
+
+                    b.HasIndex("RelatedInvestmentType")
+                        .HasDatabaseName("ix_articles_related_investment_type");
+
+                    b.HasIndex("Slug")
+                        .IsUnique()
+                        .HasDatabaseName("ix_articles_slug");
+
+                    b.ToTable("articles", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_articles_reading_time_positive", "reading_time_minutes > 0");
+                        });
+                });
+
             modelBuilder.Entity("FinGrow.Domain.Entities.Budget", b =>
                 {
                     b.Property<Guid>("Id")
@@ -191,6 +268,76 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_company_metrics_snapshots_period_starts_on_day_one", "extract(day from period_start) = 1");
                         });
+                });
+
+            modelBuilder.Entity("FinGrow.Domain.Entities.Course", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("category");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Level")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("level");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<string>("RelatedInvestmentType")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("related_investment_type");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("slug");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_courses");
+
+                    b.HasIndex("RelatedInvestmentType")
+                        .HasDatabaseName("ix_courses_related_investment_type");
+
+                    b.HasIndex("Slug")
+                        .IsUnique()
+                        .HasDatabaseName("ix_courses_slug");
+
+                    b.HasIndex("Category", "Level")
+                        .HasDatabaseName("ix_courses_category_level");
+
+                    b.ToTable("courses", (string)null);
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.Department", b =>
@@ -697,6 +844,51 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                     b.ToTable("job_runs", null, t =>
                         {
                             t.HasCheckConstraint("ck_job_runs_finished_after_started", "finished_at IS NULL OR finished_at >= started_at");
+                        });
+                });
+
+            modelBuilder.Entity("FinGrow.Domain.Entities.Lesson", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CourseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("course_id");
+
+                    b.Property<int>("DurationMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("duration_minutes");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.Property<string>("VideoUrl")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("video_url");
+
+                    b.HasKey("Id")
+                        .HasName("pk_lessons");
+
+                    b.HasIndex("CourseId", "Position")
+                        .IsUnique()
+                        .HasDatabaseName("ix_lessons_course_id_position");
+
+                    b.ToTable("lessons", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_lessons_duration_positive", "duration_minutes > 0");
+
+                            t.HasCheckConstraint("ck_lessons_position_positive", "position > 0");
                         });
                 });
 
@@ -1265,6 +1457,16 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("FinGrow.Domain.Entities.Lesson", b =>
+                {
+                    b.HasOne("FinGrow.Domain.Entities.Course", null)
+                        .WithMany("Lessons")
+                        .HasForeignKey("CourseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_lessons_courses_course_id");
+                });
+
             modelBuilder.Entity("FinGrow.Domain.Entities.RefreshToken", b =>
                 {
                     b.HasOne("FinGrow.Domain.Entities.Company", null)
@@ -1325,6 +1527,11 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("FinGrow.Domain.Entities.Company", b =>
                 {
                     b.Navigation("Departments");
+                });
+
+            modelBuilder.Entity("FinGrow.Domain.Entities.Course", b =>
+                {
+                    b.Navigation("Lessons");
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.Goal", b =>
