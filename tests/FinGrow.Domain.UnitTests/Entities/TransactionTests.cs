@@ -3,6 +3,7 @@ namespace FinGrow.Domain.UnitTests.Entities;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.Errors;
+using FinGrow.Domain.Events;
 using FinGrow.Domain.ValueObjects;
 
 public class TransactionTests
@@ -200,6 +201,35 @@ public class TransactionTests
         transaction.Eliminate(Now);
 
         Should.Throw<DomainException>(() => transaction.Eliminate(Now.AddMinutes(1)));
+    }
+
+    [Fact]
+    public void A_proposed_transaction_announces_that_it_is_waiting_for_review()
+    {
+        var transaction = RegisterExpense(Money.From(4500m, Currency.ARS));
+
+        var proposed = transaction.DequeueDomainEvents().ShouldHaveSingleItem().ShouldBeOfType<TransactionProposed>();
+        proposed.TransactionId.ShouldBe(transaction.Id);
+        proposed.EmployeeId.ShouldBe(EmployeeId);
+        proposed.Source.ShouldBe(TransactionSource.Gmail);
+        proposed.OccurredAt.ShouldBe(Now);
+    }
+
+    [Fact]
+    public void A_transaction_registered_as_confirmed_has_nothing_to_announce()
+    {
+        var transaction = Transaction.RegisterIncome(
+            EmployeeId,
+            Money.From(850000m, Currency.ARS),
+            IncomeCategory.Salario,
+            "Sueldo de marzo",
+            Today,
+            PaymentMethod.BankTransfer,
+            TransactionSource.Manual,
+            TransactionStatus.Confirmed,
+            Now);
+
+        transaction.DequeueDomainEvents().ShouldBeEmpty();
     }
 
     private static Transaction RegisterExpense(Money amount) => Transaction.RegisterExpense(

@@ -3,6 +3,7 @@ namespace FinGrow.Domain.Entities;
 using FinGrow.Domain.Common;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.Errors;
+using FinGrow.Domain.Events;
 using FinGrow.Domain.ValueObjects;
 
 /// <summary>
@@ -48,6 +49,11 @@ public sealed class Transaction : AggregateRoot
         ExternalReference = externalReference;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
+
+        if (status == TransactionStatus.Pending)
+        {
+            Raise(new TransactionProposed(id, employeeId, source, createdAt));
+        }
     }
 
     public Guid EmployeeId { get; private set; }
