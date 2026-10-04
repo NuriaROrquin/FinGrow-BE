@@ -53,7 +53,8 @@ public class GetProfileQueryHandlerTests
     {
         var company = AddCompany();
         var department = company.AddDepartment("Finanzas", description: null, managerName: null, Now);
-        AddLoggedInEmployee(company, department.Id, "+54 11 1234-5678");
+        var employee = AddLoggedInEmployee(company, department.Id, "+54 11 1234-5678");
+        employee.UpdateProfile("Ana Gómez", "+54 11 1234-5678", "30123456", new DateOnly(1990, 5, 20), "Av. Corrientes 1234", Now);
 
         var result = await CreateHandler().Handle(new GetProfileQuery(), CancellationToken.None);
 
@@ -61,6 +62,9 @@ public class GetProfileQueryHandlerTests
         result.Value.FullName.ShouldBe("Ana Gómez");
         result.Value.Email.ShouldBe("ana.gomez@acme.com");
         result.Value.PhoneNumber.ShouldBe("+54 11 1234-5678");
+        result.Value.NationalId.ShouldBe("30123456");
+        result.Value.BirthDate.ShouldBe(new DateOnly(1990, 5, 20));
+        result.Value.Address.ShouldBe("Av. Corrientes 1234");
         result.Value.CompanyName.ShouldBe("Acme S.A.");
         result.Value.DepartmentName.ShouldBe("Finanzas");
     }
@@ -77,6 +81,9 @@ public class GetProfileQueryHandlerTests
         result.IsSuccess.ShouldBeTrue();
         result.Value.DepartmentName.ShouldBeNull();
         result.Value.PhoneNumber.ShouldBeNull();
+        result.Value.NationalId.ShouldBeNull();
+        result.Value.BirthDate.ShouldBeNull();
+        result.Value.Address.ShouldBeNull();
     }
 
     [Fact]
