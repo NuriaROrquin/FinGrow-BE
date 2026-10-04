@@ -36,6 +36,21 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
             .HasMaxLength(3)
             .IsRequired();
 
+        builder.Property(employee => employee.Theme)
+            .HasConversion<string>()
+            .HasMaxLength(10)
+            .IsRequired();
+
+        builder.Property(employee => employee.Language)
+            .HasConversion<string>()
+            .HasMaxLength(2)
+            .IsRequired();
+
+        builder.Property(employee => employee.DateFormat)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
         builder.Property(employee => employee.TwoFactorSecret)
             .HasAnnotation(EncryptedStringConverter.Annotation, true);
 

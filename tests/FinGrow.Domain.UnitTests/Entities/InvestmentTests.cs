@@ -240,13 +240,65 @@ public class InvestmentTests
     }
 
     [Theory]
-    [InlineData(InvestmentType.MutualFund)]
-    [InlineData(InvestmentType.Crypto)]
-    public void Assets_that_do_not_trade_on_the_exchange_cannot_be_tracked_by_symbol(InvestmentType type)
+    [InlineData(InvestmentType.FixedTermDeposit)]
+    [InlineData(InvestmentType.Repo)]
+    [InlineData(InvestmentType.RemuneratedAccount)]
+    public void Assets_without_a_price_source_cannot_be_tracked_by_symbol(InvestmentType type)
     {
         var investment = Investment.Create(EmployeeId, "Activo", type, Money.From(1000m, Currency.USD), PurchasedOn, Now);
 
         Should.Throw<DomainException>(() => investment.Track("BTC", 1m, Now));
+    }
+
+    [Theory]
+    [InlineData(InvestmentType.Stock, "YPFD")]
+    [InlineData(InvestmentType.Cedear, "AAPL")]
+    [InlineData(InvestmentType.Etf, "SPY")]
+    [InlineData(InvestmentType.Bond, "AL30")]
+    [InlineData(InvestmentType.CorporateBond, "YMCXO")]
+    [InlineData(InvestmentType.TreasuryBill, "S30N6")]
+    [InlineData(InvestmentType.Crypto, "BTC")]
+    public void Assets_that_trade_on_the_exchange_or_are_crypto_can_be_tracked_by_symbol(InvestmentType type, string symbol)
+    {
+        var investment = Investment.Create(EmployeeId, "Activo", type, Money.From(1000m, Currency.ARS), PurchasedOn, Now);
+
+        investment.Track(symbol, 100m, Now);
+
+        investment.Symbol.ShouldBe(symbol);
+        investment.Quantity.ShouldBe(100m);
+    }
+
+    [Fact]
+    public void A_mutual_fund_is_tracked_by_its_full_name_without_changing_its_case()
+    {
+        var investment = Investment.Create(
+            EmployeeId, "Money market", InvestmentType.MutualFund, Money.From(100000m, Currency.ARS), PurchasedOn, Now);
+
+        investment.Track("  Balanz Capital   Money Market - Clase A ", 1234.5678m, Now);
+
+        investment.Symbol.ShouldBe("Balanz Capital Money Market - Clase A");
+        investment.Quantity.ShouldBe(1234.5678m);
+    }
+
+    [Fact]
+    public void A_fund_name_longer_than_the_maximum_is_rejected()
+    {
+        var investment = Investment.Create(
+            EmployeeId, "Fondo", InvestmentType.MutualFund, Money.From(1000m, Currency.ARS), PurchasedOn, Now);
+
+        Should.Throw<DomainException>(() => investment.Track(new string('F', Investment.MaxFundNameLength + 1), 1m, Now));
+    }
+
+    [Fact]
+    public void A_crypto_is_tracked_in_upper_case_and_accepts_fractions_of_a_coin()
+    {
+        var investment = Investment.Create(
+            EmployeeId, "Bitcoin", InvestmentType.Crypto, Money.From(100m, Currency.USD), PurchasedOn, Now);
+
+        investment.Track("btc", 0.00012345m, Now);
+
+        investment.Symbol.ShouldBe("BTC");
+        investment.Quantity.ShouldBe(0.00012345m);
     }
 
     [Fact]

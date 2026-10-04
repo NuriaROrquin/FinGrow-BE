@@ -34,6 +34,9 @@ public sealed class Employee : AggregateRoot, ITwoFactorAccount
         PhoneNumber = phoneNumber;
         PasswordHash = passwordHash;
         PreferredCurrency = preferredCurrency;
+        Theme = Theme.System;
+        Language = Language.es;
+        DateFormat = DateFormat.DayMonthYear;
         HiredOn = hiredOn;
         IsActive = true;
         CreatedAt = createdAt;
@@ -58,6 +61,12 @@ public sealed class Employee : AggregateRoot, ITwoFactorAccount
     public string PasswordHash { get; private set; } = string.Empty;
 
     public Currency PreferredCurrency { get; private set; }
+
+    public Theme Theme { get; private set; }
+
+    public Language Language { get; private set; }
+
+    public DateFormat DateFormat { get; private set; }
 
     public DateOnly HiredOn { get; private set; }
 
@@ -111,11 +120,24 @@ public sealed class Employee : AggregateRoot, ITwoFactorAccount
             createdAt);
     }
 
-    public void UpdateProfile(string fullName, string? phoneNumber, Currency preferredCurrency, DateTimeOffset updatedAt)
+    public void UpdateProfile(string fullName, string? phoneNumber, DateTimeOffset updatedAt)
     {
         FullName = EnsureValidFullName(fullName);
         PhoneNumber = EnsureValidPhoneNumber(phoneNumber);
-        PreferredCurrency = preferredCurrency;
+        UpdatedAt = updatedAt;
+    }
+
+    public void UpdatePreferences(
+        Theme theme,
+        Language language,
+        Currency preferredCurrency,
+        DateFormat dateFormat,
+        DateTimeOffset updatedAt)
+    {
+        PreferredCurrency = EnsureDefined(preferredCurrency, "La moneda");
+        Theme = EnsureDefined(theme, "El tema");
+        Language = EnsureDefined(language, "El idioma");
+        DateFormat = EnsureDefined(dateFormat, "El formato de fecha");
         UpdatedAt = updatedAt;
     }
 
@@ -218,6 +240,12 @@ public sealed class Employee : AggregateRoot, ITwoFactorAccount
             ? throw new DomainException($"El telefono no puede superar los {MaxPhoneNumberLength} caracteres.")
             : trimmed;
     }
+
+    private static TEnum EnsureDefined<TEnum>(TEnum value, string preference)
+        where TEnum : struct, Enum =>
+        Enum.IsDefined(value)
+            ? value
+            : throw new DomainException($"{preference} '{value}' no es un valor valido.");
 
     private static string EnsureHash(string passwordHash) =>
         string.IsNullOrWhiteSpace(passwordHash)

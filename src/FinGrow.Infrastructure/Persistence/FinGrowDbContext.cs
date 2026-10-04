@@ -33,6 +33,8 @@ public sealed class FinGrowDbContext : DbContext, IUnitOfWork
 
     public DbSet<InvestmentValuation> InvestmentValuations => Set<InvestmentValuation>();
 
+    public DbSet<SecurityPrice> SecurityPrices => Set<SecurityPrice>();
+
     public DbSet<EmployeeIntegration> EmployeeIntegrations => Set<EmployeeIntegration>();
 
     public DbSet<IntegrationLinkCode> IntegrationLinkCodes => Set<IntegrationLinkCode>();
@@ -54,6 +56,10 @@ public sealed class FinGrowDbContext : DbContext, IUnitOfWork
     public DbSet<LessonCompletion> LessonCompletions => Set<LessonCompletion>();
 
     public DbSet<CourseRating> CourseRatings => Set<CourseRating>();
+
+    public DbSet<Notification> Notifications => Set<Notification>();
+
+    public DbSet<NotificationChannelSetting> NotificationChannelSettings => Set<NotificationChannelSetting>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

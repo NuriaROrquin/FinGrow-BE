@@ -4,6 +4,8 @@ using FinGrow.Api.Authentication;
 using FinGrow.Api.Extensions;
 using FinGrow.Application.Common;
 using FinGrow.Application.Features.Account.ChangePassword;
+using FinGrow.Application.Features.Account.Preferences;
+using FinGrow.Application.Features.Account.Profile;
 using FinGrow.Application.Features.Account.TwoFactor;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -26,6 +28,26 @@ public sealed class AccountController(IMediator mediator) : ControllerBase
 
         return result.ToActionResult();
     }
+
+    [HttpGet("profile")]
+    [Authorize(Roles = Rol.Empleado)]
+    public async Task<IActionResult> GetProfile(CancellationToken cancellationToken) =>
+        (await mediator.Send(new GetProfileQuery(), cancellationToken)).ToActionResult();
+
+    [HttpPatch("profile")]
+    [Authorize(Roles = Rol.Empleado)]
+    public async Task<IActionResult> UpdateProfile(UpdateProfileCommand command, CancellationToken cancellationToken) =>
+        (await mediator.Send(command, cancellationToken)).ToActionResult();
+
+    [HttpGet("preferences")]
+    [Authorize(Roles = Rol.Empleado)]
+    public async Task<IActionResult> GetPreferences(CancellationToken cancellationToken) =>
+        (await mediator.Send(new GetPreferencesQuery(), cancellationToken)).ToActionResult();
+
+    [HttpPut("preferences")]
+    [Authorize(Roles = Rol.Empleado)]
+    public async Task<IActionResult> UpdatePreferences(UpdatePreferencesCommand command, CancellationToken cancellationToken) =>
+        (await mediator.Send(command, cancellationToken)).ToActionResult();
 
     [HttpGet("2fa")]
     public async Task<IActionResult> GetTwoFactorStatus(CancellationToken cancellationToken) =>

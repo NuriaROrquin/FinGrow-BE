@@ -6,5 +6,11 @@ public enum InvestmentType
     Stock = 2,
     Bond = 3,
     MutualFund = 4,
-    Crypto = 5
+    Crypto = 5,
+    Cedear = 6,
+    CorporateBond = 7,
+    TreasuryBill = 8,
+    FixedTermDeposit = 9,
+    Repo = 10,
+    RemuneratedAccount = 11
 }

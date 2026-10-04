@@ -485,6 +485,12 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("DateFormat")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("date_format");
+
                     b.Property<Guid?>("DepartmentId")
                         .HasColumnType("uuid")
                         .HasColumnName("department_id");
@@ -509,6 +515,12 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("language");
+
                     b.Property<DateTimeOffset?>("LastLoginAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_login_at");
@@ -529,6 +541,12 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)")
                         .HasColumnName("preferred_currency");
+
+                    b.Property<string>("Theme")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("theme");
 
                     b.Property<DateTimeOffset?>("TwoFactorEnabledAt")
                         .HasColumnType("timestamp with time zone")
@@ -772,13 +790,13 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnName("purchased_on");
 
                     b.Property<decimal?>("Quantity")
-                        .HasPrecision(20, 6)
-                        .HasColumnType("numeric(20,6)")
+                        .HasPrecision(30, 10)
+                        .HasColumnType("numeric(30,10)")
                         .HasColumnName("quantity");
 
                     b.Property<string>("Symbol")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
                         .HasColumnName("symbol");
 
                     b.Property<string>("Type")
@@ -965,6 +983,108 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                     b.ToTable("lesson_completions", (string)null);
                 });
 
+            modelBuilder.Entity("FinGrow.Domain.Entities.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("body");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DeduplicationKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("deduplication_key");
+
+                    b.Property<DateTimeOffset?>("ReadAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("read_at");
+
+                    b.Property<Guid>("RecipientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recipient_id");
+
+                    b.Property<string>("RecipientType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("recipient_type");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("title");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_notifications");
+
+                    b.HasIndex("RecipientType", "RecipientId", "CreatedAt")
+                        .HasDatabaseName("ix_notifications_recipient_type_recipient_id_created_at");
+
+                    b.HasIndex("RecipientType", "RecipientId", "Type", "DeduplicationKey", "CreatedAt")
+                        .HasDatabaseName("ix_notifications_deduplication");
+
+                    b.ToTable("notifications", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_notifications_read_after_created", "read_at IS NULL OR read_at >= created_at");
+                        });
+                });
+
+            modelBuilder.Entity("FinGrow.Domain.Entities.NotificationChannelSetting", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("channel");
+
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("employee_id");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_enabled");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_notification_channel_settings");
+
+                    b.HasIndex("EmployeeId", "Channel")
+                        .IsUnique()
+                        .HasDatabaseName("ix_notification_channel_settings_employee_id_channel");
+
+                    b.ToTable("notification_channel_settings", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_notification_channel_settings_configurable_channel", "channel <> 'InApp'");
+                        });
+                });
+
             modelBuilder.Entity("FinGrow.Domain.Entities.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1018,6 +1138,62 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_refresh_tokens_user_id_revoked_at");
 
                     b.ToTable("refresh_tokens", (string)null);
+                });
+
+            modelBuilder.Entity("FinGrow.Domain.Entities.SecurityPrice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<string>("Market")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("market");
+
+                    b.Property<DateOnly>("PricedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("priced_on");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("symbol");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(30, 12)
+                        .HasColumnType("numeric(30,12)")
+                        .HasColumnName("unit_price");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_security_prices");
+
+                    b.HasIndex("Market", "Symbol", "Currency")
+                        .IsUnique()
+                        .HasDatabaseName("ix_security_prices_market_symbol_currency");
+
+                    b.ToTable("security_prices", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_security_prices_unit_price_positive", "unit_price > 0");
+                        });
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.Transaction", b =>
@@ -1572,6 +1748,16 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_lesson_completions_lessons_lesson_id");
+                });
+
+            modelBuilder.Entity("FinGrow.Domain.Entities.NotificationChannelSetting", b =>
+                {
+                    b.HasOne("FinGrow.Domain.Entities.Employee", null)
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_notification_channel_settings_employees_employee_id");
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.RefreshToken", b =>

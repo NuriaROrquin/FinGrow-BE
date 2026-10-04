@@ -31,10 +31,10 @@ internal sealed class InvestmentConfiguration : IEntityTypeConfiguration<Investm
         builder.Property(investment => investment.PurchasedOn).IsRequired();
 
         builder.Property(investment => investment.Symbol)
-            .HasMaxLength(Investment.MaxSymbolLength);
+            .HasMaxLength(Investment.MaxFundNameLength);
 
         builder.Property(investment => investment.Quantity)
-            .HasPrecision(20, 6);
+            .HasPrecision(30, 10);
         builder.Property(investment => investment.CreatedAt).IsRequired();
         builder.Property(investment => investment.UpdatedAt).IsRequired();
 

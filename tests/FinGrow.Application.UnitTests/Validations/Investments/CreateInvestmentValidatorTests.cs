@@ -51,14 +51,39 @@ public class CreateInvestmentValidatorTests
     }
 
     [Theory]
-    [InlineData(InvestmentType.MutualFund)]
-    [InlineData(InvestmentType.Crypto)]
-    public void A_symbol_on_an_asset_that_does_not_trade_on_the_exchange_is_rejected(InvestmentType type)
+    [InlineData(InvestmentType.FixedTermDeposit)]
+    [InlineData(InvestmentType.Repo)]
+    [InlineData(InvestmentType.RemuneratedAccount)]
+    public void A_symbol_on_an_asset_without_a_price_source_is_rejected(InvestmentType type)
     {
         var result = _validator.Validate(ValidCommand() with { Type = type, Symbol = "BTC", Quantity = 1m });
 
         result.IsValid.ShouldBeFalse();
         result.Errors.ShouldContain(error => error.ErrorMessage.Contains("acciones", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(InvestmentType.Cedear, "AAPL")]
+    [InlineData(InvestmentType.CorporateBond, "YMCXO")]
+    [InlineData(InvestmentType.TreasuryBill, "S30N6")]
+    [InlineData(InvestmentType.Crypto, "BTC")]
+    [InlineData(InvestmentType.MutualFund, "Balanz Capital Money Market - Clase A")]
+    public void The_types_with_a_price_source_accept_a_symbol_and_a_quantity(InvestmentType type, string symbol)
+    {
+        var result = _validator.Validate(ValidCommand() with { Type = type, Symbol = symbol, Quantity = 100m });
+
+        result.IsValid.ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData(InvestmentType.Crypto, "BTC-USD")]
+    [InlineData(InvestmentType.Stock, "Balanz Capital")]
+    public void A_symbol_with_characters_its_market_does_not_use_is_rejected(InvestmentType type, string symbol)
+    {
+        var result = _validator.Validate(ValidCommand() with { Type = type, Symbol = symbol, Quantity = 1m });
+
+        result.IsValid.ShouldBeFalse();
+        result.Errors.ShouldContain(error => error.ErrorMessage.Contains("letras y numeros", StringComparison.Ordinal));
     }
 
     private static CreateInvestmentCommand ValidCommand() => new(
@@ -83,6 +108,12 @@ public class CreateInvestmentValidatorTests
     [InlineData(InvestmentType.Bond)]
     [InlineData(InvestmentType.MutualFund)]
     [InlineData(InvestmentType.Crypto)]
+    [InlineData(InvestmentType.Cedear)]
+    [InlineData(InvestmentType.CorporateBond)]
+    [InlineData(InvestmentType.TreasuryBill)]
+    [InlineData(InvestmentType.FixedTermDeposit)]
+    [InlineData(InvestmentType.Repo)]
+    [InlineData(InvestmentType.RemuneratedAccount)]
     public void Every_supported_asset_type_is_accepted(InvestmentType type)
     {
         var result = _validator.Validate(ValidCommand() with { Type = type });

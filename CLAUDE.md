@@ -145,6 +145,24 @@ siguiente corre igual. Un mismo trabajo no corre dos veces a la vez (`RunningJob
   falten desde el alta de la empresa. Las fotos guardan conteos, no porcentajes: la tasa de
   participación se deriva (`PeriodMetrics.ParticipationRate`), fiel a "un total no se persiste".
 
+## Eventos de dominio y alertas
+
+Un agregado levanta un evento con `Raise` y `DomainEventsInterceptor` (`Infrastructure/Persistence/`)
+lo publica por MediatR, envuelto en `DomainEventEnvelope<T>`, recién después de que
+`SaveChanges` confirma el cambio y cada uno en un scope de DI propio. Una reacción que falla se
+loguea y no llega a quien guardó, porque su cambio ya está en la base. Como el `DbContext`
+necesita `IDomainEventDispatcher`, `AddInfrastructure()` solo arranca junto a `AddApplication()`.
+
+- **Toda alerta pasa por `Notifier`** (`Application/Features/Notifications/`): deduplica por
+  criterio y ventana, persiste en `notifications` y entrega por los canales externos que el
+  empleado no apagó. No crees un `Notification` a mano ni mandes un Telegram desde un handler.
+- **Una alerta nueva** es un valor en `NotificationType` más una clase `internal` bajo
+  `Notifications/Alerts/` que implementa `INotificationHandler<DomainEventEnvelope<TEvento>>`.
+  El criterio de deduplicación es lo que hace que "la misma condición" no se repita: incluí en
+  la clave lo que distingue una alerta de otra (categoría, período, meta).
+- **La bandeja de la app no es un canal configurable**: es el historial de las alertas. Hay un
+  `CHECK` que impide guardar una preferencia para `InApp`.
+
 ## Convenciones
 
 - Identificadores en inglés; documentación, comentarios y mensajes de error en castellano. La

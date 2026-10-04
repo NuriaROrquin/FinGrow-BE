@@ -101,6 +101,16 @@ variables de entorno usando `__` como separador de sección.
 | `Byma:BaseUrl` | `Byma__BaseUrl` | Datos públicos del sitio de BYMA de los que salen los precios de cierre del trabajo `investment-quotes` (default `https://open.bymadata.com.ar/vanoms-be-core/rest/api/bymadata/free/`). No piden credenciales |
 | `Byma:TimeoutSeconds` | `Byma__TimeoutSeconds` | Timeout de cada consulta a BYMA (default 30) |
 | `Byma:MaxPagesPerPanel` | `Byma__MaxPagesPerPanel` | Tope de páginas que se leen de cada panel, de a 189 títulos (default 20) |
+| `Byma:CacheMinutes` | `Byma__CacheMinutes` | Minutos que la API reutiliza los precios bajados de BYMA antes de volver a pedirlos, para que cotizar un símbolo desde el formulario no descargue los paneles en cada consulta (default 5) |
+| `ArgentinaDatos:BaseUrl` | `ArgentinaDatos__BaseUrl` | API de [ArgentinaDatos](https://argentinadatos.com) de la que sale la cuotaparte de los fondos comunes (default `https://api.argentinadatos.com/`). Es pública y no pide credenciales |
+| `ArgentinaDatos:TimeoutSeconds` | `ArgentinaDatos__TimeoutSeconds` | Timeout de cada consulta (default 15) |
+| `ArgentinaDatos:CacheMinutes` | `ArgentinaDatos__CacheMinutes` | Minutos que se reutilizan las cuotapartes bajadas; se publican una vez por día (default 60) |
+| `ArgentinaDatos:StaleAfterDays` | `ArgentinaDatos__StaleAfterDays` | Días de atraso respecto de la cuotaparte más nueva a partir de los cuales un fondo se descarta por no existir más (default 30) |
+| `CoinGecko:BaseUrl` | `CoinGecko__BaseUrl` | API de [CoinGecko](https://www.coingecko.com) de la que sale el precio de las criptomonedas (default `https://api.coingecko.com/api/v3/`) |
+| `CoinGecko:ApiKey` | `CoinGecko__ApiKey` | Clave demo opcional (gratuita) que viaja en `x-cg-demo-api-key`; sin ella CoinGecko corta con `429` después de pocos pedidos por minuto |
+| `CoinGecko:TimeoutSeconds` | `CoinGecko__TimeoutSeconds` | Timeout de cada consulta (default 15) |
+| `CoinGecko:CacheMinutes` | `CoinGecko__CacheMinutes` | Minutos que se reutilizan los precios bajados (default 10) |
+| `CoinGecko:TopCoins` | `CoinGecko__TopCoins` | Cuántas criptomonedas, de mayor a menor capitalización, se cotizan (default y máximo 250) |
 | `Cors:AllowedOrigins` | `Cors__AllowedOrigins__0` | Orígenes habilitados para el frontend |
 
 Los secretos no se commitean. En desarrollo local:
@@ -130,12 +140,71 @@ actualización) que la pantalla de Inversiones usa para mostrar el portafolio en
 Si DolarApi no responde o devuelve algo que no se puede leer, el endpoint contesta `503` y el
 frontend muestra cada moneda por separado; una respuesta fallida nunca queda guardada en la caché.
 
-Las inversiones cargadas a mano con símbolo y cantidad se cotizan con los datos públicos del sitio
-de BYMA: acciones, CEDEARs, bonos y ONs, con liquidación a 24 hs. El símbolo tiene que ser la
-variante de la moneda de la inversión (AL30 en pesos, AL30D en dólares) y los bonos y ONs cotizan
-cada 100 nominales. Esos datos no son la API contratada de BYMA ni tienen garantía de servicio:
-antes de producción con empleados reales se reemplazan por la API EOD de BYMA (contrato con
-marketdata@byma.com.ar), implementando otro `IMarketPriceProvider`.
+Las inversiones cargadas con símbolo y cantidad se cotizan con tres fuentes públicas, una por
+mercado: los datos del sitio de BYMA para lo que cotiza en bolsa (acciones, CEDEAR, ETF, bonos,
+obligaciones negociables y letras del Tesoro), [ArgentinaDatos](https://argentinadatos.com) para
+los fondos comunes y [CoinGecko](https://www.coingecko.com) para las criptomonedas. Los plazos
+fijos, las cauciones y las cuentas remuneradas no tienen fuente y quedan valuados al costo. En
+BYMA el símbolo tiene que ser la variante de la moneda de la inversión (AL30 en pesos, AL30D en
+dólares) y los bonos, las ONs y las letras cotizan cada 100 nominales. Los datos de BYMA no son su
+API contratada ni tienen garantía de servicio: antes de producción con empleados reales se
+reemplazan por la API EOD de BYMA (contrato con marketdata@byma.com.ar), implementando otro
+`IMarketPriceProvider`.
+
+`GET /api/security-prices?symbol=AL30&currency=ARS&type=Bond` cotiza un símbolo mientras se carga
+el formulario de inversiones: devuelve el precio por unidad (por nominal en bonos, ONs y letras; por
+cuotaparte en fondos), el nombre si la fuente lo publica, la fecha del precio y la fuente. El
+`type` elige el mercado, así que un mismo símbolo en dos mercados (COIN como CEDEAR y como cripto)
+no se confunde. Primero busca en la fuente del mercado, que la API reutiliza unos minutos; si no
+tiene precio para ese símbolo (los fines de semana y feriados el feed público de BYMA viene todo en
+0) o no responde en 10 segundos, usa el último precio que guardó `investment-quotes` en
+`security_prices` con su fecha. Sin precio en ninguno de los dos contesta `404` si la fuente
+respondió y `503` si no. BYMA y CoinGecko se cotizan en `ARS` o `USD`; un fondo, en la moneda de
+la inversión.
+
+`GET /api/security-prices/search?type=MutualFund&query=balanz` busca hasta 20 símbolos o nombres
+del mercado que contengan el texto, sin distinguir mayúsculas ni tildes, primero los que empiezan
+con él. Es lo que usa el formulario para elegir un fondo, porque un fondo se identifica por su
+nombre completo tal como lo publica ArgentinaDatos ("1810 Ahorro", "Balanz Capital Money Market -
+Clase A"), no por un símbolo.
+
+### Fuente de cotización de cada instrumento
+
+| Instrumento | `InvestmentType` | Fuente | De dónde sale el precio | Precio por |
+|---|---|---|---|---|
+| Acción | `Stock` | BYMA, datos públicos | Paneles `leading-equity` y `general-equity` | Acción |
+| CEDEAR | `Cedear` | BYMA, datos públicos | Panel `cedears` | CEDEAR |
+| ETF | `Etf` | BYMA, datos públicos | Panel `cedears`: los ETF del exterior (SPY, QQQ) se operan como CEDEAR | Unidad |
+| Bono | `Bond` | BYMA, datos públicos | Panel `public-bonds` | Nominal (BYMA cotiza cada 100) |
+| Obligación negociable | `CorporateBond` | BYMA, datos públicos | Panel `negociable-obligations` | Nominal (BYMA cotiza cada 100) |
+| Letra del Tesoro | `TreasuryBill` | BYMA, datos públicos | Panel `lebacs` (LECAP y BONCAP) | Nominal (BYMA cotiza cada 100) |
+| Fondo común | `MutualFund` | ArgentinaDatos | `GET v1/finanzas/fci/{categoria}/ultimo` de `mercadoDinero`, `rentaFija`, `rentaMixta`, `rentaVariable` y `retornoTotal` | Cuotaparte (ArgentinaDatos publica el valor de 1000) |
+| Criptomoneda | `Crypto` | CoinGecko | `GET coins/markets` en `usd` y `ars`, las 250 de mayor capitalización | Unidad |
+| Plazo fijo | `FixedTermDeposit` | Ninguna | Se valúa al costo | — |
+| Caución | `Repo` | Ninguna | Se valúa al costo; BYMA publica una tasa, no un precio | — |
+| Cuenta remunerada | `RemuneratedAccount` | Ninguna | Se valúa al costo | — |
+| Dólar MEP | — | [DolarApi](https://dolarapi.com) | `GET v1/dolares/bolsa`; convierte el portafolio a una sola moneda, no valúa inversiones | Dólar |
+
+- **Un proveedor por mercado.** Cada fuente implementa `IMarketPriceProvider` y declara su
+  `PriceMarket` (`Exchange`, `MutualFund` o `Crypto`); el tipo de activo de la inversión elige el
+  mercado (`InvestmentType.QuotedOn()`) y dentro del mercado el precio se busca por símbolo y
+  moneda. Cada proveedor baja todo de una vez y lo reutiliza en memoria (`CacheMinutes`).
+- **BYMA.** `POST {Byma:BaseUrl}{panel}` con liquidación a 24 hs. La moneda elige la variante:
+  AL30 en pesos, AL30D en dólares; las variantes en dólar cable (AL30C) se descartan.
+- **ArgentinaDatos.** No informa la moneda de cada fondo: un fondo se busca por nombre en
+  cualquier moneda y se valúa en la de la inversión. La moneda que devuelve la API se deduce del
+  nombre ("Dólares", "USD", salvo "Dólar Linked", que es en pesos) y el formulario la usa para
+  avisar si no coincide. Se descartan los fondos cuya última cuotaparte tiene más de
+  `ArgentinaDatos:StaleAfterDays` días que la más nueva: son fondos que ya no existen.
+- **CoinGecko.** Sin clave permite pocos pedidos por minuto y corta con `429`; cada descarga hace
+  dos (dólares y pesos) y se reutiliza `CoinGecko:CacheMinutes`. Con una clave demo gratuita en
+  `CoinGecko:ApiKey` el límite sube a 30 por minuto. Si un símbolo se repite, queda el de mayor
+  capitalización; los que no son letras y números se descartan.
+- **Quién la usa.** `investment-quotes` valúa una vez por día hábil las inversiones con símbolo y
+  guarda el último precio en `security_prices`; si una fuente no responde, cotiza con las otras y
+  la corrida queda fallida con el motivo. `GET /api/security-prices` cotiza mientras se carga el
+  formulario y, si la fuente no tiene precio o no responde, usa ese último precio. Las cuentas
+  vinculadas a IOL se cotizan aparte con T-19.
 
 ### WhatsApp (Twilio)
 
@@ -198,7 +267,7 @@ siguiente.
 |---|---|---|
 | `metrics-snapshot` | `0 4 1 * *` (el 1 de cada mes, 01:00 de Argentina) | Genera las fotos mensuales de métricas por empresa y por departamento (`company_metrics_snapshots` y `department_metrics_snapshots`) del último mes cerrado, y completa las de los meses anteriores que falten desde el alta de cada empresa. Es idempotente: correrlo de nuevo actualiza la foto del último mes cerrado en lugar de duplicarla |
 | `mercadopago-sync` | `0 * * * *` (cada hora) | Recorre las cuentas de Mercado Pago vinculadas y trae los movimientos nuevos como pendientes de revisión. Mercado Pago no avisa por webhook lo que un usuario paga, por eso se consulta |
-| `investment-quotes` | `30 21 * * 1-5` (días hábiles, 18:30 de Argentina) | Cotiza las inversiones cargadas con símbolo y cantidad con los precios de cierre de BYMA y les registra la valuación de mercado del día. Correrlo de nuevo el mismo día actualiza esa valuación en lugar de duplicarla. Si BYMA no responde, la corrida queda fallida y no toca ninguna inversión |
+| `investment-quotes` | `30 21 * * 1-5` (días hábiles, 18:30 de Argentina) | Guarda en `security_prices` el último precio de cada símbolo de BYMA, cada fondo de ArgentinaDatos y cada cripto de CoinGecko (aunque nadie tenga inversiones con símbolo) y cotiza con esos precios las inversiones cargadas con símbolo y cantidad, registrándoles la valuación de mercado del día. Correrlo de nuevo el mismo día actualiza esa valuación en lugar de duplicarla. Si una fuente no responde, cotiza con las otras y la corrida queda fallida con el motivo; si no responde ninguna, no toca nada |
 
 Los endpoints viven bajo `/api/jobs` y se protegen con la cabecera `X-Jobs-Key`, que tiene que
 coincidir con `Jobs:ApiKey`. No usan JWT: los llama un cron, no una persona logueada.
@@ -227,6 +296,56 @@ curl -fsS -X POST "https://dev-be.fingrow.com.ar/api/jobs/metrics-snapshot/run" 
 La respuesta es la corrida registrada; si `status` es `Failed`, `error` dice por qué y el log de
 la API tiene el detalle completo. `GET /api/jobs` sirve para verificar de un vistazo que cada
 cron esté corriendo: muestra la última corrida de cada trabajo.
+
+### Alertas y notificaciones
+
+Las alertas salen de un único motor (`Notifier`, en `Application/Features/Notifications`) que
+comparten presupuestos, metas, integraciones y el panel de empresa. Cada alerta pasa por tres
+pasos, siempre en este orden:
+
+1. **Deduplicación.** Toda alerta declara un criterio (`deduplication_key`, por ejemplo
+   `transactions-to-review:MercadoPago`) y una ventana. Si al mismo destinatario ya se le avisó
+   el mismo tipo con el mismo criterio dentro de la ventana, no se vuelve a avisar.
+2. **Persistencia.** La notificación queda en la tabla `notifications`, que es la bandeja de la
+   app y el historial de todo lo que se avisó. Por eso la bandeja no se puede apagar.
+3. **Entrega.** Se manda además por cada canal externo que el empleado no haya desactivado. Hoy
+   el único es Telegram, y solo si el empleado tiene el chat vinculado. Si un canal falla, se
+   loguea y la notificación queda igual en la bandeja.
+
+El destinatario puede ser un empleado o la empresa (`recipient_type`), así que la misma bandeja
+sirve para las alertas de bienestar del panel de empresa. Los canales externos son solo para
+empleados.
+
+Lo que dispara una alerta es un **evento de dominio**: un agregado lo levanta (`Raise`) cuando
+pasa algo, y recién cuando `SaveChanges` confirma el cambio se publica por MediatR, cada evento
+en un scope propio. Si una reacción falla, se loguea y no rompe la operación que la originó,
+porque esa ya quedó guardada. La primera alerta es `TransactionsToReview`: cuando Mercado Pago o
+Gmail traen movimientos pendientes, el empleado recibe un aviso para revisarlos, como máximo uno
+cada 12 horas por origen (un sync de 30 movimientos genera una sola alerta). Lo que carga el
+empleado a mano, por foto o por chat no avisa: ya está mirando la app.
+
+| Método y ruta | Quién | Qué hace |
+|---|---|---|
+| `GET /api/notifications?unreadOnly=false&pageNumber=1&pageSize=20` | Empleado y empresa | La bandeja del usuario logueado, la más reciente primero (`pageSize` entre 1 y 100) |
+| `GET /api/notifications/unread-count` | Empleado y empresa | Cuántas no leídas tiene, para el contador de la campanita |
+| `POST /api/notifications/{id}/read` | Empleado y empresa | Marca una como leída. `404` si no es del usuario |
+| `POST /api/notifications/read-all` | Empleado y empresa | Marca todas como leídas y devuelve cuántas marcó |
+| `GET /api/notifications/channels` | Empleado | Cada canal con `isEnabled`, `isConfigurable` y `isConnected` (Telegram vinculado) |
+| `PUT /api/notifications/channels/{canal}` | Empleado | Activa o desactiva un canal externo: `{ "isEnabled": false }`. `400` para `InApp` |
+
+Un canal sin preferencia guardada está activo: quien vincula Telegram empieza a recibir alertas
+por ahí hasta que lo apague.
+
+Para sumar una alerta nueva: un tipo en `NotificationType`, el evento de dominio que la dispara
+(levantado por el agregado con `Raise`) y una clase `internal` bajo
+`Application/Features/Notifications/Alerts/` que implementa
+`INotificationHandler<DomainEventEnvelope<TuEvento>>` y llama a `Notifier.NotifyAsync` con el
+criterio y la ventana de deduplicación. Una alerta que depende del paso del tiempo (una meta sin
+aportes) se evalúa desde un trabajo programado y usa el mismo `Notifier`.
+
+Pendiente fuera de T-07: WhatsApp no es canal todavía (Twilio exige plantillas aprobadas para
+escribirle a alguien fuera de la ventana de 24 horas), no hay mail, no se reintenta una entrega
+fallida y no hay política de retención para `notifications`.
 
 ---
 
@@ -313,7 +432,8 @@ Siete entidades y tres value objects. El esquema se crea con la migración `Init
 | `transactions` | Transaction | Ingresos y gastos, con importe siempre positivo y el signo dado por `type` |
 | `budgets` | Budget | Tope por categoría y período |
 | `goals` | Goal | Metas de ahorro con objetivo, avance y fecha límite |
-| `investments` | Investment | Posiciones del portafolio: capital invertido y valuación actual |
+| `investments` | Investment | Posiciones del portafolio: capital invertido y valuación actual. `symbol` es el ticker (hasta 20 caracteres) o, en un fondo común, su nombre completo (hasta 150); `quantity` admite 10 decimales para fracciones de cripto |
+| `security_prices` | SecurityPrice | El último precio por unidad de cada mercado, símbolo y moneda (BYMA, fondos de ArgentinaDatos y cripto de CoinGecko); una fila por mercado, símbolo y moneda que `investment-quotes` pisa en cada corrida. En los fondos el símbolo es el nombre del fondo. Es lo que cotiza el formulario de inversiones cuando la fuente no publica precios (BYMA los fines de semana y feriados) o no responde |
 | `job_runs` | JobRun | Registro de cada corrida de un trabajo programado: inicio, fin, resultado y error |
 | `company_metrics_snapshots` | CompanyMetricsSnapshot | Foto mensual de métricas agregadas de una empresa: empleados activos, cuántos participaron, movimientos confirmados, presupuestos, metas e integraciones |
 | `department_metrics_snapshots` | DepartmentMetricsSnapshot | La misma foto, por departamento |
