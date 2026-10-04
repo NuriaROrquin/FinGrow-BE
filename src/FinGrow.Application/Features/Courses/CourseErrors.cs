@@ -9,4 +9,7 @@ internal static class CourseErrors
 
     public static Error LessonNotFound(Guid lessonId) =>
         Error.NotFound("Course.LessonNotFound", $"No existe una leccion con id '{lessonId}' en este curso.");
+
+    public static Error NotCompleted() =>
+        Error.Conflict("Course.NotCompleted", "Solo se puede calificar un curso terminado.");
 }
