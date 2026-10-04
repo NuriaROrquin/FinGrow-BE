@@ -54,7 +54,7 @@ public sealed class Course : AggregateRoot
 
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    public IReadOnlyCollection<Lesson> Lessons => _lessons.AsReadOnly();
+    public IReadOnlyCollection<Lesson> Lessons => _lessons.OrderBy(lesson => lesson.Position).ToList().AsReadOnly();
 
     public bool IsPublished => PublishedAt is not null;
 
