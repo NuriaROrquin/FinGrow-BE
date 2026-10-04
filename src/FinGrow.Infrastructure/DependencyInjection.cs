@@ -83,6 +83,8 @@ public static class DependencyInjection
         services.AddScoped<IInvestmentRepository, InvestmentRepository>();
         services.AddScoped<IInvestmentReadRepository, InvestmentReadRepository>();
         services.AddScoped<ICourseRepository, CourseRepository>();
+        services.AddScoped<ICourseRatingRepository, CourseRatingRepository>();
+        services.AddScoped<ICourseRatingReadRepository, CourseRatingReadRepository>();
         services.AddScoped<IJobRunRepository, JobRunRepository>();
         services.AddScoped<IMetricsSnapshotRepository, MetricsSnapshotRepository>();
         services.AddScoped<IPeriodActivityReadRepository, PeriodActivityReadRepository>();
