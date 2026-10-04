@@ -2,11 +2,6 @@ namespace FinGrow.Infrastructure.Persistence.Seeding;
 
 using FinGrow.Domain.Enums;
 
-/// <summary>
-/// El contenido educativo inicial de la plataforma (T-20). Los cursos y las lecciones son los
-/// que ya mostraba el frontend como datos de prueba; los articulos se escribieron para esta
-/// carga. El slug es la clave natural: cambiarlo hace que la carga lo trate como contenido nuevo.
-/// </summary>
 internal static class EducationCatalog
 {
     public static readonly CourseSeed[] Courses =

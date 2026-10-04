@@ -2,8 +2,6 @@ namespace FinGrow.Api.UnitTests.Persistence;
 
 using FinGrow.Infrastructure.Persistence.Seeding;
 
-// La carga contra la base se probo a mano (dos corridas seguidas); aca se verifica que el
-// catalogo en si sea cargable, que es lo que rompe si alguien agrega contenido invalido.
 public class EducationCatalogTests
 {
     [Fact]

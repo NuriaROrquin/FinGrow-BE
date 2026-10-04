@@ -50,12 +50,10 @@ internal sealed class CourseConfiguration : IEntityTypeConfiguration<Course>
             .HasForeignKey(lesson => lesson.CourseId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Sin sus lecciones un curso no sabe cuanto dura: se cargan siempre con el.
         builder.Navigation(course => course.Lessons)
             .UsePropertyAccessMode(PropertyAccessMode.Field)
             .AutoInclude();
 
-        // La clave natural: es lo que hace idempotente la carga del catalogo.
         builder.HasIndex(course => course.Slug).IsUnique();
         builder.HasIndex(course => new { course.Category, course.Level });
         builder.HasIndex(course => course.RelatedInvestmentType);

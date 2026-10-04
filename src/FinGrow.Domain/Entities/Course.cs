@@ -4,10 +4,6 @@ using FinGrow.Domain.Common;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.Errors;
 
-/// <summary>
-/// Un curso del catalogo de educacion financiera. Es contenido de la plataforma, no de una
-/// empresa ni de un empleado: lo ven todos. El progreso de cada empleado vive aparte.
-/// </summary>
 public sealed class Course : AggregateRoot
 {
     public const int MaxTitleLength = 200;
@@ -50,13 +46,8 @@ public sealed class Course : AggregateRoot
 
     public EducationCategory Category { get; private set; }
 
-    /// <summary>
-    /// Tipo de activo del que trata el curso, si trata de uno. Es lo que usa Inversiones para
-    /// sugerir material relacionado (HU-35).
-    /// </summary>
     public InvestmentType? RelatedInvestmentType { get; private set; }
 
-    /// <summary>Mientras es <c>null</c> el curso es un borrador y no se muestra en el catalogo.</summary>
     public DateTimeOffset? PublishedAt { get; private set; }
 
     public DateTimeOffset CreatedAt { get; private set; }
@@ -67,7 +58,6 @@ public sealed class Course : AggregateRoot
 
     public bool IsPublished => PublishedAt is not null;
 
-    /// <summary>Se deriva de las lecciones: una duracion guardada se desincroniza al editarlas.</summary>
     public int DurationMinutes => _lessons.Sum(lesson => lesson.DurationMinutes);
 
     public static Course Create(
@@ -87,7 +77,6 @@ public sealed class Course : AggregateRoot
             relatedInvestmentType,
             createdAt);
 
-    /// <summary>Agrega la leccion al final del curso.</summary>
     public Lesson AddLesson(string title, int durationMinutes, string videoUrl, DateTimeOffset updatedAt)
     {
         var lesson = Lesson.Create(Id, _lessons.Count + 1, title, durationMinutes, videoUrl);

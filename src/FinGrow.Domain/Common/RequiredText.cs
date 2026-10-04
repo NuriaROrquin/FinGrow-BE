@@ -4,7 +4,6 @@ using FinGrow.Domain.Errors;
 
 internal static class RequiredText
 {
-    /// <summary>Recorta el texto y exige que no quede vacio ni supere el largo maximo.</summary>
     public static string Ensure(string value, int maxLength, string label)
     {
         var trimmed = (value ?? string.Empty).Trim();

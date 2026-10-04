@@ -3,10 +3,6 @@ namespace FinGrow.Domain.Entities;
 using FinGrow.Domain.Common;
 using FinGrow.Domain.Errors;
 
-/// <summary>
-/// Una leccion de un curso. No existe por fuera de el: su orden y su duracion solo tienen
-/// sentido dentro del curso, por eso la crea el agregado <see cref="Course"/>.
-/// </summary>
 public sealed class Lesson : Entity
 {
     public const int MaxTitleLength = 200;
@@ -28,7 +24,6 @@ public sealed class Lesson : Entity
 
     public Guid CourseId { get; private set; }
 
-    /// <summary>Orden dentro del curso, empezando en 1.</summary>
     public int Position { get; private set; }
 
     public string Title { get; private set; } = string.Empty;
