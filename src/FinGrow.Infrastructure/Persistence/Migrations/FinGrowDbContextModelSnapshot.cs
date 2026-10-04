@@ -220,15 +220,6 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(11)")
                         .HasColumnName("tax_id");
 
-                    b.Property<DateTimeOffset?>("TwoFactorEnabledAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("two_factor_enabled_at");
-
-                    b.Property<string>("TwoFactorSecret")
-                        .HasColumnType("text")
-                        .HasColumnName("two_factor_secret")
-                        .HasAnnotation("FinGrow:Encrypted", true);
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
