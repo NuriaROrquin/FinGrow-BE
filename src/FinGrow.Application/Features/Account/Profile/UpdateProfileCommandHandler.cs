@@ -41,7 +41,13 @@ internal sealed class UpdateProfileCommandHandler : IRequestHandler<UpdateProfil
             return Result.Failure(NoAutenticado);
         }
 
-        employee.UpdateProfile(request.FullName, request.PhoneNumber, _clock.UtcNow);
+        employee.UpdateProfile(
+            request.FullName,
+            request.PhoneNumber,
+            request.NationalId,
+            request.BirthDate,
+            request.Address,
+            _clock.UtcNow);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success();

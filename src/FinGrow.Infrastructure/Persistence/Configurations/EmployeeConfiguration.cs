@@ -27,6 +27,14 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         builder.Property(employee => employee.PhoneNumber)
             .HasMaxLength(Employee.MaxPhoneNumberLength);
 
+        builder.Property(employee => employee.NationalId)
+            .HasMaxLength(Employee.MaxNationalIdLength);
+
+        builder.Property(employee => employee.BirthDate);
+
+        builder.Property(employee => employee.Address)
+            .HasMaxLength(Employee.MaxAddressLength);
+
         builder.Property(employee => employee.PasswordHash)
             .HasMaxLength(200)
             .IsRequired();

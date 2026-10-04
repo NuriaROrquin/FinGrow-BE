@@ -7,8 +7,24 @@ using FinGrow.Domain.ValueObjects;
 
 public sealed class Employee : AggregateRoot, ITwoFactorAccount
 {
+    public const int MinFullNameLength = 2;
     public const int MaxFullNameLength = 200;
     public const int MaxPhoneNumberLength = 30;
+    public const int MinPhoneNumberDigits = 8;
+
+    /// <summary>El maximo de digitos de un numero internacional (E.164).</summary>
+    public const int MaxPhoneNumberDigits = 15;
+
+    public const int MinNationalIdLength = 7;
+    public const int MaxNationalIdLength = 8;
+    public const int MaxAddressLength = 200;
+
+    /// <summary>La edad minima para trabajar en Argentina (Ley 26.390).</summary>
+    public const int MinAge = 16;
+
+    public const int MaxAge = 100;
+
+    private const string PhoneNumberSeparators = " +-()";
 
     private Employee()
     {
@@ -57,6 +73,12 @@ public sealed class Employee : AggregateRoot, ITwoFactorAccount
     public Email Email { get; private set; } = null!;
 
     public string? PhoneNumber { get; private set; }
+
+    public string? NationalId { get; private set; }
+
+    public DateOnly? BirthDate { get; private set; }
+
+    public string? Address { get; private set; }
 
     public string PasswordHash { get; private set; } = string.Empty;
 
@@ -120,12 +142,37 @@ public sealed class Employee : AggregateRoot, ITwoFactorAccount
             createdAt);
     }
 
-    public void UpdateProfile(string fullName, string? phoneNumber, DateTimeOffset updatedAt)
+    public void UpdateProfile(
+        string fullName,
+        string? phoneNumber,
+        string? nationalId,
+        DateOnly? birthDate,
+        string? address,
+        DateTimeOffset updatedAt)
     {
         FullName = EnsureValidFullName(fullName);
         PhoneNumber = EnsureValidPhoneNumber(phoneNumber);
+        NationalId = EnsureValidNationalId(nationalId);
+        BirthDate = EnsureValidBirthDate(birthDate, DateOnly.FromDateTime(updatedAt.Date));
+        Address = EnsureValidAddress(address);
         UpdatedAt = updatedAt;
     }
+
+    public static bool IsValidPhoneNumber(string phoneNumber)
+    {
+        var digits = phoneNumber.Count(char.IsAsciiDigit);
+
+        return phoneNumber.Length <= MaxPhoneNumberLength
+            && phoneNumber.All(character => char.IsAsciiDigit(character) || PhoneNumberSeparators.Contains(character))
+            && digits is >= MinPhoneNumberDigits and <= MaxPhoneNumberDigits;
+    }
+
+    public static bool IsValidNationalId(string nationalId) =>
+        nationalId.Length is >= MinNationalIdLength and <= MaxNationalIdLength
+        && nationalId.All(char.IsAsciiDigit);
+
+    public static bool IsValidBirthDate(DateOnly birthDate, DateOnly today) =>
+        birthDate <= today.AddYears(-MinAge) && birthDate > today.AddYears(-(MaxAge + 1));
 
     public void UpdatePreferences(
         Theme theme,
@@ -221,6 +268,8 @@ public sealed class Employee : AggregateRoot, ITwoFactorAccount
         return trimmed.Length switch
         {
             0 => throw new DomainException("El nombre del empleado es obligatorio."),
+            < MinFullNameLength => throw new DomainException(
+                $"El nombre tiene que tener al menos {MinFullNameLength} caracteres."),
             > MaxFullNameLength => throw new DomainException(
                 $"El nombre no puede superar los {MaxFullNameLength} caracteres."),
             _ => trimmed
@@ -236,8 +285,43 @@ public sealed class Employee : AggregateRoot, ITwoFactorAccount
             return null;
         }
 
-        return trimmed.Length > MaxPhoneNumberLength
-            ? throw new DomainException($"El telefono no puede superar los {MaxPhoneNumberLength} caracteres.")
+        return IsValidPhoneNumber(trimmed)
+            ? trimmed
+            : throw new DomainException(
+                $"El telefono solo admite numeros, espacios, +, - y parentesis, con entre {MinPhoneNumberDigits} y {MaxPhoneNumberDigits} digitos.");
+    }
+
+    private static string? EnsureValidNationalId(string? nationalId)
+    {
+        var trimmed = nationalId?.Trim();
+
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            return null;
+        }
+
+        return IsValidNationalId(trimmed)
+            ? trimmed
+            : throw new DomainException(
+                $"El DNI tiene que tener entre {MinNationalIdLength} y {MaxNationalIdLength} numeros, sin puntos.");
+    }
+
+    private static DateOnly? EnsureValidBirthDate(DateOnly? birthDate, DateOnly today) =>
+        birthDate is not { } date || IsValidBirthDate(date, today)
+            ? birthDate
+            : throw new DomainException($"La fecha de nacimiento tiene que corresponder a una edad de entre {MinAge} y {MaxAge} años.");
+
+    private static string? EnsureValidAddress(string? address)
+    {
+        var trimmed = address?.Trim();
+
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            return null;
+        }
+
+        return trimmed.Length > MaxAddressLength
+            ? throw new DomainException($"La direccion no puede superar los {MaxAddressLength} caracteres.")
             : trimmed;
     }
 
