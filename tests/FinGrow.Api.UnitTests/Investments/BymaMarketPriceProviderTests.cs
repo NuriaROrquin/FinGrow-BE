@@ -21,6 +21,7 @@ public class BymaMarketPriceProviderTests
         "cedears:1",
         "public-bonds:1",
         "negociable-obligations:1",
+        "lebacs:1",
     };
 
     private const string LeadingEquity = """
@@ -51,6 +52,12 @@ public class BymaMarketPriceProviderTests
           {"symbol":"AL30D","settlementType":"2","denominationCcy":"USD","closingPrice":53.97,"previousClosingPrice":54.19}]}
         """;
 
+    private const string TreasuryBills = """
+        {"content":{"page_number":1,"page_count":1},"data":[
+          {"symbol":"S30N6","settlementType":"2","denominationCcy":"ARS","closingPrice":110.55,"previousClosingPrice":110.2},
+          {"symbol":"S30N6.SB","settlementType":"2","denominationCcy":"ARS","closingPrice":0,"previousClosingPrice":0}]}
+        """;
+
     [Fact]
     public async Task Every_panel_is_read_with_next_day_settlement_and_bonds_are_priced_per_nominal()
     {
@@ -69,6 +76,7 @@ public class BymaMarketPriceProviderTests
                 new MarketPrice("SPYD", Currency.USD, 13.37m),
                 new MarketPrice("AL30", Currency.ARS, 839.40m),
                 new MarketPrice("AL30D", Currency.USD, 0.5397m),
+                new MarketPrice("S30N6", Currency.ARS, 1.1055m),
             },
             ignoreOrder: true);
     }
@@ -140,6 +148,7 @@ public class BymaMarketPriceProviderTests
         "general-equity" => (HttpStatusCode.OK, page == 1 ? GeneralEquityFirstPage : GeneralEquitySecondPage),
         "cedears" => (HttpStatusCode.OK, Cedears),
         "public-bonds" => (HttpStatusCode.OK, PublicBonds),
+        "lebacs" => (HttpStatusCode.OK, TreasuryBills),
         _ => (HttpStatusCode.OK, "[]"),
     };
 
