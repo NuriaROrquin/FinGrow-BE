@@ -606,3 +606,57 @@ public sealed class FakeCourseRatingRepository : ICourseRatingRepository, ICours
                     group.Average(rating => (decimal)rating.Score),
                     group.FirstOrDefault(rating => rating.EmployeeId == employeeId)?.Score)));
 }
+
+public sealed class FakeNotificationRepository : INotificationRepository
+{
+    public List<Notification> Notifications { get; } = new();
+
+    public void Add(Notification notification) => Notifications.Add(notification);
+
+    public Task<Notification?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Notifications.FirstOrDefault(notification => notification.Id == id));
+
+    public Task<bool> ExistsSinceAsync(
+        NotificationRecipient recipient,
+        NotificationType type,
+        string deduplicationKey,
+        DateTimeOffset since,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Notifications.Any(notification =>
+            notification.IsAddressedTo(recipient)
+            && notification.Type == type
+            && notification.DeduplicationKey == deduplicationKey
+            && notification.CreatedAt >= since));
+
+    public Task<IReadOnlyList<Notification>> ListAsync(
+        NotificationRecipient recipient,
+        bool unreadOnly,
+        int skip,
+        int take,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Notification>>(Filtered(recipient, unreadOnly)
+            .OrderByDescending(notification => notification.CreatedAt)
+            .ThenByDescending(notification => notification.Id)
+            .Skip(skip)
+            .Take(take)
+            .ToList());
+
+    public Task<int> CountAsync(NotificationRecipient recipient, bool unreadOnly, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Filtered(recipient, unreadOnly).Count());
+
+    public Task<IReadOnlyList<Notification>> ListUnreadAsync(NotificationRecipient recipient, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Notification>>(Filtered(recipient, unreadOnly: true).ToList());
+
+    private IEnumerable<Notification> Filtered(NotificationRecipient recipient, bool unreadOnly) =>
+        Notifications.Where(notification => notification.IsAddressedTo(recipient) && (!unreadOnly || !notification.IsRead));
+}
+
+public sealed class FakeNotificationChannelSettingRepository : INotificationChannelSettingRepository
+{
+    public List<NotificationChannelSetting> Settings { get; } = new();
+
+    public void Add(NotificationChannelSetting setting) => Settings.Add(setting);
+
+    public Task<IReadOnlyList<NotificationChannelSetting>> ListByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<NotificationChannelSetting>>(Settings.Where(setting => setting.EmployeeId == employeeId).ToList());
+}

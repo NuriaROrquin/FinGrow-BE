@@ -2,10 +2,13 @@ namespace FinGrow.Application;
 
 using System.Reflection;
 using Common.Behaviors;
+using Events;
 using Features.Integrations.Linking;
 using Features.Integrations.MercadoPago.Sync;
 using Features.Investments.QuoteInvestments;
 using Features.Metrics.SnapshotMetrics;
+using Features.Notifications;
+using Features.Notifications.Delivery;
 using Features.Session;
 using FluentValidation;
 using Jobs;
@@ -25,6 +28,10 @@ public static class DependencyInjection
         services.AddScoped<LinkCodeRedeemer>();
         services.AddScoped<MercadoPagoSynchronizer>();
         services.AddScoped<SessionIssuer>();
+
+        services.AddSingleton<IDomainEventDispatcher, DomainEventDispatcher>();
+        services.AddScoped<Notifier>();
+        services.AddScoped<INotificationSender, TelegramNotificationSender>();
 
         services.AddSingleton<RunningJobs>();
         services.AddScoped<JobRunner>();

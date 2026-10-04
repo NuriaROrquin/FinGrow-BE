@@ -1,6 +1,7 @@
 namespace FinGrow.Api.UnitTests.Persistence;
 
 using FinGrow.Api.Extensions;
+using FinGrow.Application;
 using FinGrow.Infrastructure;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
@@ -46,6 +47,7 @@ public class MigrateOnStartupTests
             ["MercadoPago:RedirectUri"] = "https://api.test/api/integrations/mercadopago/oauth/callback",
             ["TokenEncryption:Key"] = "dW5pdC10ZXN0LXRva2VuLWVuY3J5cHRpb24ta2V5ISE=",
         });
+        builder.Services.AddApplication();
         builder.Services.AddInfrastructure(builder.Configuration);
 
         return builder.Build();

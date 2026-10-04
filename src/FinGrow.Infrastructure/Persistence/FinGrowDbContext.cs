@@ -57,6 +57,10 @@ public sealed class FinGrowDbContext : DbContext, IUnitOfWork
 
     public DbSet<CourseRating> CourseRatings => Set<CourseRating>();
 
+    public DbSet<Notification> Notifications => Set<Notification>();
+
+    public DbSet<NotificationChannelSetting> NotificationChannelSettings => Set<NotificationChannelSetting>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());

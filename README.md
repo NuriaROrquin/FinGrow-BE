@@ -297,6 +297,56 @@ La respuesta es la corrida registrada; si `status` es `Failed`, `error` dice por
 la API tiene el detalle completo. `GET /api/jobs` sirve para verificar de un vistazo que cada
 cron esté corriendo: muestra la última corrida de cada trabajo.
 
+### Alertas y notificaciones
+
+Las alertas salen de un único motor (`Notifier`, en `Application/Features/Notifications`) que
+comparten presupuestos, metas, integraciones y el panel de empresa. Cada alerta pasa por tres
+pasos, siempre en este orden:
+
+1. **Deduplicación.** Toda alerta declara un criterio (`deduplication_key`, por ejemplo
+   `transactions-to-review:MercadoPago`) y una ventana. Si al mismo destinatario ya se le avisó
+   el mismo tipo con el mismo criterio dentro de la ventana, no se vuelve a avisar.
+2. **Persistencia.** La notificación queda en la tabla `notifications`, que es la bandeja de la
+   app y el historial de todo lo que se avisó. Por eso la bandeja no se puede apagar.
+3. **Entrega.** Se manda además por cada canal externo que el empleado no haya desactivado. Hoy
+   el único es Telegram, y solo si el empleado tiene el chat vinculado. Si un canal falla, se
+   loguea y la notificación queda igual en la bandeja.
+
+El destinatario puede ser un empleado o la empresa (`recipient_type`), así que la misma bandeja
+sirve para las alertas de bienestar del panel de empresa. Los canales externos son solo para
+empleados.
+
+Lo que dispara una alerta es un **evento de dominio**: un agregado lo levanta (`Raise`) cuando
+pasa algo, y recién cuando `SaveChanges` confirma el cambio se publica por MediatR, cada evento
+en un scope propio. Si una reacción falla, se loguea y no rompe la operación que la originó,
+porque esa ya quedó guardada. La primera alerta es `TransactionsToReview`: cuando Mercado Pago o
+Gmail traen movimientos pendientes, el empleado recibe un aviso para revisarlos, como máximo uno
+cada 12 horas por origen (un sync de 30 movimientos genera una sola alerta). Lo que carga el
+empleado a mano, por foto o por chat no avisa: ya está mirando la app.
+
+| Método y ruta | Quién | Qué hace |
+|---|---|---|
+| `GET /api/notifications?unreadOnly=false&pageNumber=1&pageSize=20` | Empleado y empresa | La bandeja del usuario logueado, la más reciente primero (`pageSize` entre 1 y 100) |
+| `GET /api/notifications/unread-count` | Empleado y empresa | Cuántas no leídas tiene, para el contador de la campanita |
+| `POST /api/notifications/{id}/read` | Empleado y empresa | Marca una como leída. `404` si no es del usuario |
+| `POST /api/notifications/read-all` | Empleado y empresa | Marca todas como leídas y devuelve cuántas marcó |
+| `GET /api/notifications/channels` | Empleado | Cada canal con `isEnabled`, `isConfigurable` y `isConnected` (Telegram vinculado) |
+| `PUT /api/notifications/channels/{canal}` | Empleado | Activa o desactiva un canal externo: `{ "isEnabled": false }`. `400` para `InApp` |
+
+Un canal sin preferencia guardada está activo: quien vincula Telegram empieza a recibir alertas
+por ahí hasta que lo apague.
+
+Para sumar una alerta nueva: un tipo en `NotificationType`, el evento de dominio que la dispara
+(levantado por el agregado con `Raise`) y una clase `internal` bajo
+`Application/Features/Notifications/Alerts/` que implementa
+`INotificationHandler<DomainEventEnvelope<TuEvento>>` y llama a `Notifier.NotifyAsync` con el
+criterio y la ventana de deduplicación. Una alerta que depende del paso del tiempo (una meta sin
+aportes) se evalúa desde un trabajo programado y usa el mismo `Notifier`.
+
+Pendiente fuera de T-07: WhatsApp no es canal todavía (Twilio exige plantillas aprobadas para
+escribirle a alguien fuera de la ventana de 24 horas), no hay mail, no se reintenta una entrega
+fallida y no hay política de retención para `notifications`.
+
 ---
 
 ## Arquitectura
