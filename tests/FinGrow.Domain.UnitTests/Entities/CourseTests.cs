@@ -120,6 +120,81 @@ public class CourseTests
         course.RelatedInvestmentType.ShouldBe(InvestmentType.Etf);
     }
 
+    [Fact]
+    public void Without_completed_lessons_the_course_is_not_started_and_resumes_at_the_first_lesson()
+    {
+        var course = CreateCourseWithLessons(3);
+        var completed = new HashSet<Guid>();
+
+        var progress = course.ProgressFor(completed);
+
+        progress.CompletedLessons.ShouldBe(0);
+        progress.LessonCount.ShouldBe(3);
+        progress.Percentage.ShouldBe(0);
+        progress.Status.ShouldBe(CourseProgressStatus.NotStarted);
+        course.ResumeLessonFor(completed).ShouldNotBeNull().Position.ShouldBe(1);
+    }
+
+    [Fact]
+    public void A_started_course_resumes_at_the_first_lesson_not_yet_completed()
+    {
+        var course = CreateCourseWithLessons(3);
+        var lessons = course.Lessons.ToList();
+        var completed = new HashSet<Guid> { lessons[0].Id, lessons[2].Id };
+
+        var progress = course.ProgressFor(completed);
+
+        progress.CompletedLessons.ShouldBe(2);
+        progress.Percentage.ShouldBe(66);
+        progress.Status.ShouldBe(CourseProgressStatus.InProgress);
+        course.ResumeLessonFor(completed).ShouldNotBeNull().Position.ShouldBe(2);
+    }
+
+    [Fact]
+    public void A_completed_course_resumes_at_the_first_lesson_to_review_it()
+    {
+        var course = CreateCourseWithLessons(2);
+        var completed = course.Lessons.Select(lesson => lesson.Id).ToHashSet();
+
+        var progress = course.ProgressFor(completed);
+
+        progress.Percentage.ShouldBe(100);
+        progress.Status.ShouldBe(CourseProgressStatus.Completed);
+        progress.IsCompleted.ShouldBeTrue();
+        course.ResumeLessonFor(completed).ShouldNotBeNull().Position.ShouldBe(1);
+    }
+
+    [Fact]
+    public void Completions_of_other_courses_do_not_count()
+    {
+        var course = CreateCourseWithLessons(2);
+        var completed = new HashSet<Guid> { Guid.CreateVersion7() };
+
+        course.ProgressFor(completed).CompletedLessons.ShouldBe(0);
+    }
+
+    [Fact]
+    public void A_lesson_is_found_only_within_its_course()
+    {
+        var course = CreateCourseWithLessons(2);
+        var lesson = course.Lessons.Last();
+
+        course.FindLesson(lesson.Id).ShouldBe(lesson);
+        course.FindLesson(Guid.CreateVersion7()).ShouldBeNull();
+    }
+
+    private static Course CreateCourseWithLessons(int lessonCount)
+    {
+        var course = CreateCourse();
+
+        for (var position = 1; position <= lessonCount; position++)
+        {
+            course.AddLesson($"Lección {position}", 10, VideoUrl, Now);
+        }
+
+        return course;
+    }
+
     private static Course CreateCourse() =>
         Course.Create(
             "fundamentos-finanzas-personales",
