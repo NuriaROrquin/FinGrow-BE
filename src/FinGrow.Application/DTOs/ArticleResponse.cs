@@ -3,7 +3,6 @@ namespace FinGrow.Application.DTOs;
 using Domain.Entities;
 using Domain.Enums;
 
-/// <summary>Un articulo abierto para leer. <see cref="Content"/> es Markdown.</summary>
 public sealed record ArticleResponse(
     Guid Id,
     string Slug,

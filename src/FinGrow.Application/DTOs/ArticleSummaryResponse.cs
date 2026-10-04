@@ -3,7 +3,6 @@ namespace FinGrow.Application.DTOs;
 using Domain.Entities;
 using Domain.Enums;
 
-/// <summary>Un articulo en el listado del catalogo: sin el cuerpo, que solo viaja al abrirlo.</summary>
 public sealed record ArticleSummaryResponse(
     Guid Id,
     string Slug,
