@@ -15,6 +15,7 @@ using FinGrow.Infrastructure.Integrations.Twilio;
 using FinGrow.Infrastructure.Persistence;
 using FinGrow.Infrastructure.Persistence.Protection;
 using FinGrow.Infrastructure.Persistence.Repositories;
+using FinGrow.Infrastructure.Persistence.Seeding;
 using FinGrow.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -89,6 +90,7 @@ public static class DependencyInjection
         services.AddScoped<IBudgetSpendingReadRepository, BudgetSpendingReadRepository>();
 
         services.AddScoped<DatabaseSeeder>();
+        services.AddScoped<EducationCatalogSeeder>();
 
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
         services.AddScoped<IEmployeeIntegrationRepository, EmployeeIntegrationRepository>();

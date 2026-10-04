@@ -77,7 +77,8 @@ variables de entorno usando `__` como separador de sección.
 | Clave | Variable de entorno | Descripción |
 |---|---|---|
 | `ConnectionStrings:Database` | `ConnectionStrings__Database` | Cadena de conexión a PostgreSQL |
-| `Database:MigrateOnStartup` | `Database__MigrateOnStartup` | Aplica las migraciones pendientes al arrancar (default `true`). Poner en `false` si las migraciones se corren desde un paso de deploy separado |
+| `Database:MigrateOnStartup` | `Database__MigrateOnStartup` | Aplica las migraciones pendientes y carga el catálogo educativo al arrancar (default `true`). Poner en `false` si las migraciones se corren desde un paso de deploy separado: en ese caso el catálogo tampoco se carga |
+| `Database:SeedOnStartup` | `Database__SeedOnStartup` | Carga la empresa de demo con sus departamentos y empleados (default `false`). Solo para entornos de prueba: los empleados de demo comparten una contraseña conocida |
 | `AiService:BaseUrl` | `AiService__BaseUrl` | URL base de FinGrow-AI |
 | `AiService:ApiKey` | `AiService__ApiKey` | Secreto compartido con FinGrow-AI; viaja en el header `X-API-Key` y tiene que ser el mismo valor que `API_KEY` en ese servicio |
 | `AiService:TimeoutSeconds` | `AiService__TimeoutSeconds` | Timeout de las llamadas a IA (default 30) |
@@ -316,6 +317,9 @@ Siete entidades y tres value objects. El esquema se crea con la migración `Init
 | `job_runs` | JobRun | Registro de cada corrida de un trabajo programado: inicio, fin, resultado y error |
 | `company_metrics_snapshots` | CompanyMetricsSnapshot | Foto mensual de métricas agregadas de una empresa: empleados activos, cuántos participaron, movimientos confirmados, presupuestos, metas e integraciones |
 | `department_metrics_snapshots` | DepartmentMetricsSnapshot | La misma foto, por departamento |
+| `courses` | Course | Cursos del catálogo de educación financiera: nivel, categoría y tipo de activo relacionado; la duración se deriva de las lecciones |
+| `lessons` | (parte de Course) | Lecciones de un curso, ordenadas por `position`, con su duración y el video |
+| `articles` | Article | Artículos del catálogo: resumen, cuerpo en Markdown, categoría y tiempo de lectura |
 
 Decisiones que conviene conocer antes de tocar el modelo:
 
@@ -332,6 +336,10 @@ Decisiones que conviene conocer antes de tocar el modelo:
 - **Las reglas críticas están además en la base.** Un gasto con categoría de ingreso, un importe
   cero o una meta con objetivo y progreso en monedas distintas los rechaza un `CHECK`, no solo el
   código C#.
+- **El catálogo educativo es contenido de la plataforma, no de una empresa.** Lo carga
+  `EducationCatalogSeeder` después de migrar, desde `EducationCatalog`. La carga es idempotente
+  por `slug`: suma lo que falta y no pisa lo que ya existe, así que corregir un curso ya cargado
+  se hace en la base o con una migración, y cambiar un slug lo carga como contenido nuevo.
 - **Nombres en snake_case.** Se aplican de una sola vez en `OnModelCreating`
   (`SnakeCaseNamingExtensions`), para poder consultar en psql sin comillas dobles.
 
