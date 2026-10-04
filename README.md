@@ -140,23 +140,33 @@ actualización) que la pantalla de Inversiones usa para mostrar el portafolio en
 Si DolarApi no responde o devuelve algo que no se puede leer, el endpoint contesta `503` y el
 frontend muestra cada moneda por separado; una respuesta fallida nunca queda guardada en la caché.
 
-Las inversiones cargadas a mano con símbolo y cantidad se cotizan con los datos públicos del sitio
-de BYMA, con liquidación a 24 hs. Se pueden cotizar las acciones, los CEDEAR, los ETF, los bonos, las
-obligaciones negociables y las letras del Tesoro (LECAP y BONCAP, del panel `lebacs`); los fondos
-comunes, las criptomonedas, los plazos fijos, las cauciones y las cuentas remuneradas no cotizan en
-BYMA y quedan valuados al costo. El símbolo tiene que ser la variante de la moneda de la inversión
-(AL30 en pesos, AL30D en dólares) y los bonos, las ONs y las letras cotizan cada 100 nominales.
-Esos datos no son la API contratada de BYMA ni tienen garantía de servicio: antes de producción con
-empleados reales se reemplazan por la API EOD de BYMA (contrato con marketdata@byma.com.ar),
-implementando otro `IMarketPriceProvider`.
+Las inversiones cargadas con símbolo y cantidad se cotizan con tres fuentes públicas, una por
+mercado: los datos del sitio de BYMA para lo que cotiza en bolsa (acciones, CEDEAR, ETF, bonos,
+obligaciones negociables y letras del Tesoro), [ArgentinaDatos](https://argentinadatos.com) para
+los fondos comunes y [CoinGecko](https://www.coingecko.com) para las criptomonedas. Los plazos
+fijos, las cauciones y las cuentas remuneradas no tienen fuente y quedan valuados al costo. En
+BYMA el símbolo tiene que ser la variante de la moneda de la inversión (AL30 en pesos, AL30D en
+dólares) y los bonos, las ONs y las letras cotizan cada 100 nominales. Los datos de BYMA no son su
+API contratada ni tienen garantía de servicio: antes de producción con empleados reales se
+reemplazan por la API EOD de BYMA (contrato con marketdata@byma.com.ar), implementando otro
+`IMarketPriceProvider`.
 
-`GET /api/security-prices/{symbol}?currency=ARS` cotiza un símbolo mientras se carga el formulario
-de inversiones: devuelve el precio por unidad (por nominal en bonos, ONs y letras), la fecha del precio y
-la fuente. Primero busca en los paneles de BYMA, que la API reutiliza `Byma:CacheMinutes`; si BYMA
-no tiene precio para ese símbolo (los fines de semana y feriados el feed público viene todo en 0) o
-no responde en 10 segundos, usa el último cierre que guardó `investment-quotes` en `security_prices`
-con su fecha. Sin precio en ninguno de los dos contesta `404` si BYMA respondió y `503` si no.
-Solo acepta `ARS` y `USD`, las monedas en las que cotiza BYMA.
+`GET /api/security-prices?symbol=AL30&currency=ARS&type=Bond` cotiza un símbolo mientras se carga
+el formulario de inversiones: devuelve el precio por unidad (por nominal en bonos, ONs y letras; por
+cuotaparte en fondos), el nombre si la fuente lo publica, la fecha del precio y la fuente. El
+`type` elige el mercado, así que un mismo símbolo en dos mercados (COIN como CEDEAR y como cripto)
+no se confunde. Primero busca en la fuente del mercado, que la API reutiliza unos minutos; si no
+tiene precio para ese símbolo (los fines de semana y feriados el feed público de BYMA viene todo en
+0) o no responde en 10 segundos, usa el último precio que guardó `investment-quotes` en
+`security_prices` con su fecha. Sin precio en ninguno de los dos contesta `404` si la fuente
+respondió y `503` si no. BYMA y CoinGecko se cotizan en `ARS` o `USD`; un fondo, en la moneda de
+la inversión.
+
+`GET /api/security-prices/search?type=MutualFund&query=balanz` busca hasta 20 símbolos o nombres
+del mercado que contengan el texto, sin distinguir mayúsculas ni tildes, primero los que empiezan
+con él. Es lo que usa el formulario para elegir un fondo, porque un fondo se identifica por su
+nombre completo tal como lo publica ArgentinaDatos ("1810 Ahorro", "Balanz Capital Money Market -
+Clase A"), no por un símbolo.
 
 ### Fuente de cotización de cada instrumento
 
@@ -168,25 +178,33 @@ Solo acepta `ARS` y `USD`, las monedas en las que cotiza BYMA.
 | Bono | `Bond` | BYMA, datos públicos | Panel `public-bonds` | Nominal (BYMA cotiza cada 100) |
 | Obligación negociable | `CorporateBond` | BYMA, datos públicos | Panel `negociable-obligations` | Nominal (BYMA cotiza cada 100) |
 | Letra del Tesoro | `TreasuryBill` | BYMA, datos públicos | Panel `lebacs` (LECAP y BONCAP) | Nominal (BYMA cotiza cada 100) |
-| Fondo común | `MutualFund` | Ninguna | Se valúa al costo | — |
+| Fondo común | `MutualFund` | ArgentinaDatos | `GET v1/finanzas/fci/{categoria}/ultimo` de `mercadoDinero`, `rentaFija`, `rentaMixta`, `rentaVariable` y `retornoTotal` | Cuotaparte (ArgentinaDatos publica el valor de 1000) |
+| Criptomoneda | `Crypto` | CoinGecko | `GET coins/markets` en `usd` y `ars`, las 250 de mayor capitalización | Unidad |
 | Plazo fijo | `FixedTermDeposit` | Ninguna | Se valúa al costo | — |
 | Caución | `Repo` | Ninguna | Se valúa al costo; BYMA publica una tasa, no un precio | — |
 | Cuenta remunerada | `RemuneratedAccount` | Ninguna | Se valúa al costo | — |
-| Criptomoneda | `Crypto` | Ninguna | Se valúa al costo | — |
 | Dólar MEP | — | [DolarApi](https://dolarapi.com) | `GET v1/dolares/bolsa`; convierte el portafolio a una sola moneda, no valúa inversiones | Dólar |
 
-- **Todo lo de BYMA sale de la misma descarga.** `BymaMarketPriceProvider` baja todos los paneles
-  con `POST {Byma:BaseUrl}{panel}` y liquidación a 24 hs, y el precio se busca por símbolo y
-  moneda, no por tipo: el tipo de activo solo decide si la inversión acepta símbolo. La moneda
-  elige la variante: AL30 en pesos, AL30D en dólares; las variantes en dólar cable (AL30C) se
-  descartan.
+- **Un proveedor por mercado.** Cada fuente implementa `IMarketPriceProvider` y declara su
+  `PriceMarket` (`Exchange`, `MutualFund` o `Crypto`); el tipo de activo de la inversión elige el
+  mercado (`InvestmentType.QuotedOn()`) y dentro del mercado el precio se busca por símbolo y
+  moneda. Cada proveedor baja todo de una vez y lo reutiliza en memoria (`CacheMinutes`).
+- **BYMA.** `POST {Byma:BaseUrl}{panel}` con liquidación a 24 hs. La moneda elige la variante:
+  AL30 en pesos, AL30D en dólares; las variantes en dólar cable (AL30C) se descartan.
+- **ArgentinaDatos.** No informa la moneda de cada fondo: un fondo se busca por nombre en
+  cualquier moneda y se valúa en la de la inversión. La moneda que devuelve la API se deduce del
+  nombre ("Dólares", "USD", salvo "Dólar Linked", que es en pesos) y el formulario la usa para
+  avisar si no coincide. Se descartan los fondos cuya última cuotaparte tiene más de
+  `ArgentinaDatos:StaleAfterDays` días que la más nueva: son fondos que ya no existen.
+- **CoinGecko.** Sin clave permite pocos pedidos por minuto y corta con `429`; cada descarga hace
+  dos (dólares y pesos) y se reutiliza `CoinGecko:CacheMinutes`. Con una clave demo gratuita en
+  `CoinGecko:ApiKey` el límite sube a 30 por minuto. Si un símbolo se repite, queda el de mayor
+  capitalización; los que no son letras y números se descartan.
 - **Quién la usa.** `investment-quotes` valúa una vez por día hábil las inversiones con símbolo y
-  guarda el último cierre en `security_prices`; `GET /api/security-prices/{symbol}` cotiza mientras
-  se carga el formulario y, si BYMA viene en 0 o no responde, usa ese último cierre.
-- **Lo que no tiene fuente** queda con el valor que cargó el empleado. Para los fondos comunes y
-  las criptomonedas ya hay fuentes públicas probadas (ArgentinaDatos publica la cuotaparte diaria
-  de cada fondo por nombre; CoinGecko y CriptoYa, el precio de cada cripto en pesos y dólares),
-  pero todavía no están integradas. Las cuentas vinculadas a IOL se cotizan aparte con T-19.
+  guarda el último precio en `security_prices`; si una fuente no responde, cotiza con las otras y
+  la corrida queda fallida con el motivo. `GET /api/security-prices` cotiza mientras se carga el
+  formulario y, si la fuente no tiene precio o no responde, usa ese último precio. Las cuentas
+  vinculadas a IOL se cotizan aparte con T-19.
 
 ### WhatsApp (Twilio)
 
@@ -249,7 +267,7 @@ siguiente.
 |---|---|---|
 | `metrics-snapshot` | `0 4 1 * *` (el 1 de cada mes, 01:00 de Argentina) | Genera las fotos mensuales de métricas por empresa y por departamento (`company_metrics_snapshots` y `department_metrics_snapshots`) del último mes cerrado, y completa las de los meses anteriores que falten desde el alta de cada empresa. Es idempotente: correrlo de nuevo actualiza la foto del último mes cerrado en lugar de duplicarla |
 | `mercadopago-sync` | `0 * * * *` (cada hora) | Recorre las cuentas de Mercado Pago vinculadas y trae los movimientos nuevos como pendientes de revisión. Mercado Pago no avisa por webhook lo que un usuario paga, por eso se consulta |
-| `investment-quotes` | `30 21 * * 1-5` (días hábiles, 18:30 de Argentina) | Guarda en `security_prices` el último cierre de cada símbolo y moneda que trae BYMA (aunque nadie tenga inversiones con símbolo) y cotiza con esos precios las inversiones cargadas con símbolo y cantidad, registrándoles la valuación de mercado del día. Correrlo de nuevo el mismo día actualiza esa valuación en lugar de duplicarla. Si BYMA no responde, la corrida queda fallida y no toca ni los precios guardados ni ninguna inversión |
+| `investment-quotes` | `30 21 * * 1-5` (días hábiles, 18:30 de Argentina) | Guarda en `security_prices` el último precio de cada símbolo de BYMA, cada fondo de ArgentinaDatos y cada cripto de CoinGecko (aunque nadie tenga inversiones con símbolo) y cotiza con esos precios las inversiones cargadas con símbolo y cantidad, registrándoles la valuación de mercado del día. Correrlo de nuevo el mismo día actualiza esa valuación en lugar de duplicarla. Si una fuente no responde, cotiza con las otras y la corrida queda fallida con el motivo; si no responde ninguna, no toca nada |
 
 Los endpoints viven bajo `/api/jobs` y se protegen con la cabecera `X-Jobs-Key`, que tiene que
 coincidir con `Jobs:ApiKey`. No usan JWT: los llama un cron, no una persona logueada.
