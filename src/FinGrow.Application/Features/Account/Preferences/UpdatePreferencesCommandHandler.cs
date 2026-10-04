@@ -1,21 +1,21 @@
-namespace FinGrow.Application.Features.Account.Profile;
+namespace FinGrow.Application.Features.Account.Preferences;
 
 using FinGrow.Application.Common;
 using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Repositories;
 using MediatR;
 
-internal sealed class UpdateProfileCommandHandler : IRequestHandler<UpdateProfileCommand, Result>
+internal sealed class UpdatePreferencesCommandHandler : IRequestHandler<UpdatePreferencesCommand, Result>
 {
     private static readonly Error NoAutenticado =
-        Error.Unauthorized("Account.NoAutenticado", "Hay que iniciar sesión para editar tu perfil.");
+        Error.Unauthorized("Account.NoAutenticado", "Hay que iniciar sesión para guardar tus preferencias.");
 
     private readonly ICurrentUser _currentUser;
     private readonly IEmployeeRepository _employees;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _clock;
 
-    public UpdateProfileCommandHandler(
+    public UpdatePreferencesCommandHandler(
         ICurrentUser currentUser,
         IEmployeeRepository employees,
         IUnitOfWork unitOfWork,
@@ -27,7 +27,7 @@ internal sealed class UpdateProfileCommandHandler : IRequestHandler<UpdateProfil
         _clock = clock;
     }
 
-    public async Task<Result> Handle(UpdateProfileCommand request, CancellationToken cancellationToken)
+    public async Task<Result> Handle(UpdatePreferencesCommand request, CancellationToken cancellationToken)
     {
         if (_currentUser.UserId is not { } employeeId)
         {
@@ -41,7 +41,12 @@ internal sealed class UpdateProfileCommandHandler : IRequestHandler<UpdateProfil
             return Result.Failure(NoAutenticado);
         }
 
-        employee.UpdateProfile(request.FullName, request.PhoneNumber, _clock.UtcNow);
+        employee.UpdatePreferences(
+            request.Theme,
+            request.Language,
+            request.Currency,
+            request.DateFormat,
+            _clock.UtcNow);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
