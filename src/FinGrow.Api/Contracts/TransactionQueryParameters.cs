@@ -26,7 +26,7 @@ public sealed class TransactionQueryParameters
     public IncomeCategory? IncomeCategory { get; init; }
 
     [FromQuery]
-    public TransactionStatus? Status { get; init; }
+    public TransactionStatus[]? Status { get; init; }
 
     [FromQuery]
     public PaymentMethod? PaymentMethod { get; init; }

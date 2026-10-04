@@ -89,8 +89,8 @@ dependencias sin tocar `Program.cs` ni `AddApplication()`.
   invocar al handler.
 - **El mapeo a HTTP vive en Api, no en Application**, para no acoplar Application a ASP.NET
   Core. `ResultExtensions.ToActionResult()` (`Api/Extensions/`) traduce `Error.Type` a status
-  code: `Validation`→400, `NotFound`→404, `Conflict`→409, `Forbidden`→403, cualquier otro
-  (`Failure`)→500. Un controller nuevo solo necesita
+  code: `Validation`→400, `NotFound`→404, `Conflict`→409, `Forbidden`→403, `Unavailable`→503
+  (un servicio externo que no responde, como DolarApi), cualquier otro (`Failure`)→500. Un controller nuevo solo necesita
   `return (await sender.Send(command, ct)).ToActionResult();`.
 - Esto es distinto de `ExceptionHandlingMiddleware`: ese middleware sigue cubriendo únicamente
   lo inesperado (excepciones no manejadas); `Result.Failure` es el camino para fallos de negocio
@@ -117,6 +117,33 @@ WhatsApp responde inline con `TwiMlResult`; Telegram responde `200` y manda el t
 Telegram reintenta cualquier respuesta que no sea 2xx y un código ya canjeado se rechazaría en
 el reintento. Una cuenta que no está en `employee_integrations` solo puede mandar su código de
 vinculación.
+
+## Trabajos programados
+
+No hay scheduler dentro del proceso. Los trabajos implementan `IScheduledJob`
+(`Application/Jobs/`), se registran en `AddApplication()` y los dispara desde afuera el cron de
+Dokploy llamando a `POST /api/jobs/{nombre}/run` con la cabecera `X-Jobs-Key`
+(`ValidateJobsKeyAttribute`, `Api/Jobs/`; la clave es `Jobs:ApiKey` y sin ella la API no
+arranca). `JobRunner` persiste cada corrida en `job_runs`, ejecuta el trabajo en un scope de DI
+propio (DbContext aparte, así lo que un trabajo dejó a medias no se guarda junto con el registro
+de la corrida) y no deja escapar excepciones: quedan como corrida fallida con el error y la
+siguiente corre igual. Un mismo trabajo no corre dos veces a la vez (`RunningJobs` responde
+`Conflict`). El detalle operativo (crons, comando de Dokploy) está en el README.
+
+- **Un trabajo nuevo** es una clase `internal` bajo `Application/Features/<Feature>/` que
+  implementa `IScheduledJob`, más una línea en `AddApplication()` y su schedule en Dokploy.
+  `Name` va en kebab-case y tiene que ser único; `Schedule` es el cron sugerido en UTC que se
+  copia a Dokploy: acá es documentación, no lo ejecuta nadie.
+- **Devolvé `JobResult`, no excepciones, para los desenlaces esperables.**
+  `JobResult.Failure(error, resumen)` es para cuando parte de la corrida no salió aunque el
+  resto sí (`mercadopago-sync` lo hace por cuenta).
+- **Lo que recorre muchos empleados abre un scope por unidad** (`IServiceScopeFactory`), como
+  `MercadoPagoSyncJob`: si a uno le falla `SaveChanges`, el DbContext queda con cambios rotos y
+  arrastraría a los que siguen.
+- **`metrics-snapshot` es idempotente y se autocompleta**: siempre rehace la foto del último mes
+  cerrado (por si se confirmaron movimientos tarde) y genera las de los meses anteriores que
+  falten desde el alta de la empresa. Las fotos guardan conteos, no porcentajes: la tasa de
+  participación se deriva (`PeriodMetrics.ParticipationRate`), fiel a "un total no se persiste".
 
 ## Convenciones
 

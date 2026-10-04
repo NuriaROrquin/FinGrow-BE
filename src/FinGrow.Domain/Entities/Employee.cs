@@ -5,10 +5,6 @@ using FinGrow.Domain.Enums;
 using FinGrow.Domain.Errors;
 using FinGrow.Domain.ValueObjects;
 
-/// <summary>
-/// La persona que usa la app. Es raiz de agregado porque tiene ciclo de vida propio
-/// (credenciales, preferencias, baja logica) aunque pertenezca a una empresa.
-/// </summary>
 public sealed class Employee : AggregateRoot
 {
     public const int MaxFullNameLength = 200;
@@ -70,6 +66,12 @@ public sealed class Employee : AggregateRoot
 
     public DateTimeOffset? LastLoginAt { get; private set; }
 
+    public string? TwoFactorSecret { get; private set; }
+
+    public DateTimeOffset? TwoFactorEnabledAt { get; private set; }
+
+    public bool IsTwoFactorEnabled => TwoFactorEnabledAt is not null;
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -127,6 +129,38 @@ public sealed class Employee : AggregateRoot
     {
         PasswordHash = EnsureHash(passwordHash);
         UpdatedAt = updatedAt;
+    }
+
+    public void StartTwoFactorEnrollment(string secret, DateTimeOffset updatedAt)
+    {
+        if (IsTwoFactorEnabled)
+        {
+            throw new DomainException("El doble factor ya esta activo.");
+        }
+
+        if (string.IsNullOrWhiteSpace(secret))
+        {
+            throw new DomainException("El secreto del doble factor es obligatorio.");
+        }
+
+        TwoFactorSecret = secret;
+        UpdatedAt = updatedAt;
+    }
+
+    public void EnableTwoFactor(DateTimeOffset enabledAt)
+    {
+        if (IsTwoFactorEnabled)
+        {
+            throw new DomainException("El doble factor ya esta activo.");
+        }
+
+        if (TwoFactorSecret is null)
+        {
+            throw new DomainException("No se puede activar el doble factor sin haber iniciado el alta.");
+        }
+
+        TwoFactorEnabledAt = enabledAt;
+        UpdatedAt = enabledAt;
     }
 
     public void RegisterLogin(DateTimeOffset loggedInAt)
