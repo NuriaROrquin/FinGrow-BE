@@ -1,7 +1,6 @@
 namespace FinGrow.Api.Extensions;
 
 using FinGrow.Infrastructure.Persistence;
-using FinGrow.Infrastructure.Persistence.Seeding;
 
 public static partial class SeedExtensions
 {
@@ -16,8 +15,8 @@ public static partial class SeedExtensions
         }
 
         using var scope = app.Services.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<DatabaseSeeder>().SeedAsync();
-        await scope.ServiceProvider.GetRequiredService<EducationCatalogSeeder>().SeedAsync();
+        var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
+        await seeder.SeedAsync();
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Seed al arrancar deshabilitado ({Key}=false).")]

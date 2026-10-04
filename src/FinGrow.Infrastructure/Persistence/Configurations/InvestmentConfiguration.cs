@@ -9,7 +9,11 @@ internal sealed class InvestmentConfiguration : IEntityTypeConfiguration<Investm
     public void Configure(EntityTypeBuilder<Investment> builder)
     {
         builder.ToTable("investments", table =>
-            table.HasCheckConstraint("ck_investments_invested_positive", "invested_amount > 0"));
+        {
+            table.HasCheckConstraint("ck_investments_invested_positive", "invested_amount > 0");
+            table.HasCheckConstraint("ck_investments_symbol_with_quantity", "(symbol IS NULL) = (quantity IS NULL)");
+            table.HasCheckConstraint("ck_investments_quantity_positive", "quantity IS NULL OR quantity > 0");
+        });
 
         builder.HasKey(investment => investment.Id);
 
@@ -25,6 +29,12 @@ internal sealed class InvestmentConfiguration : IEntityTypeConfiguration<Investm
         builder.OwnsMoney(investment => investment.InvestedAmount, "invested_amount", "invested_currency");
 
         builder.Property(investment => investment.PurchasedOn).IsRequired();
+
+        builder.Property(investment => investment.Symbol)
+            .HasMaxLength(Investment.MaxSymbolLength);
+
+        builder.Property(investment => investment.Quantity)
+            .HasPrecision(20, 6);
         builder.Property(investment => investment.CreatedAt).IsRequired();
         builder.Property(investment => investment.UpdatedAt).IsRequired();
 
@@ -33,6 +43,7 @@ internal sealed class InvestmentConfiguration : IEntityTypeConfiguration<Investm
         builder.Ignore(investment => investment.ValuedOn);
         builder.Ignore(investment => investment.ReturnAmount);
         builder.Ignore(investment => investment.ReturnPercentage);
+        builder.Ignore(investment => investment.HasMarketValuation);
 
         builder.HasOne(investment => investment.Employee)
             .WithMany()

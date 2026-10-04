@@ -13,6 +13,54 @@ public class CreateInvestmentValidatorTests
 
     private readonly CreateInvestmentValidator _validator = new(new FakeDateTimeProvider(Now));
 
+    [Fact]
+    public void A_symbol_with_its_quantity_passes()
+    {
+        var result = _validator.Validate(ValidCommand() with { Symbol = "SPYD", Quantity = 10m });
+
+        result.IsValid.ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData("SPYD", null)]
+    [InlineData(null, 10.0)]
+    public void A_symbol_without_quantity_or_the_other_way_around_is_rejected(string? symbol, double? quantity)
+    {
+        var result = _validator.Validate(ValidCommand() with { Symbol = symbol, Quantity = (decimal?)quantity });
+
+        result.IsValid.ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData("SPY D")]
+    [InlineData("BRK.B")]
+    [InlineData("SIMBOLODEMASDEVEINTEAA")]
+    public void A_symbol_with_other_characters_or_too_long_is_rejected(string symbol)
+    {
+        var result = _validator.Validate(ValidCommand() with { Symbol = symbol, Quantity = 1m });
+
+        result.IsValid.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void A_quantity_that_is_not_positive_is_rejected()
+    {
+        var result = _validator.Validate(ValidCommand() with { Symbol = "SPYD", Quantity = 0m });
+
+        result.IsValid.ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData(InvestmentType.MutualFund)]
+    [InlineData(InvestmentType.Crypto)]
+    public void A_symbol_on_an_asset_that_does_not_trade_on_the_exchange_is_rejected(InvestmentType type)
+    {
+        var result = _validator.Validate(ValidCommand() with { Type = type, Symbol = "BTC", Quantity = 1m });
+
+        result.IsValid.ShouldBeFalse();
+        result.Errors.ShouldContain(error => error.ErrorMessage.Contains("acciones", StringComparison.Ordinal));
+    }
+
     private static CreateInvestmentCommand ValidCommand() => new(
         Guid.CreateVersion7(),
         AssetName: "S&P 500 ETF",

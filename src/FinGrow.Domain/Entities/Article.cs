@@ -4,10 +4,6 @@ using FinGrow.Domain.Common;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.Errors;
 
-/// <summary>
-/// Un articulo del catalogo de educacion financiera, pensado para leerse en un rato corto
-/// (HU-38). El cuerpo es Markdown: el frontend lo renderiza tal cual.
-/// </summary>
 public sealed class Article : AggregateRoot
 {
     public const int MaxTitleLength = 200;
@@ -53,10 +49,8 @@ public sealed class Article : AggregateRoot
 
     public int ReadingTimeMinutes { get; private set; }
 
-    /// <summary>Tipo de activo del que trata el articulo, si trata de uno (HU-35).</summary>
     public InvestmentType? RelatedInvestmentType { get; private set; }
 
-    /// <summary>Mientras es <c>null</c> el articulo es un borrador y no se muestra en el catalogo.</summary>
     public DateTimeOffset? PublishedAt { get; private set; }
 
     public DateTimeOffset CreatedAt { get; private set; }

@@ -30,7 +30,6 @@ internal sealed class LessonConfiguration : IEntityTypeConfiguration<Lesson>
             .HasMaxLength(Lesson.MaxVideoUrlLength)
             .IsRequired();
 
-        // Dos lecciones no pueden ocupar el mismo lugar del curso.
         builder.HasIndex(lesson => new { lesson.CourseId, lesson.Position }).IsUnique();
     }
 }

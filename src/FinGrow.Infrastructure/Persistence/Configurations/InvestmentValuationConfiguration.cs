@@ -12,6 +12,8 @@ internal sealed class InvestmentValuationConfiguration : IEntityTypeConfiguratio
 
         builder.HasKey(valuation => valuation.Id);
 
+        builder.Property(valuation => valuation.Id).ValueGeneratedNever();
+
         builder.OwnsMoney(valuation => valuation.Value, "value", "currency");
 
         builder.Property(valuation => valuation.ValuedOn).IsRequired();

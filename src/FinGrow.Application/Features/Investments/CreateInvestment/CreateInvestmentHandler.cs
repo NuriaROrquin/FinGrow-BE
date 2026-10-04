@@ -23,6 +23,8 @@ internal sealed class CreateInvestmentHandler(
             request.PurchasedOn,
             dateTimeProvider.UtcNow);
 
+        investment.Track(request.Symbol, request.Quantity, dateTimeProvider.UtcNow);
+
         investmentRepository.Add(investment);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 

@@ -4,17 +4,8 @@ using FinGrow.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
-/// <summary>
-/// Carga el catalogo de cursos y articulos (T-20), publicado y listo para HU-35 a HU-40.
-///
-/// Es idempotente por slug y no por "ya hay algo": inserta solo los cursos y articulos cuyo
-/// slug todavia no existe, asi agregar contenido nuevo a <see cref="EducationCatalog"/> y volver
-/// a correr la carga suma lo que falta sin duplicar ni pisar lo que ya estaba (ni lo que alguien
-/// haya editado a mano). Todo va en un unico SaveChanges, que es atomico.
-/// </summary>
 public sealed partial class EducationCatalogSeeder
 {
-    // Fecha fija, como en DatabaseSeeder, para que la carga sea reproducible.
     private static readonly DateTimeOffset SeedTimestamp = new(2025, 1, 2, 12, 0, 0, TimeSpan.Zero);
 
     private readonly FinGrowDbContext _dbContext;
@@ -37,15 +28,8 @@ public sealed partial class EducationCatalogSeeder
             .Select(article => article.Slug)
             .ToListAsync(cancellationToken);
 
-        var courses = EducationCatalog.Courses
-            .Where(seed => !existingCourses.Contains(seed.Slug))
-            .Select(ToCourse)
-            .ToList();
-
-        var articles = EducationCatalog.Articles
-            .Where(seed => !existingArticles.Contains(seed.Slug))
-            .Select(ToArticle)
-            .ToList();
+        var courses = MissingCourses(existingCourses);
+        var articles = MissingArticles(existingArticles);
 
         if (courses.Count == 0 && articles.Count == 0)
         {
@@ -61,6 +45,18 @@ public sealed partial class EducationCatalogSeeder
         var lessons = courses.Sum(course => course.Lessons.Count);
         LogSeeded(_logger, courses.Count, lessons, articles.Count);
     }
+
+    internal static List<Course> MissingCourses(IReadOnlyCollection<string> existingSlugs) =>
+        EducationCatalog.Courses
+            .Where(seed => !existingSlugs.Contains(seed.Slug))
+            .Select(ToCourse)
+            .ToList();
+
+    internal static List<Article> MissingArticles(IReadOnlyCollection<string> existingSlugs) =>
+        EducationCatalog.Articles
+            .Where(seed => !existingSlugs.Contains(seed.Slug))
+            .Select(ToArticle)
+            .ToList();
 
     internal static Course ToCourse(CourseSeed seed)
     {

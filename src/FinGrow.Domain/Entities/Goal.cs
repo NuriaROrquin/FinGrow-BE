@@ -109,6 +109,58 @@ public sealed class Goal : AggregateRoot
     /// </summary>
     public bool IsOverdue(DateOnly today) => Status == GoalStatus.Active && Deadline < today;
 
+    public int PlannedMonths => Math.Max(1, MonthNumber(Deadline) - MonthNumber(ArgentinaTime.DateOf(CreatedAt)) + 1);
+
+    public Money MonthlyCommitment => Money.From(TargetAmount.Amount / PlannedMonths, TargetAmount.Currency);
+
+    public bool IsCommittedIn(DateOnly anyDayOfMonth)
+    {
+        var month = MonthNumber(anyDayOfMonth);
+
+        if (Status == GoalStatus.Cancelled
+            || month < MonthNumber(ArgentinaTime.DateOf(CreatedAt))
+            || month > MonthNumber(Deadline))
+        {
+            return false;
+        }
+
+        return ReachedOn is not { } reachedOn || MonthNumber(reachedOn) >= month;
+    }
+
+    /// <summary>
+    /// Fecha del aporte con el que el acumulado llego al objetivo, recorriendo los aportes por su fecha.
+    /// Difiere de <see cref="AchievedAt"/> cuando el aporte se carga con fecha atrasada: AchievedAt es
+    /// cuando se registro, ReachedOn es cuando se ahorro. Null si la meta no esta alcanzada.
+    /// </summary>
+    public DateOnly? ReachedOn
+    {
+        get
+        {
+            if (Status != GoalStatus.Achieved)
+            {
+                return null;
+            }
+
+            var accumulated = Money.Zero(TargetAmount.Currency);
+
+            foreach (var contribution in _contributions
+                         .OrderBy(contribution => contribution.ContributedOn)
+                         .ThenBy(contribution => contribution.CreatedAt))
+            {
+                accumulated = accumulated.Add(contribution.Amount);
+
+                if (accumulated.IsAtLeast(TargetAmount))
+                {
+                    return contribution.ContributedOn;
+                }
+            }
+
+            return null;
+        }
+    }
+
+    private static int MonthNumber(DateOnly date) => (date.Year * 12) + date.Month - 1;
+
     /// <summary>Registra un aporte y marca la meta como alcanzada si con eso llega al objetivo.</summary>
     public GoalContribution AddContribution(
         Money amount,

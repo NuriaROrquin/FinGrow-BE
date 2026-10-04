@@ -65,6 +65,52 @@ public class EmployeeTests
         employee.LastLoginAt.ShouldBe(Now.AddHours(1));
     }
 
+    [Fact]
+    public void Two_factor_is_disabled_until_the_enrollment_is_confirmed()
+    {
+        var employee = CreateEmployee();
+
+        employee.StartTwoFactorEnrollment("SECRETBASE32", Now);
+
+        employee.TwoFactorSecret.ShouldBe("SECRETBASE32");
+        employee.IsTwoFactorEnabled.ShouldBeFalse();
+
+        employee.EnableTwoFactor(Now.AddMinutes(1));
+
+        employee.IsTwoFactorEnabled.ShouldBeTrue();
+        employee.TwoFactorEnabledAt.ShouldBe(Now.AddMinutes(1));
+    }
+
+    [Fact]
+    public void Two_factor_cannot_be_enabled_without_starting_the_enrollment()
+    {
+        var employee = CreateEmployee();
+
+        Should.Throw<DomainException>(() => employee.EnableTwoFactor(Now));
+    }
+
+    [Fact]
+    public void An_enabled_two_factor_cannot_be_enabled_or_reenrolled_again()
+    {
+        var employee = CreateEmployee();
+        employee.StartTwoFactorEnrollment("SECRETBASE32", Now);
+        employee.EnableTwoFactor(Now);
+
+        Should.Throw<DomainException>(() => employee.EnableTwoFactor(Now));
+        Should.Throw<DomainException>(() => employee.StartTwoFactorEnrollment("OTROSECRETO", Now));
+        employee.TwoFactorSecret.ShouldBe("SECRETBASE32");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void The_two_factor_secret_is_required(string secret)
+    {
+        var employee = CreateEmployee();
+
+        Should.Throw<DomainException>(() => employee.StartTwoFactorEnrollment(secret, Now));
+    }
+
     private static Employee CreateEmployee() => Employee.Create(
         CompanyId,
         departmentId: null,

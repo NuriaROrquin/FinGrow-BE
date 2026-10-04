@@ -14,6 +14,9 @@ public sealed record InvestmentResponse(
     decimal ReturnPercentage,
     DateOnly PurchasedOn,
     DateOnly ValuedOn,
+    bool HasMarketValuation,
+    string? Symbol,
+    decimal? Quantity,
     DateTimeOffset CreatedAt)
 {
     public static InvestmentResponse FromEntity(Investment investment) => new(
@@ -27,5 +30,8 @@ public sealed record InvestmentResponse(
         investment.ReturnPercentage,
         investment.PurchasedOn,
         investment.ValuedOn,
+        investment.HasMarketValuation,
+        investment.Symbol,
+        investment.Quantity,
         investment.CreatedAt);
 }

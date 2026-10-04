@@ -36,5 +36,7 @@ public sealed class UpdateInvestmentValidator : AbstractValidator<UpdateInvestme
             .WithMessage("La fecha de compra es obligatoria.")
             .Must(purchasedOn => purchasedOn <= dateTimeProvider.Today)
             .WithMessage("La fecha de compra no puede estar en el futuro.");
+
+        Include(new InvestmentTrackingValidator());
     }
 }

@@ -3,10 +3,6 @@ namespace FinGrow.Domain.Common;
 using System.Text.RegularExpressions;
 using FinGrow.Domain.Errors;
 
-/// <summary>
-/// Clave natural del contenido educativo (<c>fundamentos-finanzas-personales</c>). Es lo que
-/// permite que la carga del catalogo reconozca lo que ya existe y no lo duplique.
-/// </summary>
 public static partial class Slug
 {
     public const int MaxLength = 120;

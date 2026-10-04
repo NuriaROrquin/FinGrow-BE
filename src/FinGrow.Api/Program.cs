@@ -26,7 +26,8 @@ builder.Services.AddOptions<JobsOptions>()
     .ValidateOnStart();
 
 builder.Services.AddControllers()
-    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
+    .AddReadableInvalidRequestResponses();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 

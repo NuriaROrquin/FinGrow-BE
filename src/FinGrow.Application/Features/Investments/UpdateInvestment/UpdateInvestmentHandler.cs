@@ -29,6 +29,8 @@ internal sealed class UpdateInvestmentHandler(
             request.PurchasedOn,
             dateTimeProvider.UtcNow);
 
+        investment.Track(request.Symbol, request.Quantity, dateTimeProvider.UtcNow);
+
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(InvestmentResponse.FromEntity(investment));

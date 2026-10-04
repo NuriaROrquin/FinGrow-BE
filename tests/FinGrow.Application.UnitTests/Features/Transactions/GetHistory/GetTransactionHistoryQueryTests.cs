@@ -24,6 +24,17 @@ public sealed class GetTransactionHistoryQueryTests
     }
 
     [Fact]
+    public async Task Handler_uses_confirmed_status_by_default()
+    {
+        var repository = new FakeTransactionReadRepository();
+        var handler = CreateHandler(repository, Guid.NewGuid());
+
+        await handler.Handle(new GetTransactionHistoryQuery(new TransactionFilters()), CancellationToken.None);
+
+        repository.RequestedStatuses.ShouldBe(new[] { TransactionStatus.Confirmed });
+    }
+
+    [Fact]
     public async Task Handler_forwards_combined_category_and_date_filters()
     {
         var userId = Guid.Parse("11111111-1111-1111-1111-111111111111");
@@ -50,10 +61,11 @@ public sealed class GetTransactionHistoryQueryTests
         var handler = CreateHandler(repository, Guid.NewGuid());
 
         await handler.Handle(
-            new GetTransactionHistoryQuery(new TransactionFilters(Status: TransactionStatus.Confirmed)),
+            new GetTransactionHistoryQuery(new TransactionFilters(
+                Status: new[] { TransactionStatus.Confirmed, TransactionStatus.Eliminated })),
             CancellationToken.None);
 
-        repository.RequestedStatus.ShouldBe(TransactionStatus.Confirmed);
+        repository.RequestedStatuses.ShouldBe(new[] { TransactionStatus.Confirmed, TransactionStatus.Eliminated });
     }
 
     [Fact]
@@ -164,7 +176,7 @@ public sealed class GetTransactionHistoryQueryTests
 
         public bool WasCalled { get; private set; }
 
-        public TransactionStatus? RequestedStatus { get; private set; }
+        public IReadOnlyCollection<TransactionStatus> RequestedStatuses { get; private set; } = Array.Empty<TransactionStatus>();
 
         public ExpenseCategory? RequestedExpenseCategory { get; private set; }
 
@@ -175,6 +187,30 @@ public sealed class GetTransactionHistoryQueryTests
         public DateOnly? RequestedToDate { get; private set; }
 
         public PaymentMethod? RequestedPaymentMethod { get; private set; }
+
+        public Task<IReadOnlyList<MonthlyExpenseTotal>> GetMonthlyExpensesAsync(
+            Guid employeeId,
+            Currency currency,
+            DateOnly fromDate,
+            DateOnly toDate,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<MonthlyExpenseTotal>>(Array.Empty<MonthlyExpenseTotal>());
+
+        public Task<IReadOnlyList<MonthlyIncomeExpenseTotal>> GetMonthlyIncomeExpensesAsync(
+            Guid employeeId,
+            Currency currency,
+            DateOnly fromDate,
+            DateOnly toDate,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<MonthlyIncomeExpenseTotal>>(Array.Empty<MonthlyIncomeExpenseTotal>());
+
+        public Task<IReadOnlyList<CategoryExpenseTotal>> GetExpensesByCategoryAsync(
+            Guid employeeId,
+            Currency currency,
+            DateOnly fromDate,
+            DateOnly toDate,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<CategoryExpenseTotal>>(Array.Empty<CategoryExpenseTotal>());
 
         public Task<TransactionSummary> GetSummaryAsync(
             Guid employeeId,
@@ -196,7 +232,7 @@ public sealed class GetTransactionHistoryQueryTests
             int pageSize,
             string? search,
             TransactionType? type,
-            TransactionStatus? status,
+            IReadOnlyCollection<TransactionStatus> statuses,
             ExpenseCategory? expenseCategory,
             IncomeCategory? incomeCategory,
             PaymentMethod? paymentMethod,
@@ -206,7 +242,7 @@ public sealed class GetTransactionHistoryQueryTests
         {
             WasCalled = true;
             RequestedEmployeeId = employeeId;
-            RequestedStatus = status;
+            RequestedStatuses = statuses;
             RequestedExpenseCategory = expenseCategory;
             RequestedIncomeCategory = incomeCategory;
             RequestedFromDate = fromDate;
@@ -219,6 +255,19 @@ public sealed class GetTransactionHistoryQueryTests
                 pageSize,
                 _transactions.Count));
         }
+
+        public Task<IReadOnlyList<Transaction>> GetFilteredAsync(
+            Guid employeeId,
+            string? search,
+            TransactionType? type,
+            IReadOnlyCollection<TransactionStatus> statuses,
+            ExpenseCategory? expenseCategory,
+            IncomeCategory? incomeCategory,
+            PaymentMethod? paymentMethod,
+            DateOnly? fromDate,
+            DateOnly? toDate,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(_transactions);
     }
 }
 
@@ -260,6 +309,30 @@ public sealed class GetTransactionSummaryQueryTests
 
     private sealed class FakeTransactionReadRepository : ITransactionReadRepository
     {
+        public Task<IReadOnlyList<MonthlyExpenseTotal>> GetMonthlyExpensesAsync(
+            Guid employeeId,
+            Currency currency,
+            DateOnly fromDate,
+            DateOnly toDate,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<MonthlyExpenseTotal>>(Array.Empty<MonthlyExpenseTotal>());
+
+        public Task<IReadOnlyList<MonthlyIncomeExpenseTotal>> GetMonthlyIncomeExpensesAsync(
+            Guid employeeId,
+            Currency currency,
+            DateOnly fromDate,
+            DateOnly toDate,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<MonthlyIncomeExpenseTotal>>(Array.Empty<MonthlyIncomeExpenseTotal>());
+
+        public Task<IReadOnlyList<CategoryExpenseTotal>> GetExpensesByCategoryAsync(
+            Guid employeeId,
+            Currency currency,
+            DateOnly fromDate,
+            DateOnly toDate,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<CategoryExpenseTotal>>(Array.Empty<CategoryExpenseTotal>());
+
         public Task<TransactionSummary> GetSummaryAsync(
             Guid employeeId,
             DateOnly? fromDate = null,
@@ -280,7 +353,7 @@ public sealed class GetTransactionSummaryQueryTests
             int pageSize,
             string? search,
             TransactionType? type,
-            TransactionStatus? status,
+            IReadOnlyCollection<TransactionStatus> statuses,
             ExpenseCategory? expenseCategory,
             IncomeCategory? incomeCategory,
             PaymentMethod? paymentMethod,
@@ -288,6 +361,19 @@ public sealed class GetTransactionSummaryQueryTests
             DateOnly? toDate,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(new TransactionPage(Array.Empty<Transaction>(), pageNumber, pageSize, 0));
+
+        public Task<IReadOnlyList<Transaction>> GetFilteredAsync(
+            Guid employeeId,
+            string? search,
+            TransactionType? type,
+            IReadOnlyCollection<TransactionStatus> statuses,
+            ExpenseCategory? expenseCategory,
+            IncomeCategory? incomeCategory,
+            PaymentMethod? paymentMethod,
+            DateOnly? fromDate,
+            DateOnly? toDate,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Transaction>>(Array.Empty<Transaction>());
     }
 }
 
@@ -331,7 +417,7 @@ public sealed class GetTransactionHistoryQueryValidatorTests
     public async Task Validator_rejects_unknown_status()
     {
         var result = await _validator.ValidateAsync(
-            new GetTransactionHistoryQuery(new TransactionFilters(Status: (TransactionStatus)999)));
+            new GetTransactionHistoryQuery(new TransactionFilters(Status: new[] { (TransactionStatus)999 })));
 
         result.IsValid.ShouldBeFalse();
     }
