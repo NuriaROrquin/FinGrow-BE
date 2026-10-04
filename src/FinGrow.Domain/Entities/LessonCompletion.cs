@@ -2,10 +2,6 @@ namespace FinGrow.Domain.Entities;
 
 using FinGrow.Domain.Common;
 
-/// <summary>
-/// Que un empleado termino una leccion. Es lo que mide el progreso de cada curso (HU-36): el
-/// catalogo es de todos, el avance es de cada uno. Marcar una leccion como vista lo hace HU-37.
-/// </summary>
 public sealed class LessonCompletion : Entity
 {
     private LessonCompletion()

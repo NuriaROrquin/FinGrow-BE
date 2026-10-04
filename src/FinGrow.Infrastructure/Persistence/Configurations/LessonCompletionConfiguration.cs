@@ -26,7 +26,6 @@ internal sealed class LessonCompletionConfiguration : IEntityTypeConfiguration<L
             .HasForeignKey(completion => completion.LessonId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Una leccion se termina una sola vez; el indice tambien cubre el progreso por empleado.
         builder.HasIndex(completion => new { completion.EmployeeId, completion.LessonId }).IsUnique();
     }
 }

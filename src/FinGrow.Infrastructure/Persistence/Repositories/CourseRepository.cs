@@ -23,13 +23,11 @@ internal sealed class CourseRepository(FinGrowDbContext dbContext) : ICourseRepo
 
         if (maxDurationMinutes is not null)
         {
-            // La duracion no esta guardada (se deriva de las lecciones): se suma en la base.
             query = query.Where(course => course.Lessons.Sum(lesson => lesson.DurationMinutes) <= maxDurationMinutes);
         }
 
         var courses = await query.ToListAsync(cancellationToken);
 
-        // Level se guarda como texto, asi que ordenar en la base lo haria alfabeticamente.
         return courses
             .OrderBy(course => course.Level)
             .ThenBy(course => course.Title)

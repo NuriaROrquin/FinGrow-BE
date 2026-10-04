@@ -19,7 +19,6 @@ internal sealed class ListCoursesHandler(ICourseRepository courseRepository)
 
         var completedLessonIds = await courseRepository.ListCompletedLessonIdsAsync(request.EmployeeId, cancellationToken);
 
-        // El estado sale del avance, que no esta guardado: se filtra despues de calcularlo.
         var summaries = courses
             .Select(course => CourseSummaryResponse.FromEntity(course, completedLessonIds))
             .Where(summary => request.ProgressStatus is null || summary.ProgressStatus == request.ProgressStatus)

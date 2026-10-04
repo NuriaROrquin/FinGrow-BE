@@ -3,10 +3,6 @@ namespace FinGrow.Application.DTOs;
 using Domain.Entities;
 using Domain.Enums;
 
-/// <summary>
-/// Un curso en el catalogo, con el avance del empleado que lo consulta. Las lecciones no viajan:
-/// se piden al abrir el curso.
-/// </summary>
 public sealed record CourseSummaryResponse(
     Guid Id,
     string Slug,
@@ -26,7 +22,6 @@ public sealed record CourseSummaryResponse(
         var lessonCount = course.Lessons.Count;
         var completedLessons = course.Lessons.Count(lesson => completedLessonIds.Contains(lesson.Id));
 
-        // Se redondea para abajo: un curso no puede mostrar 100% si le falta una leccion.
         var progressPercentage = lessonCount == 0 ? 0 : completedLessons * 100 / lessonCount;
 
         var status = completedLessons == 0
