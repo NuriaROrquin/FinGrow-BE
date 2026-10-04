@@ -213,6 +213,8 @@ public static class DependencyInjection
 
     private static IServiceCollection AddByma(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddMemoryCache();
+
         services.AddOptions<BymaOptions>()
             .Bind(configuration.GetSection(BymaOptions.SectionName))
             .ValidateDataAnnotations()

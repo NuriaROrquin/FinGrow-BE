@@ -15,4 +15,7 @@ public sealed class BymaOptions
 
     [Range(1, 100)]
     public int MaxPagesPerPanel { get; init; } = 20;
+
+    [Range(0, 1440)]
+    public int CacheMinutes { get; init; } = 5;
 }

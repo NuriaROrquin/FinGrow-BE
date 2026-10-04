@@ -5,11 +5,13 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Enums;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 
 internal sealed class BymaMarketPriceProvider : IMarketPriceProvider
 {
     internal const string NextDaySettlementCode = "2";
+    private const string ClosingPricesCacheKey = "market-prices:byma";
 
     internal static readonly IReadOnlyList<BymaPanel> Panels = new[]
     {
@@ -23,17 +25,32 @@ internal sealed class BymaMarketPriceProvider : IMarketPriceProvider
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly HttpClient _httpClient;
+    private readonly IMemoryCache _cache;
     private readonly BymaOptions _options;
 
-    public BymaMarketPriceProvider(HttpClient httpClient, IOptions<BymaOptions> options)
+    public BymaMarketPriceProvider(HttpClient httpClient, IMemoryCache cache, IOptions<BymaOptions> options)
     {
         _httpClient = httpClient;
+        _cache = cache;
         _options = options.Value;
     }
 
     public string Source => "BYMA";
 
     public async Task<IReadOnlyList<MarketPrice>> GetClosingPricesAsync(CancellationToken cancellationToken = default)
+    {
+        if (_cache.TryGetValue(ClosingPricesCacheKey, out IReadOnlyList<MarketPrice>? cached) && cached is not null)
+        {
+            return cached;
+        }
+
+        var prices = await FetchClosingPricesAsync(cancellationToken);
+        _cache.Set(ClosingPricesCacheKey, prices, TimeSpan.FromMinutes(_options.CacheMinutes));
+
+        return prices;
+    }
+
+    private async Task<IReadOnlyList<MarketPrice>> FetchClosingPricesAsync(CancellationToken cancellationToken)
     {
         var prices = new List<MarketPrice>();
 

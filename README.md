@@ -101,6 +101,7 @@ variables de entorno usando `__` como separador de sección.
 | `Byma:BaseUrl` | `Byma__BaseUrl` | Datos públicos del sitio de BYMA de los que salen los precios de cierre del trabajo `investment-quotes` (default `https://open.bymadata.com.ar/vanoms-be-core/rest/api/bymadata/free/`). No piden credenciales |
 | `Byma:TimeoutSeconds` | `Byma__TimeoutSeconds` | Timeout de cada consulta a BYMA (default 30) |
 | `Byma:MaxPagesPerPanel` | `Byma__MaxPagesPerPanel` | Tope de páginas que se leen de cada panel, de a 189 títulos (default 20) |
+| `Byma:CacheMinutes` | `Byma__CacheMinutes` | Minutos que la API reutiliza los precios bajados de BYMA antes de volver a pedirlos, para que cotizar un símbolo desde el formulario no descargue los paneles en cada consulta (default 5) |
 | `Cors:AllowedOrigins` | `Cors__AllowedOrigins__0` | Orígenes habilitados para el frontend |
 
 Los secretos no se commitean. En desarrollo local:
