@@ -7,7 +7,9 @@ using FinGrow.Domain.Repositories;
 using FinGrow.Infrastructure.Ai;
 using FinGrow.Infrastructure.Identity;
 using FinGrow.Infrastructure.Integrations;
+using FinGrow.Infrastructure.Integrations.ArgentinaDatos;
 using FinGrow.Infrastructure.Integrations.Byma;
+using FinGrow.Infrastructure.Integrations.CoinGecko;
 using FinGrow.Infrastructure.Integrations.DolarApi;
 using FinGrow.Infrastructure.Integrations.MercadoPago;
 using FinGrow.Infrastructure.Integrations.Telegram;
@@ -30,6 +32,8 @@ using Polly.Retry;
 
 public static class DependencyInjection
 {
+    private const string PriceSourcesUserAgent = "FinGrow/1.0";
+
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddPersistence(configuration);
@@ -41,6 +45,8 @@ public static class DependencyInjection
         services.AddMercadoPago(configuration);
         services.AddDolarApi(configuration);
         services.AddByma(configuration);
+        services.AddArgentinaDatos(configuration);
+        services.AddCoinGecko(configuration);
 
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, CurrentUser>();
@@ -220,13 +226,64 @@ public static class DependencyInjection
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
-        services.AddHttpClient<IMarketPriceProvider, BymaMarketPriceProvider>((provider, client) =>
+        services.AddHttpClient<IMarketPriceProvider, BymaMarketPriceProvider>(BymaOptions.HttpClientName, (provider, client) =>
         {
             var options = provider.GetRequiredService<IOptions<BymaOptions>>().Value;
 
             client.BaseAddress = new Uri(options.BaseUrl);
             client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
         });
+
+        return services;
+    }
+
+    private static IServiceCollection AddArgentinaDatos(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddMemoryCache();
+
+        services.AddOptions<ArgentinaDatosOptions>()
+            .Bind(configuration.GetSection(ArgentinaDatosOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddHttpClient<IMarketPriceProvider, ArgentinaDatosFundPriceProvider>(
+            ArgentinaDatosOptions.HttpClientName,
+            (provider, client) =>
+            {
+                var options = provider.GetRequiredService<IOptions<ArgentinaDatosOptions>>().Value;
+
+                client.BaseAddress = new Uri(options.BaseUrl);
+                client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+                client.DefaultRequestHeaders.UserAgent.ParseAdd(PriceSourcesUserAgent);
+            });
+
+        return services;
+    }
+
+    private static IServiceCollection AddCoinGecko(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddMemoryCache();
+
+        services.AddOptions<CoinGeckoOptions>()
+            .Bind(configuration.GetSection(CoinGeckoOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddHttpClient<IMarketPriceProvider, CoinGeckoCryptoPriceProvider>(
+            CoinGeckoOptions.HttpClientName,
+            (provider, client) =>
+            {
+                var options = provider.GetRequiredService<IOptions<CoinGeckoOptions>>().Value;
+
+                client.BaseAddress = new Uri(options.BaseUrl);
+                client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+                client.DefaultRequestHeaders.UserAgent.ParseAdd(PriceSourcesUserAgent);
+
+                if (!string.IsNullOrWhiteSpace(options.ApiKey))
+                {
+                    client.DefaultRequestHeaders.Add(CoinGeckoOptions.ApiKeyHeader, options.ApiKey);
+                }
+            });
 
         return services;
     }

@@ -6,6 +6,8 @@ public sealed class BymaOptions
 {
     public const string SectionName = "Byma";
 
+    public const string HttpClientName = "Byma";
+
     [Required(ErrorMessage = "Falta configurar la URL base de los datos de BYMA (Byma:BaseUrl).")]
     [Url]
     public string BaseUrl { get; init; } = "https://open.bymadata.com.ar/vanoms-be-core/rest/api/bymadata/free/";

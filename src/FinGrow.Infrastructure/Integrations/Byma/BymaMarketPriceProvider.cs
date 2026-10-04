@@ -36,6 +36,8 @@ internal sealed class BymaMarketPriceProvider : IMarketPriceProvider
         _options = options.Value;
     }
 
+    public PriceMarket Market => PriceMarket.Exchange;
+
     public string Source => "BYMA";
 
     public async Task<IReadOnlyList<MarketPrice>> GetClosingPricesAsync(CancellationToken cancellationToken = default)

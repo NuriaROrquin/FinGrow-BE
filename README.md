@@ -102,6 +102,15 @@ variables de entorno usando `__` como separador de sección.
 | `Byma:TimeoutSeconds` | `Byma__TimeoutSeconds` | Timeout de cada consulta a BYMA (default 30) |
 | `Byma:MaxPagesPerPanel` | `Byma__MaxPagesPerPanel` | Tope de páginas que se leen de cada panel, de a 189 títulos (default 20) |
 | `Byma:CacheMinutes` | `Byma__CacheMinutes` | Minutos que la API reutiliza los precios bajados de BYMA antes de volver a pedirlos, para que cotizar un símbolo desde el formulario no descargue los paneles en cada consulta (default 5) |
+| `ArgentinaDatos:BaseUrl` | `ArgentinaDatos__BaseUrl` | API de [ArgentinaDatos](https://argentinadatos.com) de la que sale la cuotaparte de los fondos comunes (default `https://api.argentinadatos.com/`). Es pública y no pide credenciales |
+| `ArgentinaDatos:TimeoutSeconds` | `ArgentinaDatos__TimeoutSeconds` | Timeout de cada consulta (default 15) |
+| `ArgentinaDatos:CacheMinutes` | `ArgentinaDatos__CacheMinutes` | Minutos que se reutilizan las cuotapartes bajadas; se publican una vez por día (default 60) |
+| `ArgentinaDatos:StaleAfterDays` | `ArgentinaDatos__StaleAfterDays` | Días de atraso respecto de la cuotaparte más nueva a partir de los cuales un fondo se descarta por no existir más (default 30) |
+| `CoinGecko:BaseUrl` | `CoinGecko__BaseUrl` | API de [CoinGecko](https://www.coingecko.com) de la que sale el precio de las criptomonedas (default `https://api.coingecko.com/api/v3/`) |
+| `CoinGecko:ApiKey` | `CoinGecko__ApiKey` | Clave demo opcional (gratuita) que viaja en `x-cg-demo-api-key`; sin ella CoinGecko corta con `429` después de pocos pedidos por minuto |
+| `CoinGecko:TimeoutSeconds` | `CoinGecko__TimeoutSeconds` | Timeout de cada consulta (default 15) |
+| `CoinGecko:CacheMinutes` | `CoinGecko__CacheMinutes` | Minutos que se reutilizan los precios bajados (default 10) |
+| `CoinGecko:TopCoins` | `CoinGecko__TopCoins` | Cuántas criptomonedas, de mayor a menor capitalización, se cotizan (default y máximo 250) |
 | `Cors:AllowedOrigins` | `Cors__AllowedOrigins__0` | Orígenes habilitados para el frontend |
 
 Los secretos no se commitean. En desarrollo local:
