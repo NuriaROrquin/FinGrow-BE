@@ -2,7 +2,7 @@ namespace FinGrow.Domain.Entities;
 
 using FinGrow.Domain.Common;
 
-public sealed class LessonCompletion : Entity
+public sealed class LessonCompletion : AggregateRoot
 {
     private LessonCompletion()
     {
