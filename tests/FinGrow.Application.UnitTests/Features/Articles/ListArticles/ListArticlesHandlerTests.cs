@@ -1,13 +1,12 @@
-namespace FinGrow.Application.UnitTests.Features.Articles;
+namespace FinGrow.Application.UnitTests.Features.Articles.ListArticles;
 
 using Common;
-using FinGrow.Application.Features.Articles.GetArticle;
 using FinGrow.Application.Features.Articles.ListArticles;
 using Fakes;
 using Domain.Entities;
 using Domain.Enums;
 
-public class ArticleCatalogHandlerTests
+public class ListArticlesHandlerTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 27, 10, 0, 0, TimeSpan.Zero);
 
@@ -97,30 +96,5 @@ public class ArticleCatalogHandlerTests
         StoreArticle("nuevo", publishedAt: Now);
 
         (await ListAsync()).Value.Select(article => article.Slug).ToList().ShouldBe(NewestFirst);
-    }
-
-    [Fact]
-    public async Task Opening_an_article_returns_its_markdown_content()
-    {
-        StoreArticle("fondo-de-emergencia");
-
-        var result = await new GetArticleHandler(_articles)
-            .Handle(new GetArticleQuery("fondo-de-emergencia"), CancellationToken.None);
-
-        result.IsSuccess.ShouldBeTrue();
-        result.Value.Content.ShouldBe("## Subtitulo\n\nCuerpo en **Markdown**.");
-    }
-
-    [Theory]
-    [InlineData("no-existe")]
-    [InlineData("borrador")]
-    public async Task A_missing_or_draft_article_is_not_found(string slug)
-    {
-        StoreArticle("borrador", published: false);
-
-        var result = await new GetArticleHandler(_articles).Handle(new GetArticleQuery(slug), CancellationToken.None);
-
-        result.IsFailure.ShouldBeTrue();
-        result.Error.Type.ShouldBe(ErrorType.NotFound);
     }
 }
