@@ -27,6 +27,11 @@ public sealed class AccountController(IMediator mediator) : ControllerBase
         return result.ToActionResult();
     }
 
+    [HttpGet("2fa")]
+    [Authorize(Roles = Rol.Empleado)]
+    public async Task<IActionResult> GetTwoFactorStatus(CancellationToken cancellationToken) =>
+        (await mediator.Send(new GetTwoFactorStatusQuery(), cancellationToken)).ToActionResult();
+
     [HttpPost("2fa/setup")]
     [Authorize(Roles = Rol.Empleado)]
     public async Task<IActionResult> SetupTwoFactor(CancellationToken cancellationToken) =>

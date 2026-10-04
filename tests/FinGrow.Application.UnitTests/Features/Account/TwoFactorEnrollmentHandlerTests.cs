@@ -39,6 +39,31 @@ public class TwoFactorEnrollmentHandlerTests
     private EnableTwoFactorCommandHandler CreateEnableHandler() =>
         new(_currentUser, _employees, _totp, _unitOfWork, new FakeDateTimeProvider(Now));
 
+    private GetTwoFactorStatusQueryHandler CreateStatusHandler() => new(_currentUser, _employees);
+
+    [Fact]
+    public async Task Status_is_disabled_until_the_enrollment_is_confirmed()
+    {
+        var employee = AddLoggedInEmployee();
+        employee.StartTwoFactorEnrollment("SECRETBASE32", Now);
+
+        var pending = await CreateStatusHandler().Handle(new GetTwoFactorStatusQuery(), CancellationToken.None);
+        employee.EnableTwoFactor(Now);
+        var enabled = await CreateStatusHandler().Handle(new GetTwoFactorStatusQuery(), CancellationToken.None);
+
+        pending.Value.Enabled.ShouldBeFalse();
+        enabled.Value.Enabled.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Status_requires_an_authenticated_user()
+    {
+        var result = await CreateStatusHandler().Handle(new GetTwoFactorStatusQuery(), CancellationToken.None);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("Account.NoAutenticado");
+    }
+
     [Fact]
     public async Task Setup_stores_a_new_secret_and_returns_the_provisioning_uri_without_enabling()
     {
