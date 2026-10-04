@@ -27,6 +27,9 @@ public sealed class FakeCompanyRepository : ICompanyRepository
     public Task<Company?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Companies.FirstOrDefault(company => company.Id == id));
 
+    public Task<Company?> GetWithDepartmentsAsync(Guid id, CancellationToken cancellationToken = default) =>
+        GetByIdAsync(id, cancellationToken);
+
     public Task<Company?> GetByEmailAsync(Email email, CancellationToken cancellationToken) =>
         Task.FromResult(Companies.FirstOrDefault(company => company.Email == email));
 

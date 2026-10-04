@@ -7,6 +7,8 @@ public interface ICompanyRepository
 {
     Task<Company?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
+    Task<Company?> GetWithDepartmentsAsync(Guid id, CancellationToken cancellationToken = default);
+
     Task<Company?> GetByEmailAsync(Email email, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<Company>> ListActiveAsync(CancellationToken cancellationToken = default);
