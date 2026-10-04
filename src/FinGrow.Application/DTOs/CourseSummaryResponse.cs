@@ -19,16 +19,7 @@ public sealed record CourseSummaryResponse(
 {
     public static CourseSummaryResponse FromEntity(Course course, IReadOnlySet<Guid> completedLessonIds)
     {
-        var lessonCount = course.Lessons.Count;
-        var completedLessons = course.Lessons.Count(lesson => completedLessonIds.Contains(lesson.Id));
-
-        var progressPercentage = lessonCount == 0 ? 0 : completedLessons * 100 / lessonCount;
-
-        var status = completedLessons == 0
-            ? CourseProgressStatus.NotStarted
-            : completedLessons == lessonCount
-                ? CourseProgressStatus.Completed
-                : CourseProgressStatus.InProgress;
+        var progress = course.ProgressFor(completedLessonIds);
 
         return new CourseSummaryResponse(
             course.Id,
@@ -39,9 +30,9 @@ public sealed record CourseSummaryResponse(
             course.Category,
             course.RelatedInvestmentType,
             course.DurationMinutes,
-            lessonCount,
-            completedLessons,
-            progressPercentage,
-            status);
+            progress.LessonCount,
+            progress.CompletedLessons,
+            progress.Percentage,
+            progress.Status);
     }
 }
