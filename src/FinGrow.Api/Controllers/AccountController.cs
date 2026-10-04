@@ -33,6 +33,11 @@ public sealed class AccountController(IMediator mediator) : ControllerBase
     public async Task<IActionResult> GetProfile(CancellationToken cancellationToken) =>
         (await mediator.Send(new GetProfileQuery(), cancellationToken)).ToActionResult();
 
+    [HttpPatch("profile")]
+    [Authorize(Roles = Rol.Empleado)]
+    public async Task<IActionResult> UpdateProfile(UpdateProfileCommand command, CancellationToken cancellationToken) =>
+        (await mediator.Send(command, cancellationToken)).ToActionResult();
+
     [HttpGet("2fa")]
     [Authorize(Roles = Rol.Empleado)]
     public async Task<IActionResult> GetTwoFactorStatus(CancellationToken cancellationToken) =>
