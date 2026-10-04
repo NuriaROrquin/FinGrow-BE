@@ -99,6 +99,8 @@ public static class DependencyInjection
         services.AddScoped<IBudgetRepository, BudgetRepository>();
         services.AddScoped<IBudgetSpendingReadRepository, BudgetSpendingReadRepository>();
         services.AddScoped<IArticleRepository, ArticleRepository>();
+        services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<INotificationChannelSettingRepository, NotificationChannelSettingRepository>();
 
         services.AddScoped<DatabaseSeeder>();
         services.AddScoped<EducationCatalogSeeder>();
