@@ -106,6 +106,34 @@ public class BymaMarketPriceProviderTests
         exception.Message.ShouldContain("public-bonds");
     }
 
+    [Fact]
+    public async Task A_second_download_within_the_cache_window_reuses_the_prices_without_calling_byma_again()
+    {
+        using var factory = new BymaWebApplicationFactory(HealthyByma);
+
+        var first = await factory.Services.GetRequiredService<IMarketPriceProvider>().GetClosingPricesAsync();
+        var second = await factory.Services.GetRequiredService<IMarketPriceProvider>().GetClosingPricesAsync();
+
+        second.ShouldBe(first);
+        factory.Byma.Requests.Count.ShouldBe(ExpectedRequests.Length);
+    }
+
+    [Fact]
+    public async Task A_failed_download_is_not_reused_and_the_next_one_calls_byma_again()
+    {
+        var bymaIsDown = true;
+        using var factory = new BymaWebApplicationFactory((panel, page) =>
+            bymaIsDown ? (HttpStatusCode.InternalServerError, "{}") : HealthyByma(panel, page));
+
+        await Should.ThrowAsync<HttpRequestException>(() =>
+            factory.Services.GetRequiredService<IMarketPriceProvider>().GetClosingPricesAsync());
+
+        bymaIsDown = false;
+        var prices = await factory.Services.GetRequiredService<IMarketPriceProvider>().GetClosingPricesAsync();
+
+        prices.ShouldContain(new MarketPrice("AL30", Currency.ARS, 839.40m));
+    }
+
     private static (HttpStatusCode Status, string Body) HealthyByma(string panel, int page) => panel switch
     {
         "leading-equity" => (HttpStatusCode.OK, LeadingEquity),
