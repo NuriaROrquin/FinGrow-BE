@@ -138,6 +138,14 @@ cada 100 nominales. Esos datos no son la API contratada de BYMA ni tienen garant
 antes de producción con empleados reales se reemplazan por la API EOD de BYMA (contrato con
 marketdata@byma.com.ar), implementando otro `IMarketPriceProvider`.
 
+`GET /api/security-prices/{symbol}?currency=ARS` cotiza un símbolo mientras se carga el formulario
+de inversiones: devuelve el precio por unidad (por nominal en bonos y ONs), la fecha del precio y
+la fuente. Primero busca en los paneles de BYMA, que la API reutiliza `Byma:CacheMinutes`; si BYMA
+no tiene precio para ese símbolo (los fines de semana y feriados el feed público viene todo en 0) o
+no responde en 10 segundos, usa el último cierre que guardó `investment-quotes` en `security_prices`
+con su fecha. Sin precio en ninguno de los dos contesta `404` si BYMA respondió y `503` si no.
+Solo acepta `ARS` y `USD`, las monedas en las que cotiza BYMA.
+
 ### WhatsApp (Twilio)
 
 Los mensajes de WhatsApp entran por `POST /api/webhooks/whatsapp`. El endpoint es público
