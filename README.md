@@ -321,6 +321,7 @@ Siete entidades y tres value objects. El esquema se crea con la migración `Init
 | `lessons` | (parte de Course) | Lecciones de un curso, ordenadas por `position`, con su duración y el video |
 | `articles` | Article | Artículos del catálogo: resumen, cuerpo en Markdown, categoría y tiempo de lectura |
 | `lesson_completions` | LessonCompletion | Qué lecciones terminó cada empleado; el progreso de un curso se deriva de acá |
+| `course_ratings` | CourseRating | La calificación de 1 a 5 que cada empleado le da a un curso que terminó; el promedio del curso se deriva de acá |
 
 Decisiones que conviene conocer antes de tocar el modelo:
 

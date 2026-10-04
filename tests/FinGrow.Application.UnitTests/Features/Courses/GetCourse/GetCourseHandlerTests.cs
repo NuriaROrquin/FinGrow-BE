@@ -14,6 +14,7 @@ public class GetCourseHandlerTests
     private static readonly int[] ExpectedPositions = { 1, 2, 3 };
 
     private readonly FakeCourseRepository _courses = new();
+    private readonly FakeCourseRatingRepository _ratings = new();
 
     private Course StoreCourse(string slug = "fundamentos-finanzas-personales", bool published = true)
     {
@@ -40,7 +41,7 @@ public class GetCourseHandlerTests
     }
 
     private Task<Result<CourseDetailResponse>> GetAsync(string slug = "fundamentos-finanzas-personales") =>
-        new GetCourseHandler(_courses).Handle(new GetCourseQuery(EmployeeId, slug), CancellationToken.None);
+        new GetCourseHandler(_courses, _ratings).Handle(new GetCourseQuery(EmployeeId, slug), CancellationToken.None);
 
     [Fact]
     public async Task Opening_a_course_returns_its_lessons_in_order_with_their_videos()

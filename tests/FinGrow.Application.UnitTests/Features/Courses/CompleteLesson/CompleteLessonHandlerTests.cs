@@ -13,6 +13,7 @@ public class CompleteLessonHandlerTests
     private static readonly Guid EmployeeId = Guid.CreateVersion7();
 
     private readonly FakeCourseRepository _courses = new();
+    private readonly FakeCourseRatingRepository _ratings = new();
     private readonly FakeUnitOfWork _unitOfWork = new();
     private readonly FakeDateTimeProvider _clock = new(Now);
 
@@ -36,7 +37,7 @@ public class CompleteLessonHandlerTests
     }
 
     private Task<Result<CourseDetailResponse>> CompleteAsync(Guid lessonId, string slug = "fundamentos-finanzas-personales") =>
-        new CompleteLessonHandler(_courses, _unitOfWork, _clock)
+        new CompleteLessonHandler(_courses, _ratings, _unitOfWork, _clock)
             .Handle(new CompleteLessonCommand(EmployeeId, slug, lessonId), CancellationToken.None);
 
     [Fact]

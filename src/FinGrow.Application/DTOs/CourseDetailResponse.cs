@@ -2,6 +2,7 @@ namespace FinGrow.Application.DTOs;
 
 using Domain.Entities;
 using Domain.Enums;
+using Interfaces;
 
 public sealed record CourseDetailResponse(
     Guid Id,
@@ -16,10 +17,16 @@ public sealed record CourseDetailResponse(
     int CompletedLessons,
     int ProgressPercentage,
     CourseProgressStatus ProgressStatus,
+    decimal? AverageRating,
+    int RatingCount,
+    int? MyRating,
     Guid? ResumeLessonId,
     IReadOnlyList<LessonResponse> Lessons)
 {
-    public static CourseDetailResponse FromEntity(Course course, IReadOnlySet<Guid> completedLessonIds)
+    public static CourseDetailResponse FromEntity(
+        Course course,
+        IReadOnlySet<Guid> completedLessonIds,
+        CourseRatingSummary rating)
     {
         var progress = course.ProgressFor(completedLessonIds);
 
@@ -36,6 +43,9 @@ public sealed record CourseDetailResponse(
             progress.CompletedLessons,
             progress.Percentage,
             progress.Status,
+            rating.RoundedAverage,
+            rating.Count,
+            rating.EmployeeScore,
             course.ResumeLessonFor(completedLessonIds)?.Id,
             course.Lessons
                 .Select(lesson => LessonResponse.FromEntity(lesson, completedLessonIds.Contains(lesson.Id)))

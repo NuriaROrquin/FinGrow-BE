@@ -557,3 +557,27 @@ public sealed class FakeArticleRepository : IArticleRepository
     public Task<Article?> GetPublishedBySlugAsync(string slug, CancellationToken cancellationToken = default) =>
         Task.FromResult(Articles.FirstOrDefault(article => article.Slug == slug && article.IsPublished));
 }
+
+public sealed class FakeCourseRatingRepository : ICourseRatingRepository, ICourseRatingReadRepository
+{
+    public List<CourseRating> Ratings { get; } = new();
+
+    public Task<CourseRating?> FindAsync(Guid employeeId, Guid courseId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Ratings.FirstOrDefault(rating => rating.EmployeeId == employeeId && rating.CourseId == courseId));
+
+    public void Add(CourseRating rating) => Ratings.Add(rating);
+
+    public Task<IReadOnlyDictionary<Guid, CourseRatingSummary>> GetSummariesAsync(
+        Guid employeeId,
+        IReadOnlyCollection<Guid> courseIds,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyDictionary<Guid, CourseRatingSummary>>(Ratings
+            .Where(rating => courseIds.Contains(rating.CourseId))
+            .GroupBy(rating => rating.CourseId)
+            .ToDictionary(
+                group => group.Key,
+                group => new CourseRatingSummary(
+                    group.Count(),
+                    group.Average(rating => (decimal)rating.Score),
+                    group.FirstOrDefault(rating => rating.EmployeeId == employeeId)?.Score)));
+}

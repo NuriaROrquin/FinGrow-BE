@@ -179,6 +179,85 @@ public class CoursesEndpointsTests
         factory.Courses.CompletedLessonIds.ShouldBeEmpty();
     }
 
+    [Fact]
+    public async Task Rating_a_completed_course_returns_the_new_average()
+    {
+        using var factory = new CoursesWebApplicationFactory();
+        var course = PublishedCourse();
+        factory.Courses.Courses.Add(course);
+        foreach (var lesson in course.Lessons)
+        {
+            factory.Courses.CompletedLessonIds.Add(lesson.Id);
+        }
+
+        factory.Ratings.Add(CourseRating.Create(Guid.CreateVersion7(), course.Id, 3, Now));
+        var client = AuthenticatedClient(factory, Rol.Empleado);
+
+        var response = await client.PutAsJsonAsync(
+            new Uri("/api/courses/fundamentos-finanzas-personales/rating", UriKind.Relative),
+            new { score = 5 });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("myRating").GetInt32().ShouldBe(5);
+        body.GetProperty("ratingCount").GetInt32().ShouldBe(2);
+        body.GetProperty("averageRating").GetDecimal().ShouldBe(4m);
+        factory.Ratings.Ratings.ShouldContain(rating => rating.EmployeeId == EmployeeId && rating.Score == 5);
+    }
+
+    [Fact]
+    public async Task Rating_a_course_that_is_not_completed_is_409()
+    {
+        using var factory = new CoursesWebApplicationFactory();
+        factory.Courses.Courses.Add(PublishedCourse());
+        var client = AuthenticatedClient(factory, Rol.Empleado);
+
+        var response = await client.PutAsJsonAsync(
+            new Uri("/api/courses/fundamentos-finanzas-personales/rating", UriKind.Relative),
+            new { score = 5 });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("title").GetString().ShouldBe("Course.NotCompleted");
+        factory.Ratings.Ratings.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(6)]
+    public async Task A_score_outside_one_to_five_is_400(int score)
+    {
+        using var factory = new CoursesWebApplicationFactory();
+        factory.Courses.Courses.Add(PublishedCourse());
+        var client = AuthenticatedClient(factory, Rol.Empleado);
+
+        var response = await client.PutAsJsonAsync(
+            new Uri("/api/courses/fundamentos-finanzas-personales/rating", UriKind.Relative),
+            new { score });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        factory.Ratings.Ratings.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task The_list_shows_the_average_rating_of_each_course()
+    {
+        using var factory = new CoursesWebApplicationFactory();
+        var course = PublishedCourse();
+        factory.Courses.Courses.Add(course);
+        factory.Ratings.Add(CourseRating.Create(Guid.CreateVersion7(), course.Id, 4, Now));
+        factory.Ratings.Add(CourseRating.Create(Guid.CreateVersion7(), course.Id, 5, Now));
+        var client = AuthenticatedClient(factory, Rol.Empleado);
+
+        var response = await client.GetAsync(new Uri("/api/courses", UriKind.Relative));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var item = (await response.Content.ReadFromJsonAsync<JsonElement>())[0];
+        item.GetProperty("averageRating").GetDecimal().ShouldBe(4.5m);
+        item.GetProperty("ratingCount").GetInt32().ShouldBe(2);
+        item.GetProperty("myRating").ValueKind.ShouldBe(JsonValueKind.Null);
+    }
+
     private static Course PublishedCourse()
     {
         var course = Course.Create(
@@ -247,9 +326,35 @@ public class CoursesEndpointsTests
         public void AddCompletion(LessonCompletion completion) => CompletedLessonIds.Add(completion.LessonId);
     }
 
+    private sealed class InMemoryCourseRatingRepository : ICourseRatingRepository, ICourseRatingReadRepository
+    {
+        public List<CourseRating> Ratings { get; } = new();
+
+        public Task<CourseRating?> FindAsync(Guid employeeId, Guid courseId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Ratings.FirstOrDefault(rating => rating.EmployeeId == employeeId && rating.CourseId == courseId));
+
+        public void Add(CourseRating rating) => Ratings.Add(rating);
+
+        public Task<IReadOnlyDictionary<Guid, CourseRatingSummary>> GetSummariesAsync(
+            Guid employeeId,
+            IReadOnlyCollection<Guid> courseIds,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyDictionary<Guid, CourseRatingSummary>>(Ratings
+                .Where(rating => courseIds.Contains(rating.CourseId))
+                .GroupBy(rating => rating.CourseId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => new CourseRatingSummary(
+                        group.Count(),
+                        group.Average(rating => (decimal)rating.Score),
+                        group.FirstOrDefault(rating => rating.EmployeeId == employeeId)?.Score)));
+    }
+
     private sealed class CoursesWebApplicationFactory : WebApplicationFactory<Program>
     {
         public CapturingCourseRepository Courses { get; } = new();
+
+        public InMemoryCourseRatingRepository Ratings { get; } = new();
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
@@ -274,6 +379,10 @@ public class CoursesEndpointsTests
             {
                 services.RemoveAll<ICourseRepository>();
                 services.AddSingleton<ICourseRepository>(Courses);
+                services.RemoveAll<ICourseRatingRepository>();
+                services.AddSingleton<ICourseRatingRepository>(Ratings);
+                services.RemoveAll<ICourseRatingReadRepository>();
+                services.AddSingleton<ICourseRatingReadRepository>(Ratings);
                 services.AddScoped<IUnitOfWork, NoOpUnitOfWork>();
             });
         }

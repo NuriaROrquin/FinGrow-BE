@@ -2,10 +2,13 @@ namespace FinGrow.Application.Features.Courses.GetCourse;
 
 using Common;
 using DTOs;
+using Interfaces;
 using Domain.Repositories;
 using MediatR;
 
-internal sealed class GetCourseHandler(ICourseRepository courseRepository)
+internal sealed class GetCourseHandler(
+    ICourseRepository courseRepository,
+    ICourseRatingReadRepository ratingReadRepository)
     : IRequestHandler<GetCourseQuery, Result<CourseDetailResponse>>
 {
     public async Task<Result<CourseDetailResponse>> Handle(GetCourseQuery request, CancellationToken cancellationToken)
@@ -19,6 +22,14 @@ internal sealed class GetCourseHandler(ICourseRepository courseRepository)
 
         var completedLessonIds = await courseRepository.ListCompletedLessonIdsAsync(request.EmployeeId, cancellationToken);
 
-        return Result.Success(CourseDetailResponse.FromEntity(course, completedLessonIds));
+        var ratings = await ratingReadRepository.GetSummariesAsync(
+            request.EmployeeId,
+            new[] { course.Id },
+            cancellationToken);
+
+        return Result.Success(CourseDetailResponse.FromEntity(
+            course,
+            completedLessonIds,
+            ratings.GetValueOrDefault(course.Id, CourseRatingSummary.None)));
     }
 }

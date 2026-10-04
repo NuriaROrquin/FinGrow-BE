@@ -16,6 +16,7 @@ public class ListCoursesHandlerTests
     private static readonly string[] SlugsByLevel = { "basico", "intermedio", "avanzado" };
 
     private readonly FakeCourseRepository _courses = new();
+    private readonly FakeCourseRatingRepository _ratings = new();
 
     private Course StoreCourse(string slug, CourseLevel level = CourseLevel.Beginner, params int[] lessonMinutes) =>
         StoreCourse(slug, level, published: true, lessonMinutes);
@@ -50,7 +51,7 @@ public class ListCoursesHandlerTests
         CourseLevel? level = null,
         int? maxDuration = null,
         CourseProgressStatus? status = null) =>
-        new ListCoursesHandler(_courses).Handle(
+        new ListCoursesHandler(_courses, _ratings).Handle(
             new ListCoursesQuery(EmployeeId, level, maxDuration, status),
             CancellationToken.None);
 
@@ -165,5 +166,25 @@ public class ListCoursesHandlerTests
 
         (await ListAsync()).Value.Select(course => course.Slug)
             .ShouldBe(SlugsByLevel);
+    }
+
+    [Fact]
+    public async Task Each_course_shows_its_average_rating_and_the_rating_of_the_employee()
+    {
+        var rated = StoreCourse("calificado");
+        StoreCourse("sin-calificar");
+        _ratings.Add(CourseRating.Create(EmployeeId, rated.Id, 5, Now));
+        _ratings.Add(CourseRating.Create(Guid.CreateVersion7(), rated.Id, 2, Now));
+
+        var courses = (await ListAsync()).Value;
+
+        var withRatings = courses.Single(course => course.Slug == "calificado");
+        withRatings.AverageRating.ShouldBe(3.5m);
+        withRatings.RatingCount.ShouldBe(2);
+        withRatings.MyRating.ShouldBe(5);
+        var withoutRatings = courses.Single(course => course.Slug == "sin-calificar");
+        withoutRatings.AverageRating.ShouldBeNull();
+        withoutRatings.RatingCount.ShouldBe(0);
+        withoutRatings.MyRating.ShouldBeNull();
     }
 }

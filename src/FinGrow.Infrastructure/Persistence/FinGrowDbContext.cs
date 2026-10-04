@@ -53,6 +53,8 @@ public sealed class FinGrowDbContext : DbContext, IUnitOfWork
 
     public DbSet<LessonCompletion> LessonCompletions => Set<LessonCompletion>();
 
+    public DbSet<CourseRating> CourseRatings => Set<CourseRating>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());

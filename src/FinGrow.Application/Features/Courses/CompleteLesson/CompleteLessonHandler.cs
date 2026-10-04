@@ -9,6 +9,7 @@ using MediatR;
 
 internal sealed class CompleteLessonHandler(
     ICourseRepository courseRepository,
+    ICourseRatingReadRepository ratingReadRepository,
     IUnitOfWork unitOfWork,
     IDateTimeProvider dateTimeProvider) : IRequestHandler<CompleteLessonCommand, Result<CourseDetailResponse>>
 {
@@ -37,6 +38,14 @@ internal sealed class CompleteLessonHandler(
             await unitOfWork.SaveChangesAsync(cancellationToken);
         }
 
-        return Result.Success(CourseDetailResponse.FromEntity(course, completedLessonIds));
+        var ratings = await ratingReadRepository.GetSummariesAsync(
+            request.EmployeeId,
+            new[] { course.Id },
+            cancellationToken);
+
+        return Result.Success(CourseDetailResponse.FromEntity(
+            course,
+            completedLessonIds,
+            ratings.GetValueOrDefault(course.Id, CourseRatingSummary.None)));
     }
 }
