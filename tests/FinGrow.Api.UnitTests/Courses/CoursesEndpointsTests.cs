@@ -42,19 +42,9 @@ public class CoursesEndpointsTests
     public async Task Each_course_comes_with_its_level_duration_and_the_progress_of_the_employee()
     {
         using var factory = new CoursesWebApplicationFactory();
-        var course = Course.Create(
-            "fundamentos-finanzas-personales",
-            "Fundamentos de Finanzas Personales",
-            "Aprendé a gestionar tu dinero.",
-            CourseLevel.Beginner,
-            EducationCategory.Basics,
-            InvestmentType.Etf,
-            Now);
-        var firstLesson = course.AddLesson("Introducción", 10, "https://www.youtube.com/embed/abc", Now);
-        course.AddLesson("Presupuesto", 15, "https://www.youtube.com/embed/def", Now);
-        course.Publish(Now);
+        var course = PublishedCourse();
         factory.Courses.Courses.Add(course);
-        factory.Courses.CompletedLessonIds.Add(firstLesson.Id);
+        factory.Courses.CompletedLessonIds.Add(course.Lessons.First().Id);
         var client = AuthenticatedClient(factory, Rol.Empleado);
 
         var response = await client.GetAsync(new Uri("/api/courses", UriKind.Relative));
@@ -111,6 +101,99 @@ public class CoursesEndpointsTests
 
         response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
         factory.Courses.WasQueried.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Opening_a_course_returns_its_lessons_and_the_lesson_where_to_resume()
+    {
+        using var factory = new CoursesWebApplicationFactory();
+        var course = PublishedCourse();
+        var lessons = course.Lessons.ToList();
+        factory.Courses.Courses.Add(course);
+        factory.Courses.CompletedLessonIds.Add(lessons[0].Id);
+        var client = AuthenticatedClient(factory, Rol.Empleado);
+
+        var response = await client.GetAsync(new Uri("/api/courses/fundamentos-finanzas-personales", UriKind.Relative));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        factory.Courses.RequestedEmployeeId.ShouldBe(EmployeeId);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("progressStatus").GetString().ShouldBe("InProgress");
+        body.GetProperty("resumeLessonId").GetGuid().ShouldBe(lessons[1].Id);
+        var items = body.GetProperty("lessons");
+        items.GetArrayLength().ShouldBe(2);
+        items[0].GetProperty("position").GetInt32().ShouldBe(1);
+        items[0].GetProperty("isCompleted").GetBoolean().ShouldBeTrue();
+        items[1].GetProperty("title").GetString().ShouldBe("Presupuesto");
+        items[1].GetProperty("durationMinutes").GetInt32().ShouldBe(15);
+        items[1].GetProperty("videoUrl").GetString().ShouldBe("https://www.youtube.com/embed/def");
+        items[1].GetProperty("isCompleted").GetBoolean().ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task A_course_that_does_not_exist_is_404()
+    {
+        using var factory = new CoursesWebApplicationFactory();
+        var client = AuthenticatedClient(factory, Rol.Empleado);
+
+        var response = await client.GetAsync(new Uri("/api/courses/no-existe", UriKind.Relative));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("title").GetString().ShouldBe("Course.NotFound");
+    }
+
+    [Fact]
+    public async Task Completing_a_lesson_returns_the_updated_progress()
+    {
+        using var factory = new CoursesWebApplicationFactory();
+        var course = PublishedCourse();
+        var lessons = course.Lessons.ToList();
+        factory.Courses.Courses.Add(course);
+        var client = AuthenticatedClient(factory, Rol.Empleado);
+
+        var response = await client.PutAsync(
+            new Uri($"/api/courses/fundamentos-finanzas-personales/lessons/{lessons[0].Id}/completion", UriKind.Relative),
+            null);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        factory.Courses.CompletedLessonIds.ShouldContain(lessons[0].Id);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("completedLessons").GetInt32().ShouldBe(1);
+        body.GetProperty("progressPercentage").GetInt32().ShouldBe(50);
+        body.GetProperty("resumeLessonId").GetGuid().ShouldBe(lessons[1].Id);
+    }
+
+    [Fact]
+    public async Task Completing_a_lesson_that_is_not_in_the_course_is_404()
+    {
+        using var factory = new CoursesWebApplicationFactory();
+        factory.Courses.Courses.Add(PublishedCourse());
+        var client = AuthenticatedClient(factory, Rol.Empleado);
+
+        var response = await client.PutAsync(
+            new Uri($"/api/courses/fundamentos-finanzas-personales/lessons/{Guid.CreateVersion7()}/completion", UriKind.Relative),
+            null);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        factory.Courses.CompletedLessonIds.ShouldBeEmpty();
+    }
+
+    private static Course PublishedCourse()
+    {
+        var course = Course.Create(
+            "fundamentos-finanzas-personales",
+            "Fundamentos de Finanzas Personales",
+            "Aprendé a gestionar tu dinero.",
+            CourseLevel.Beginner,
+            EducationCategory.Basics,
+            InvestmentType.Etf,
+            Now);
+        course.AddLesson("Introducción", 10, "https://www.youtube.com/embed/abc", Now);
+        course.AddLesson("Presupuesto", 15, "https://www.youtube.com/embed/def", Now);
+        course.Publish(Now);
+
+        return course;
     }
 
     private static HttpClient AuthenticatedClient(CoursesWebApplicationFactory factory, string role)
@@ -191,7 +274,13 @@ public class CoursesEndpointsTests
             {
                 services.RemoveAll<ICourseRepository>();
                 services.AddSingleton<ICourseRepository>(Courses);
+                services.AddScoped<IUnitOfWork, NoOpUnitOfWork>();
             });
         }
+    }
+
+    private sealed class NoOpUnitOfWork : IUnitOfWork
+    {
+        public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => Task.FromResult(0);
     }
 }
