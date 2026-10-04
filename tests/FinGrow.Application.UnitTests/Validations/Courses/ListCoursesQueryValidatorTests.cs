@@ -1,4 +1,4 @@
-namespace FinGrow.Application.UnitTests.Features.Courses;
+namespace FinGrow.Application.UnitTests.Validations.Courses;
 
 using FinGrow.Application.Features.Courses.ListCourses;
 using Domain.Enums;

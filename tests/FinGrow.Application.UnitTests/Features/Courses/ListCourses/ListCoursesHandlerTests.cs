@@ -1,4 +1,4 @@
-namespace FinGrow.Application.UnitTests.Features.Courses;
+namespace FinGrow.Application.UnitTests.Features.Courses.ListCourses;
 
 using Common;
 using DTOs;
