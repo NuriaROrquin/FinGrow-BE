@@ -11,6 +11,9 @@ public class ArticleCatalogHandlerTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 27, 10, 0, 0, TimeSpan.Zero);
 
+    private static readonly string[] UpToFiveMinutes = { "corto", "justo" };
+    private static readonly string[] NewestFirst = { "nuevo", "viejo" };
+
     private readonly FakeArticleRepository _articles = new();
 
     private Article StoreArticle(
@@ -84,7 +87,7 @@ public class ArticleCatalogHandlerTests
 
         var slugs = (await ListAsync(maxReadingTime: 5)).Value.Select(article => article.Slug);
 
-        slugs.ShouldBe(["corto", "justo"], ignoreOrder: true);
+        slugs.ShouldBe(UpToFiveMinutes, ignoreOrder: true);
     }
 
     [Fact]
@@ -93,7 +96,7 @@ public class ArticleCatalogHandlerTests
         StoreArticle("viejo", publishedAt: Now.AddDays(-10));
         StoreArticle("nuevo", publishedAt: Now);
 
-        (await ListAsync()).Value.Select(article => article.Slug).ToList().ShouldBe(["nuevo", "viejo"]);
+        (await ListAsync()).Value.Select(article => article.Slug).ToList().ShouldBe(NewestFirst);
     }
 
     [Fact]
