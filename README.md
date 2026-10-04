@@ -355,8 +355,8 @@ Siete entidades y tres value objects. El esquema se crea con la migración `Init
 | `transactions` | Transaction | Ingresos y gastos, con importe siempre positivo y el signo dado por `type` |
 | `budgets` | Budget | Tope por categoría y período |
 | `goals` | Goal | Metas de ahorro con objetivo, avance y fecha límite |
-| `investments` | Investment | Posiciones del portafolio: capital invertido y valuación actual |
-| `security_prices` | SecurityPrice | El último precio de cierre por unidad de cada símbolo y moneda que trajo BYMA; una fila por símbolo y moneda que `investment-quotes` pisa en cada corrida. Es lo que cotiza el formulario de inversiones cuando BYMA no publica precios (fines de semana y feriados) |
+| `investments` | Investment | Posiciones del portafolio: capital invertido y valuación actual. `symbol` es el ticker (hasta 20 caracteres) o, en un fondo común, su nombre completo (hasta 150); `quantity` admite 10 decimales para fracciones de cripto |
+| `security_prices` | SecurityPrice | El último precio por unidad de cada mercado, símbolo y moneda (BYMA, fondos de ArgentinaDatos y cripto de CoinGecko); una fila por mercado, símbolo y moneda que `investment-quotes` pisa en cada corrida. En los fondos el símbolo es el nombre del fondo. Es lo que cotiza el formulario de inversiones cuando la fuente no publica precios (BYMA los fines de semana y feriados) o no responde |
 | `job_runs` | JobRun | Registro de cada corrida de un trabajo programado: inicio, fin, resultado y error |
 | `company_metrics_snapshots` | CompanyMetricsSnapshot | Foto mensual de métricas agregadas de una empresa: empleados activos, cuántos participaron, movimientos confirmados, presupuestos, metas e integraciones |
 | `department_metrics_snapshots` | DepartmentMetricsSnapshot | La misma foto, por departamento |

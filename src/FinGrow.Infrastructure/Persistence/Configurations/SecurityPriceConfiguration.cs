@@ -15,8 +15,13 @@ internal sealed class SecurityPriceConfiguration : IEntityTypeConfiguration<Secu
 
         builder.Property(price => price.Id).ValueGeneratedNever();
 
+        builder.Property(price => price.Market)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
         builder.Property(price => price.Symbol)
-            .HasMaxLength(Investment.MaxSymbolLength)
+            .HasMaxLength(Investment.MaxFundNameLength)
             .IsRequired();
 
         builder.Property(price => price.Currency)
@@ -25,7 +30,7 @@ internal sealed class SecurityPriceConfiguration : IEntityTypeConfiguration<Secu
             .IsRequired();
 
         builder.Property(price => price.UnitPrice)
-            .HasPrecision(20, 6)
+            .HasPrecision(30, 12)
             .IsRequired();
 
         builder.Property(price => price.PricedOn).IsRequired();
@@ -36,6 +41,6 @@ internal sealed class SecurityPriceConfiguration : IEntityTypeConfiguration<Secu
 
         builder.Property(price => price.UpdatedAt).IsRequired();
 
-        builder.HasIndex(price => new { price.Symbol, price.Currency }).IsUnique();
+        builder.HasIndex(price => new { price.Market, price.Symbol, price.Currency }).IsUnique();
     }
 }
