@@ -12,12 +12,15 @@ public sealed class SecurityPrice : AggregateRoot
     {
     }
 
-    private SecurityPrice(Guid id, string symbol, Currency currency)
+    private SecurityPrice(Guid id, PriceMarket market, string symbol, Currency currency)
         : base(id)
     {
+        Market = market;
         Symbol = symbol;
         Currency = currency;
     }
+
+    public PriceMarket Market { get; private set; }
 
     public string Symbol { get; private set; } = string.Empty;
 
@@ -32,6 +35,7 @@ public sealed class SecurityPrice : AggregateRoot
     public DateTimeOffset UpdatedAt { get; private set; }
 
     public static SecurityPrice Create(
+        PriceMarket market,
         string symbol,
         Currency currency,
         decimal unitPrice,
@@ -41,7 +45,8 @@ public sealed class SecurityPrice : AggregateRoot
     {
         var price = new SecurityPrice(
             Guid.CreateVersion7(),
-            RequiredText.Ensure(symbol, Investment.MaxSymbolLength, "El simbolo").ToUpperInvariant(),
+            market,
+            market.NormalizeSymbol(RequiredText.Ensure(symbol, market.MaxSymbolLength(), "El simbolo")),
             currency);
 
         price.Update(unitPrice, pricedOn, source, updatedAt);
