@@ -1,10 +1,12 @@
 namespace FinGrow.Api.Controllers;
 
+using Contracts;
 using Extensions;
 using Application.Common;
 using Application.Features.Courses.CompleteLesson;
 using Application.Features.Courses.GetCourse;
 using Application.Features.Courses.ListCourses;
+using Application.Features.Courses.RateCourse;
 using Application.Interfaces;
 using Domain.Enums;
 using MediatR;
@@ -34,5 +36,11 @@ public sealed class CoursesController(ISender sender, ICurrentUser currentUser) 
     public async Task<IActionResult> CompleteLesson(string slug, Guid lessonId, CancellationToken cancellationToken) =>
         (await sender.Send(
             new CompleteLessonCommand(currentUser.UserId!.Value, slug, lessonId),
+            cancellationToken)).ToActionResult();
+
+    [HttpPut("{slug}/rating")]
+    public async Task<IActionResult> Rate(string slug, RateCourseRequest request, CancellationToken cancellationToken) =>
+        (await sender.Send(
+            new RateCourseCommand(currentUser.UserId!.Value, slug, request.Score),
             cancellationToken)).ToActionResult();
 }
