@@ -466,6 +466,19 @@ public sealed class FakeMarketPriceProvider : IMarketPriceProvider
     }
 }
 
+public sealed class FakeSecurityPriceRepository : ISecurityPriceRepository
+{
+    public List<SecurityPrice> Prices { get; } = new();
+
+    public Task<SecurityPrice?> FindAsync(string symbol, Currency currency, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Prices.FirstOrDefault(price => price.Symbol == symbol && price.Currency == currency));
+
+    public Task<IReadOnlyList<SecurityPrice>> ListAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<SecurityPrice>>(Prices.ToList());
+
+    public void AddRange(IEnumerable<SecurityPrice> prices) => Prices.AddRange(prices);
+}
+
 public sealed class FakeBudgetRepository : IBudgetRepository
 {
     public List<Budget> Budgets { get; } = new();
