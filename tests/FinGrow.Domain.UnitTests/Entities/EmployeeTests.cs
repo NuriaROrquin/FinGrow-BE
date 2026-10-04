@@ -111,6 +111,45 @@ public class EmployeeTests
         Should.Throw<DomainException>(() => employee.StartTwoFactorEnrollment(secret, Now));
     }
 
+    [Fact]
+    public void A_new_employee_starts_with_the_default_preferences()
+    {
+        var employee = CreateEmployee();
+
+        employee.Theme.ShouldBe(Theme.System);
+        employee.Language.ShouldBe(Language.es);
+        employee.DateFormat.ShouldBe(DateFormat.DayMonthYear);
+        employee.PreferredCurrency.ShouldBe(Currency.ARS);
+    }
+
+    [Fact]
+    public void Updating_the_preferences_saves_the_four_of_them()
+    {
+        var employee = CreateEmployee();
+
+        employee.UpdatePreferences(Theme.Dark, Language.en, Currency.USD, DateFormat.YearMonthDay, Now.AddDays(1));
+
+        employee.Theme.ShouldBe(Theme.Dark);
+        employee.Language.ShouldBe(Language.en);
+        employee.PreferredCurrency.ShouldBe(Currency.USD);
+        employee.DateFormat.ShouldBe(DateFormat.YearMonthDay);
+        employee.UpdatedAt.ShouldBe(Now.AddDays(1));
+    }
+
+    [Fact]
+    public void A_preference_outside_the_enum_is_rejected()
+    {
+        var employee = CreateEmployee();
+
+        Should.Throw<DomainException>(() => employee.UpdatePreferences(
+            (Theme)99,
+            Language.es,
+            Currency.ARS,
+            DateFormat.DayMonthYear,
+            Now));
+        employee.Theme.ShouldBe(Theme.System);
+    }
+
     private static Employee CreateEmployee() => Employee.Create(
         CompanyId,
         departmentId: null,

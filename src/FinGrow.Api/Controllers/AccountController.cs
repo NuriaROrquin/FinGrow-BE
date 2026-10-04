@@ -4,6 +4,7 @@ using FinGrow.Api.Authentication;
 using FinGrow.Api.Extensions;
 using FinGrow.Application.Common;
 using FinGrow.Application.Features.Account.ChangePassword;
+using FinGrow.Application.Features.Account.Preferences;
 using FinGrow.Application.Features.Account.Profile;
 using FinGrow.Application.Features.Account.TwoFactor;
 using MediatR;
@@ -36,6 +37,16 @@ public sealed class AccountController(IMediator mediator) : ControllerBase
     [HttpPatch("profile")]
     [Authorize(Roles = Rol.Empleado)]
     public async Task<IActionResult> UpdateProfile(UpdateProfileCommand command, CancellationToken cancellationToken) =>
+        (await mediator.Send(command, cancellationToken)).ToActionResult();
+
+    [HttpGet("preferences")]
+    [Authorize(Roles = Rol.Empleado)]
+    public async Task<IActionResult> GetPreferences(CancellationToken cancellationToken) =>
+        (await mediator.Send(new GetPreferencesQuery(), cancellationToken)).ToActionResult();
+
+    [HttpPut("preferences")]
+    [Authorize(Roles = Rol.Empleado)]
+    public async Task<IActionResult> UpdatePreferences(UpdatePreferencesCommand command, CancellationToken cancellationToken) =>
         (await mediator.Send(command, cancellationToken)).ToActionResult();
 
     [HttpGet("2fa")]
