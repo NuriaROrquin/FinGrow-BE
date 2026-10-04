@@ -20,6 +20,7 @@ internal sealed class BymaMarketPriceProvider : IMarketPriceProvider
         new BymaPanel("cedears", 1m),
         new BymaPanel("public-bonds", 100m),
         new BymaPanel("negociable-obligations", 100m),
+        new BymaPanel("lebacs", 100m),
     };
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);

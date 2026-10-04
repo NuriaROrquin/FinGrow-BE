@@ -132,9 +132,11 @@ Si DolarApi no responde o devuelve algo que no se puede leer, el endpoint contes
 frontend muestra cada moneda por separado; una respuesta fallida nunca queda guardada en la caché.
 
 Las inversiones cargadas a mano con símbolo y cantidad se cotizan con los datos públicos del sitio
-de BYMA: acciones, CEDEARs, bonos y ONs, con liquidación a 24 hs. El símbolo tiene que ser la
-variante de la moneda de la inversión (AL30 en pesos, AL30D en dólares) y los bonos y ONs cotizan
-cada 100 nominales. Esos datos no son la API contratada de BYMA ni tienen garantía de servicio:
+de BYMA, con liquidación a 24 hs. Se pueden cotizar las acciones, los CEDEAR, los ETF, los bonos, las
+obligaciones negociables y las letras del Tesoro (LECAP y BONCAP, del panel `lebacs`); los fondos
+comunes, las criptomonedas, los plazos fijos, las cauciones y las cuentas remuneradas no cotizan en
+BYMA y quedan valuados al costo. El símbolo tiene que ser la variante de la moneda de la inversión
+(AL30 en pesos, AL30D en dólares) y los bonos, las ONs y las letras cotizan cada 100 nominales. Esos datos no son la API contratada de BYMA ni tienen garantía de servicio:
 antes de producción con empleados reales se reemplazan por la API EOD de BYMA (contrato con
 marketdata@byma.com.ar), implementando otro `IMarketPriceProvider`.
 
