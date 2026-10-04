@@ -199,7 +199,7 @@ siguiente.
 |---|---|---|
 | `metrics-snapshot` | `0 4 1 * *` (el 1 de cada mes, 01:00 de Argentina) | Genera las fotos mensuales de métricas por empresa y por departamento (`company_metrics_snapshots` y `department_metrics_snapshots`) del último mes cerrado, y completa las de los meses anteriores que falten desde el alta de cada empresa. Es idempotente: correrlo de nuevo actualiza la foto del último mes cerrado en lugar de duplicarla |
 | `mercadopago-sync` | `0 * * * *` (cada hora) | Recorre las cuentas de Mercado Pago vinculadas y trae los movimientos nuevos como pendientes de revisión. Mercado Pago no avisa por webhook lo que un usuario paga, por eso se consulta |
-| `investment-quotes` | `30 21 * * 1-5` (días hábiles, 18:30 de Argentina) | Cotiza las inversiones cargadas con símbolo y cantidad con los precios de cierre de BYMA y les registra la valuación de mercado del día. Correrlo de nuevo el mismo día actualiza esa valuación en lugar de duplicarla. Si BYMA no responde, la corrida queda fallida y no toca ninguna inversión |
+| `investment-quotes` | `30 21 * * 1-5` (días hábiles, 18:30 de Argentina) | Guarda en `security_prices` el último cierre de cada símbolo y moneda que trae BYMA (aunque nadie tenga inversiones con símbolo) y cotiza con esos precios las inversiones cargadas con símbolo y cantidad, registrándoles la valuación de mercado del día. Correrlo de nuevo el mismo día actualiza esa valuación en lugar de duplicarla. Si BYMA no responde, la corrida queda fallida y no toca ni los precios guardados ni ninguna inversión |
 
 Los endpoints viven bajo `/api/jobs` y se protegen con la cabecera `X-Jobs-Key`, que tiene que
 coincidir con `Jobs:ApiKey`. No usan JWT: los llama un cron, no una persona logueada.
