@@ -314,6 +314,7 @@ Siete entidades y tres value objects. El esquema se crea con la migración `Init
 | `budgets` | Budget | Tope por categoría y período |
 | `goals` | Goal | Metas de ahorro con objetivo, avance y fecha límite |
 | `investments` | Investment | Posiciones del portafolio: capital invertido y valuación actual |
+| `security_prices` | SecurityPrice | El último precio de cierre por unidad de cada símbolo y moneda que trajo BYMA; una fila por símbolo y moneda que `investment-quotes` pisa en cada corrida. Es lo que cotiza el formulario de inversiones cuando BYMA no publica precios (fines de semana y feriados) |
 | `job_runs` | JobRun | Registro de cada corrida de un trabajo programado: inicio, fin, resultado y error |
 | `company_metrics_snapshots` | CompanyMetricsSnapshot | Foto mensual de métricas agregadas de una empresa: empleados activos, cuántos participaron, movimientos confirmados, presupuestos, metas e integraciones |
 | `department_metrics_snapshots` | DepartmentMetricsSnapshot | La misma foto, por departamento |
