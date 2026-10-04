@@ -93,6 +93,34 @@ public class BudgetTests
     }
 
     [Fact]
+    public void Changing_the_currency_moves_every_limit_and_keeps_the_amounts()
+    {
+        var budget = CreateMonthlyBudget();
+        budget.SetLimit(ExpenseCategory.Alimentos, Money.From(50000m, Currency.ARS), Now);
+        budget.SetLimit(ExpenseCategory.Transporte, Money.From(1200.5m, Currency.ARS), Now);
+
+        budget.ChangeCurrency(Currency.USD, Now.AddDays(1));
+
+        budget.Currency.ShouldBe(Currency.USD);
+        budget.LimitFor(ExpenseCategory.Alimentos).ShouldBe(Money.From(50000m, Currency.USD));
+        budget.LimitFor(ExpenseCategory.Transporte).ShouldBe(Money.From(1200.5m, Currency.USD));
+        budget.UpdatedAt.ShouldBe(Now.AddDays(1));
+    }
+
+    [Fact]
+    public void After_changing_the_currency_new_limits_go_in_the_new_one()
+    {
+        var budget = CreateMonthlyBudget();
+        budget.SetLimit(ExpenseCategory.Alimentos, Money.From(50000m, Currency.ARS), Now);
+
+        budget.ChangeCurrency(Currency.EUR, Now);
+
+        Should.NotThrow(() => budget.SetLimit(ExpenseCategory.Salud, Money.From(300m, Currency.EUR), Now));
+        Should.Throw<DomainException>(() =>
+            budget.SetLimit(ExpenseCategory.Transporte, Money.From(500m, Currency.ARS), Now));
+    }
+
+    [Fact]
     public void Removing_a_limit_that_does_not_exist_fails()
     {
         var budget = CreateMonthlyBudget();
@@ -151,6 +179,17 @@ public class BudgetTests
         next.LimitFor(ExpenseCategory.Alimentos)!.Amount.ShouldBe(50000m);
         next.LimitFor(ExpenseCategory.Transporte)!.Amount.ShouldBe(20000m);
         next.Limits.ShouldAllBe(limit => limit.BudgetId == next.Id);
+    }
+
+    [Fact]
+    public void Duplicating_a_budget_does_not_share_money_instances_with_the_original()
+    {
+        var budget = CreateMonthlyBudget();
+        budget.SetLimit(ExpenseCategory.Alimentos, Money.From(50000m, Currency.ARS), Now);
+
+        var next = budget.Duplicate(new DateOnly(2026, 4, 1), Now.AddMonths(1));
+
+        next.LimitFor(ExpenseCategory.Alimentos).ShouldNotBeSameAs(budget.LimitFor(ExpenseCategory.Alimentos));
     }
 
     [Fact]

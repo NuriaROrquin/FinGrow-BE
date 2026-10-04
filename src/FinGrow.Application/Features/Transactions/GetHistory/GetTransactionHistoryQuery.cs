@@ -50,7 +50,7 @@ internal sealed class GetTransactionHistoryQueryHandler(
             filters.PageSize,
             filters.Search,
             filters.Type,
-            filters.Status,
+            filters.EffectiveStatuses,
             filters.ExpenseCategory,
             filters.IncomeCategory,
             filters.PaymentMethod,

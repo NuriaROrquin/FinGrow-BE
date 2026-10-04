@@ -1,9 +1,8 @@
 namespace FinGrow.Api.UnitTests.Persistence;
 
+using FinGrow.Domain.Enums;
 using FinGrow.Infrastructure.Persistence.Seeding;
 
-// La carga contra la base se probo a mano (dos corridas seguidas); aca se verifica que el
-// catalogo en si sea cargable, que es lo que rompe si alguien agrega contenido invalido.
 public class EducationCatalogTests
 {
     [Fact]
@@ -40,13 +39,42 @@ public class EducationCatalogTests
     }
 
     [Fact]
-    public void There_is_content_related_to_investment_types_for_the_investments_screen()
+    public void A_first_load_adds_the_whole_catalog()
+    {
+        EducationCatalogSeeder.MissingCourses(Array.Empty<string>()).Count.ShouldBe(EducationCatalog.Courses.Length);
+        EducationCatalogSeeder.MissingArticles(Array.Empty<string>()).Count.ShouldBe(EducationCatalog.Articles.Length);
+    }
+
+    [Fact]
+    public void A_second_load_adds_nothing()
+    {
+        var courseSlugs = EducationCatalog.Courses.Select(course => course.Slug).ToList();
+        var articleSlugs = EducationCatalog.Articles.Select(article => article.Slug).ToList();
+
+        EducationCatalogSeeder.MissingCourses(courseSlugs).ShouldBeEmpty();
+        EducationCatalogSeeder.MissingArticles(articleSlugs).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void A_load_after_new_content_was_added_to_the_catalog_adds_only_the_new_content()
+    {
+        var courseSlugs = EducationCatalog.Courses.Skip(1).Select(course => course.Slug).ToList();
+        var articleSlugs = EducationCatalog.Articles.Skip(1).Select(article => article.Slug).ToList();
+
+        EducationCatalogSeeder.MissingCourses(courseSlugs).Select(course => course.Slug)
+            .ShouldBe(new[] { EducationCatalog.Courses[0].Slug });
+        EducationCatalogSeeder.MissingArticles(articleSlugs).Select(article => article.Slug)
+            .ShouldBe(new[] { EducationCatalog.Articles[0].Slug });
+    }
+
+    [Fact]
+    public void Every_investment_type_has_related_content_for_the_investments_screen()
     {
         var relatedTypes = EducationCatalog.Courses.Select(course => course.RelatedInvestmentType)
             .Concat(EducationCatalog.Articles.Select(article => article.RelatedInvestmentType))
-            .OfType<Domain.Enums.InvestmentType>()
+            .OfType<InvestmentType>()
             .Distinct();
 
-        relatedTypes.ShouldNotBeEmpty();
+        relatedTypes.ShouldBe(Enum.GetValues<InvestmentType>(), ignoreOrder: true);
     }
 }

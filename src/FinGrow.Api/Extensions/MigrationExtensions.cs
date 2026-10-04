@@ -1,6 +1,7 @@
 namespace FinGrow.Api.Extensions;
 
 using FinGrow.Infrastructure.Persistence;
+using FinGrow.Infrastructure.Persistence.Seeding;
 using Microsoft.EntityFrameworkCore;
 
 public static partial class MigrationExtensions
@@ -22,12 +23,15 @@ public static partial class MigrationExtensions
         if (pending.Count == 0)
         {
             LogUpToDate(app.Logger);
-            return;
+        }
+        else
+        {
+            LogApplying(app.Logger, pending.Count, pending);
+            await dbContext.Database.MigrateAsync();
+            LogApplied(app.Logger);
         }
 
-        LogApplying(app.Logger, pending.Count, pending);
-        await dbContext.Database.MigrateAsync();
-        LogApplied(app.Logger);
+        await scope.ServiceProvider.GetRequiredService<EducationCatalogSeeder>().SeedAsync();
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Migraciones al arrancar deshabilitadas ({Key}=false).")]

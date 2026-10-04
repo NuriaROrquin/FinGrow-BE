@@ -16,5 +16,12 @@ internal sealed class CompanyRepository : ICompanyRepository
 
     public Task<Company?> GetByEmailAsync(Email email, CancellationToken cancellationToken) =>
         _dbContext.Set<Company>().SingleOrDefaultAsync(company => company.Email == email, cancellationToken);
+
+    public async Task<IReadOnlyList<Company>> ListActiveAsync(CancellationToken cancellationToken = default) =>
+        await _dbContext.Companies
+            .Include(company => company.Departments)
+            .Where(company => company.IsActive)
+            .OrderBy(company => company.Name)
+            .ToListAsync(cancellationToken);
 }
 

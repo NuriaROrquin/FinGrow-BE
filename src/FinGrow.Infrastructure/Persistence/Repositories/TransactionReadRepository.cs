@@ -11,6 +11,107 @@ internal sealed class TransactionReadRepository : ITransactionReadRepository
 
     public TransactionReadRepository(FinGrowDbContext dbContext) => _dbContext = dbContext;
 
+    public async Task<IReadOnlyList<MonthlyExpenseTotal>> GetMonthlyExpensesAsync(
+        Guid employeeId,
+        Currency currency,
+        DateOnly fromDate,
+        DateOnly toDate,
+        CancellationToken cancellationToken = default)
+    {
+        var totals = await _dbContext.Transactions
+            .AsNoTracking()
+            .Where(transaction =>
+                transaction.EmployeeId == employeeId
+                && transaction.Status == TransactionStatus.Confirmed
+                && transaction.Type == TransactionType.Expense
+                && transaction.Amount.Currency == currency
+                && transaction.OccurredOn >= fromDate
+                && transaction.OccurredOn <= toDate)
+            .GroupBy(transaction => new { transaction.OccurredOn.Year, transaction.OccurredOn.Month })
+            .Select(group => new
+            {
+                group.Key.Year,
+                group.Key.Month,
+                Total = group.Sum(transaction => transaction.Amount.Amount),
+            })
+            .OrderBy(total => total.Year)
+            .ThenBy(total => total.Month)
+            .ToListAsync(cancellationToken);
+
+        return totals
+            .Select(total => new MonthlyExpenseTotal(total.Year, total.Month, total.Total))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<MonthlyIncomeExpenseTotal>> GetMonthlyIncomeExpensesAsync(
+        Guid employeeId,
+        Currency currency,
+        DateOnly fromDate,
+        DateOnly toDate,
+        CancellationToken cancellationToken = default)
+    {
+        var totals = await _dbContext.Transactions
+            .AsNoTracking()
+            .Where(transaction =>
+                transaction.EmployeeId == employeeId
+                && transaction.Status == TransactionStatus.Confirmed
+                && transaction.Amount.Currency == currency
+                && transaction.OccurredOn >= fromDate
+                && transaction.OccurredOn <= toDate)
+            .GroupBy(transaction => new { transaction.OccurredOn.Year, transaction.OccurredOn.Month })
+            .Select(group => new
+            {
+                group.Key.Year,
+                group.Key.Month,
+                TotalIncome = group.Sum(transaction =>
+                    transaction.Type == TransactionType.Income ? transaction.Amount.Amount : 0m),
+                TotalExpense = group.Sum(transaction =>
+                    transaction.Type == TransactionType.Expense ? transaction.Amount.Amount : 0m),
+            })
+            .OrderBy(total => total.Year)
+            .ThenBy(total => total.Month)
+            .ToListAsync(cancellationToken);
+
+        return totals
+            .Select(total => new MonthlyIncomeExpenseTotal(
+                total.Year,
+                total.Month,
+                total.TotalIncome,
+                total.TotalExpense))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<CategoryExpenseTotal>> GetExpensesByCategoryAsync(
+        Guid employeeId,
+        Currency currency,
+        DateOnly fromDate,
+        DateOnly toDate,
+        CancellationToken cancellationToken = default)
+    {
+        var totals = await _dbContext.Transactions
+            .AsNoTracking()
+            .Where(transaction =>
+                transaction.EmployeeId == employeeId
+                && transaction.Status == TransactionStatus.Confirmed
+                && transaction.Type == TransactionType.Expense
+                && transaction.Amount.Currency == currency
+                && transaction.OccurredOn >= fromDate
+                && transaction.OccurredOn <= toDate)
+            .GroupBy(transaction => transaction.ExpenseCategory!.Value)
+            .Select(group => new
+            {
+                Category = group.Key,
+                Total = group.Sum(transaction => transaction.Amount.Amount),
+            })
+            .Where(total => total.Total > 0m)
+            .OrderBy(total => total.Category)
+            .ToListAsync(cancellationToken);
+
+        return totals
+            .Select(total => new CategoryExpenseTotal(total.Category, total.Total))
+            .ToList();
+    }
+
     public async Task<TransactionSummary> GetSummaryAsync(
         Guid employeeId,
         DateOnly? fromDate = null,
@@ -71,7 +172,7 @@ internal sealed class TransactionReadRepository : ITransactionReadRepository
         int pageSize,
         string? search,
         TransactionType? type,
-        TransactionStatus? status,
+        IReadOnlyCollection<TransactionStatus> statuses,
         ExpenseCategory? expenseCategory,
         IncomeCategory? incomeCategory,
         PaymentMethod? paymentMethod,
@@ -79,12 +180,69 @@ internal sealed class TransactionReadRepository : ITransactionReadRepository
         DateOnly? toDate,
         CancellationToken cancellationToken = default)
     {
+        var filteredQuery = BuildFilteredQuery(
+            employeeId,
+            search,
+            type,
+            statuses,
+            expenseCategory,
+            incomeCategory,
+            paymentMethod,
+            fromDate,
+            toDate);
+
+        var totalCount = await filteredQuery.CountAsync(cancellationToken);
+
+        var items = await filteredQuery
+            .OrderByDescending(transaction => transaction.OccurredOn)
+            .ThenByDescending(transaction => transaction.Id)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        return new TransactionPage(items, pageNumber, pageSize, totalCount);
+    }
+
+    public async Task<IReadOnlyList<Transaction>> GetFilteredAsync(
+        Guid employeeId,
+        string? search,
+        TransactionType? type,
+        IReadOnlyCollection<TransactionStatus> statuses,
+        ExpenseCategory? expenseCategory,
+        IncomeCategory? incomeCategory,
+        PaymentMethod? paymentMethod,
+        DateOnly? fromDate,
+        DateOnly? toDate,
+        CancellationToken cancellationToken = default) =>
+        await BuildFilteredQuery(
+                employeeId,
+                search,
+                type,
+                statuses,
+                expenseCategory,
+                incomeCategory,
+                paymentMethod,
+                fromDate,
+                toDate)
+            .OrderByDescending(transaction => transaction.OccurredOn)
+            .ThenByDescending(transaction => transaction.Id)
+            .ToListAsync(cancellationToken);
+
+    private IQueryable<Transaction> BuildFilteredQuery(
+        Guid employeeId,
+        string? search,
+        TransactionType? type,
+        IReadOnlyCollection<TransactionStatus> statuses,
+        ExpenseCategory? expenseCategory,
+        IncomeCategory? incomeCategory,
+        PaymentMethod? paymentMethod,
+        DateOnly? fromDate,
+        DateOnly? toDate)
+    {
         var filteredQuery = _dbContext.Transactions
             .AsNoTracking()
             .Where(transaction => transaction.EmployeeId == employeeId)
-            .Where(transaction =>
-                transaction.Status == TransactionStatus.Pending
-                || transaction.Status == TransactionStatus.Confirmed);
+            .Where(transaction => statuses.Contains(transaction.Status));
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -99,11 +257,6 @@ internal sealed class TransactionReadRepository : ITransactionReadRepository
         {
             filteredQuery = filteredQuery.Where(transaction => transaction.Type == type.Value);
         }
-
-            if (status.HasValue)
-            {
-                filteredQuery = filteredQuery.Where(transaction => transaction.Status == status.Value);
-            }
 
         if (expenseCategory.HasValue)
         {
@@ -130,16 +283,7 @@ internal sealed class TransactionReadRepository : ITransactionReadRepository
             filteredQuery = filteredQuery.Where(transaction => transaction.OccurredOn <= toDate.Value);
         }
 
-        var totalCount = await filteredQuery.CountAsync(cancellationToken);
-
-        var items = await filteredQuery
-            .OrderByDescending(transaction => transaction.OccurredOn)
-            .ThenByDescending(transaction => transaction.Id)
-            .Skip((pageNumber - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(cancellationToken);
-
-        return new TransactionPage(items, pageNumber, pageSize, totalCount);
+        return filteredQuery;
     }
 
     private static decimal GetTotal(IEnumerable<TypeCurrencyTotal> totals, TransactionType type, Currency currency) =>

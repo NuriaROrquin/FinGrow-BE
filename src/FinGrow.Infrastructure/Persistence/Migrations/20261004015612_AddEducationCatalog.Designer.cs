@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FinGrow.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(FinGrowDbContext))]
-    [Migration("20260927151122_AddEducationCatalog")]
+    [Migration("20261004015612_AddEducationCatalog")]
     partial class AddEducationCatalog
     {
         /// <inheritdoc />
@@ -144,7 +144,6 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("FinGrow.Domain.Entities.BudgetCategoryLimit", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -240,6 +239,38 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_companies_tax_id");
 
                     b.ToTable("companies", (string)null);
+                });
+
+            modelBuilder.Entity("FinGrow.Domain.Entities.CompanyMetricsSnapshot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTimeOffset>("ComputedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("computed_at");
+
+                    b.Property<DateOnly>("PeriodStart")
+                        .HasColumnType("date")
+                        .HasColumnName("period_start");
+
+                    b.HasKey("Id")
+                        .HasName("pk_company_metrics_snapshots");
+
+                    b.HasIndex("CompanyId", "PeriodStart")
+                        .IsUnique()
+                        .HasDatabaseName("ix_company_metrics_snapshots_company_id_period_start");
+
+                    b.ToTable("company_metrics_snapshots", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_company_metrics_snapshots_period_starts_on_day_one", "extract(day from period_start) = 1");
+                        });
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.Course", b =>
@@ -361,6 +392,45 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                     b.ToTable("departments", (string)null);
                 });
 
+            modelBuilder.Entity("FinGrow.Domain.Entities.DepartmentMetricsSnapshot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTimeOffset>("ComputedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("computed_at");
+
+                    b.Property<Guid>("DepartmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("department_id");
+
+                    b.Property<DateOnly>("PeriodStart")
+                        .HasColumnType("date")
+                        .HasColumnName("period_start");
+
+                    b.HasKey("Id")
+                        .HasName("pk_department_metrics_snapshots");
+
+                    b.HasIndex("CompanyId", "PeriodStart")
+                        .HasDatabaseName("ix_department_metrics_snapshots_company_id_period_start");
+
+                    b.HasIndex("DepartmentId", "PeriodStart")
+                        .IsUnique()
+                        .HasDatabaseName("ix_department_metrics_snapshots_department_id_period_start");
+
+                    b.ToTable("department_metrics_snapshots", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_department_metrics_snapshots_period_starts_on_day_one", "extract(day from period_start) = 1");
+                        });
+                });
+
             modelBuilder.Entity("FinGrow.Domain.Entities.Employee", b =>
                 {
                     b.Property<Guid>("Id")
@@ -420,6 +490,15 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)")
                         .HasColumnName("preferred_currency");
+
+                    b.Property<DateTimeOffset?>("TwoFactorEnabledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("two_factor_enabled_at");
+
+                    b.Property<string>("TwoFactorSecret")
+                        .HasColumnType("text")
+                        .HasColumnName("two_factor_secret")
+                        .HasAnnotation("FinGrow:Encrypted", true);
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -653,6 +732,16 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("date")
                         .HasColumnName("purchased_on");
 
+                    b.Property<decimal?>("Quantity")
+                        .HasPrecision(20, 6)
+                        .HasColumnType("numeric(20,6)")
+                        .HasColumnName("quantity");
+
+                    b.Property<string>("Symbol")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("symbol");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -672,13 +761,16 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                     b.ToTable("investments", null, t =>
                         {
                             t.HasCheckConstraint("ck_investments_invested_positive", "invested_amount > 0");
+
+                            t.HasCheckConstraint("ck_investments_quantity_positive", "quantity IS NULL OR quantity > 0");
+
+                            t.HasCheckConstraint("ck_investments_symbol_with_quantity", "(symbol IS NULL) = (quantity IS NULL)");
                         });
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.InvestmentValuation", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -707,6 +799,55 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_investment_valuations_investment_id_valued_on");
 
                     b.ToTable("investment_valuations", (string)null);
+                });
+
+            modelBuilder.Entity("FinGrow.Domain.Entities.JobRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("error");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<string>("JobName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("job_name");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Summary")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("summary");
+
+                    b.HasKey("Id")
+                        .HasName("pk_job_runs");
+
+                    b.HasIndex("JobName", "StartedAt")
+                        .HasDatabaseName("ix_job_runs_job_name_started_at");
+
+                    b.ToTable("job_runs", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_job_runs_finished_after_started", "finished_at IS NULL OR finished_at >= started_at");
+                        });
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.Lesson", b =>
@@ -951,6 +1092,63 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("FinGrow.Domain.Entities.CompanyMetricsSnapshot", b =>
+                {
+                    b.HasOne("FinGrow.Domain.Entities.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_company_metrics_snapshots_companies_company_id");
+
+                    b.OwnsOne("FinGrow.Domain.ValueObjects.PeriodMetrics", "Metrics", b1 =>
+                        {
+                            b1.Property<Guid>("CompanyMetricsSnapshotId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<int>("ActiveEmployees")
+                                .HasColumnType("integer")
+                                .HasColumnName("active_employees");
+
+                            b1.Property<int>("ConfirmedTransactions")
+                                .HasColumnType("integer")
+                                .HasColumnName("confirmed_transactions");
+
+                            b1.Property<int>("EmployeesWithActiveGoal")
+                                .HasColumnType("integer")
+                                .HasColumnName("employees_with_active_goal");
+
+                            b1.Property<int>("EmployeesWithBudget")
+                                .HasColumnType("integer")
+                                .HasColumnName("employees_with_budget");
+
+                            b1.Property<int>("EmployeesWithIntegration")
+                                .HasColumnType("integer")
+                                .HasColumnName("employees_with_integration");
+
+                            b1.Property<int>("GoalsAchieved")
+                                .HasColumnType("integer")
+                                .HasColumnName("goals_achieved");
+
+                            b1.Property<int>("ParticipatingEmployees")
+                                .HasColumnType("integer")
+                                .HasColumnName("participating_employees");
+
+                            b1.HasKey("CompanyMetricsSnapshotId")
+                                .HasName("pk_company_metrics_snapshots");
+
+                            b1.ToTable("company_metrics_snapshots");
+
+                            b1.WithOwner()
+                                .HasForeignKey("CompanyMetricsSnapshotId")
+                                .HasConstraintName("fk_company_metrics_snapshots_company_metrics_snapshots_id");
+                        });
+
+                    b.Navigation("Metrics")
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("FinGrow.Domain.Entities.Department", b =>
                 {
                     b.HasOne("FinGrow.Domain.Entities.Company", null)
@@ -959,6 +1157,70 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_departments_companies_company_id");
+                });
+
+            modelBuilder.Entity("FinGrow.Domain.Entities.DepartmentMetricsSnapshot", b =>
+                {
+                    b.HasOne("FinGrow.Domain.Entities.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_department_metrics_snapshots_companies_company_id");
+
+                    b.HasOne("FinGrow.Domain.Entities.Department", null)
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_department_metrics_snapshots_departments_department_id");
+
+                    b.OwnsOne("FinGrow.Domain.ValueObjects.PeriodMetrics", "Metrics", b1 =>
+                        {
+                            b1.Property<Guid>("DepartmentMetricsSnapshotId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<int>("ActiveEmployees")
+                                .HasColumnType("integer")
+                                .HasColumnName("active_employees");
+
+                            b1.Property<int>("ConfirmedTransactions")
+                                .HasColumnType("integer")
+                                .HasColumnName("confirmed_transactions");
+
+                            b1.Property<int>("EmployeesWithActiveGoal")
+                                .HasColumnType("integer")
+                                .HasColumnName("employees_with_active_goal");
+
+                            b1.Property<int>("EmployeesWithBudget")
+                                .HasColumnType("integer")
+                                .HasColumnName("employees_with_budget");
+
+                            b1.Property<int>("EmployeesWithIntegration")
+                                .HasColumnType("integer")
+                                .HasColumnName("employees_with_integration");
+
+                            b1.Property<int>("GoalsAchieved")
+                                .HasColumnType("integer")
+                                .HasColumnName("goals_achieved");
+
+                            b1.Property<int>("ParticipatingEmployees")
+                                .HasColumnType("integer")
+                                .HasColumnName("participating_employees");
+
+                            b1.HasKey("DepartmentMetricsSnapshotId")
+                                .HasName("pk_department_metrics_snapshots");
+
+                            b1.ToTable("department_metrics_snapshots");
+
+                            b1.WithOwner()
+                                .HasForeignKey("DepartmentMetricsSnapshotId")
+                                .HasConstraintName("fk_department_metrics_snapshots_department_metrics_snapshots_id");
+                        });
+
+                    b.Navigation("Metrics")
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.Employee", b =>

@@ -85,6 +85,36 @@ public class JwtAuthenticationTests : IClassFixture<JwtAuthenticationTests.Secur
     }
 
     [Fact]
+    public async Task A_two_factor_challenge_is_rejected_as_a_session_token()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var tokenService = scope.ServiceProvider.GetRequiredService<ITokenService>();
+        var challenge = tokenService.GenerateTwoFactorChallenge(Guid.CreateVersion7());
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add("Cookie", $"{SessionCookie.Name}={challenge.Value}");
+
+        var response = await client.GetAsync(new Uri("/test/secure", UriKind.Relative));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public void A_challenge_is_read_back_but_a_session_token_is_not_accepted_as_a_challenge()
+    {
+        var employeeId = Guid.CreateVersion7();
+        using var scope = _factory.Services.CreateScope();
+        var tokenService = scope.ServiceProvider.GetRequiredService<ITokenService>();
+
+        var challenge = tokenService.GenerateTwoFactorChallenge(employeeId);
+        var session = tokenService.GenerateToken(employeeId, Guid.CreateVersion7(), "Empleado", "Ana Pérez");
+
+        tokenService.ReadTwoFactorChallenge(challenge.Value).ShouldBe(employeeId);
+        tokenService.ReadTwoFactorChallenge(session.Value).ShouldBeNull();
+        tokenService.ReadTwoFactorChallenge("not-a-jwt").ShouldBeNull();
+    }
+
+    [Fact]
     public async Task Session_endpoint_returns_the_claims_and_delete_clears_the_cookie()
     {
         var userId = Guid.CreateVersion7();
@@ -139,6 +169,7 @@ public class JwtAuthenticationTests : IClassFixture<JwtAuthenticationTests.Secur
                     ["MercadoPago:ClientSecret"] = "unit-test-mp-client-secret",
                     ["MercadoPago:RedirectUri"] = "https://api.test/api/integrations/mercadopago/oauth/callback",
                     ["TokenEncryption:Key"] = "dW5pdC10ZXN0LXRva2VuLWVuY3J5cHRpb24ta2V5ISE=",
+                    ["Jobs:ApiKey"] = "unit-test-jobs-api-key-1234",
                 }));
 
             builder.ConfigureTestServices(services =>

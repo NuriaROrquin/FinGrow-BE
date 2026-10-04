@@ -226,6 +226,51 @@ public class MercadoPagoSynchronizerTests
     }
 
     [Fact]
+    public async Task A_401_with_a_refresh_token_renews_the_authorization_and_retries()
+    {
+        _payments.UnauthorizedAccessToken = "access";
+        _oauth.Tokens = new MercadoPagoTokens("new-access", "new-refresh", TimeSpan.FromDays(180), MercadoPagoUserId);
+        _payments.Payments.Add(Purchase(30, "Canva", 10285m, "debit_card"));
+
+        var result = await Sync();
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Imported.ShouldBe(1);
+        _integration.Grant!.AccessToken.ShouldBe("new-access");
+        _payments.Searches.ShouldHaveSingleItem();
+        _unitOfWork.SaveCount.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task A_401_that_persists_after_renewing_is_reported_as_an_expired_authorization()
+    {
+        _payments.UnauthorizedAccessToken = "access";
+        _oauth.Tokens = new MercadoPagoTokens("access", "refresh", TimeSpan.FromDays(180), MercadoPagoUserId);
+        _payments.Payments.Add(Purchase(31, "Canva", 10285m, "debit_card"));
+
+        var result = await Sync();
+
+        result.Error.ShouldBe(MercadoPagoSynchronizer.GrantExpired);
+        _transactions.Transactions.ShouldBeEmpty();
+        _integration.LastSyncedAt.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task A_401_without_a_refresh_token_is_reported_as_an_expired_authorization()
+    {
+        _integration.Authorize(OAuthGrant.From("access", null, Now.AddDays(170)), Now);
+        _payments.UnauthorizedAccessToken = "access";
+        _payments.Payments.Add(Purchase(32, "Canva", 10285m, "debit_card"));
+
+        var result = await Sync();
+
+        result.Error.ShouldBe(MercadoPagoSynchronizer.GrantExpired);
+        _transactions.Transactions.ShouldBeEmpty();
+        _integration.LastSyncedAt.ShouldBeNull();
+        _unitOfWork.SaveCount.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task An_integration_without_a_grant_cannot_be_synced()
     {
         var unauthorized = EmployeeIntegration.Create(EmployeeId, IntegrationProvider.MercadoPago, MercadoPagoUserId, Now);

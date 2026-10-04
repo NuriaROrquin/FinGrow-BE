@@ -13,6 +13,10 @@ internal sealed class BudgetCategoryLimitConfiguration : IEntityTypeConfiguratio
 
         builder.HasKey(limit => limit.Id);
 
+        // El id lo genera el dominio. Si EF lo creyera generado por la base, un tope agregado a un
+        // presupuesto ya guardado llegaria con id y lo trataria como existente: UPDATE en vez de INSERT.
+        builder.Property(limit => limit.Id).ValueGeneratedNever();
+
         builder.Property(limit => limit.Category)
             .HasConversion(new ExpenseCategoryConverter())
             .HasMaxLength(ExpenseCategoryConverter.MaxLength)

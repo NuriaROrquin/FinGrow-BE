@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using FinGrow.Api.Authentication;
 using FinGrow.Api.Extensions;
+using FinGrow.Api.Jobs;
 using FinGrow.Api.MercadoPago;
 using FinGrow.Application;
 using FinGrow.Infrastructure;
@@ -19,9 +20,14 @@ builder.Services.AddOptions<MercadoPagoReturnOptions>()
     .Bind(builder.Configuration.GetSection(MercadoPagoReturnOptions.SectionName))
     .ValidateDataAnnotations()
     .ValidateOnStart();
+builder.Services.AddOptions<JobsOptions>()
+    .Bind(builder.Configuration.GetSection(JobsOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 
 builder.Services.AddControllers()
-    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
+    .AddReadableInvalidRequestResponses();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 

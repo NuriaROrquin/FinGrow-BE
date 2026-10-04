@@ -39,13 +39,21 @@ public sealed class FinGrowDbContext : DbContext, IUnitOfWork
 
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
+    public DbSet<JobRun> JobRuns => Set<JobRun>();
+
+    public DbSet<CompanyMetricsSnapshot> CompanyMetricsSnapshots => Set<CompanyMetricsSnapshot>();
+
+    public DbSet<DepartmentMetricsSnapshot> DepartmentMetricsSnapshots => Set<DepartmentMetricsSnapshot>();
+
     public DbSet<Course> Courses => Set<Course>();
 
     public DbSet<Lesson> Lessons => Set<Lesson>();
 
     public DbSet<Article> Articles => Set<Article>();
 
-protected override void OnModelCreating(ModelBuilder modelBuilder)
+    public DbSet<LessonCompletion> LessonCompletions => Set<LessonCompletion>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
 

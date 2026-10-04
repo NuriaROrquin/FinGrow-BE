@@ -1,49 +1,35 @@
 namespace FinGrow.Application.Features.Transactions.GetHistory;
 
+using FinGrow.Domain.Enums;
 using FluentValidation;
 
 public sealed class GetTransactionHistoryQueryValidator : AbstractValidator<GetTransactionHistoryQuery>
 {
-    public GetTransactionHistoryQueryValidator() =>
-        RuleFor(query => query.Filters).SetValidator(new TransactionFiltersValidator());
-}
-
-public sealed class TransactionFiltersValidator : AbstractValidator<TransactionFilters>
-{
-    public TransactionFiltersValidator()
+    public GetTransactionHistoryQueryValidator()
     {
-        RuleFor(filters => filters.PageNumber)
+        RuleFor(query => query.Filters.PageNumber)
             .GreaterThanOrEqualTo(1);
 
-        RuleFor(filters => filters.PageSize)
+        RuleFor(query => query.Filters.PageSize)
             .InclusiveBetween(1, 100);
 
-        RuleFor(filters => filters.Type)
-            .IsInEnum()
-            .When(filters => filters.Type.HasValue)
-            .WithMessage("El tipo debe ser 'ingreso' o 'gasto'.");
+        RuleFor(query => query.Filters.Type)
+            .Must(type => !type.HasValue || Enum.IsDefined(type.Value))
+            .WithMessage("El tipo de transaccion no es valido.");
 
-        RuleFor(filters => filters.Status)
-            .IsInEnum()
-            .When(filters => filters.Status.HasValue)
-            .WithMessage("El estado debe ser 'pendiente' o 'confirmado'.");
+        RuleForEach(query => query.Filters.Status)
+            .Must(status => Enum.IsDefined(status))
+            .WithMessage("El estado de la transaccion no es valido.");
 
-        RuleFor(filters => filters.ExpenseCategory)
-            .IsInEnum()
-            .When(filters => filters.ExpenseCategory.HasValue)
-            .WithMessage("La categoria de gasto no existe.");
+        RuleFor(query => query.Filters.ExpenseCategory)
+            .Must(category => !category.HasValue || Enum.IsDefined(category.Value))
+            .WithMessage("La categoria de gasto no es valida.");
 
-        RuleFor(filters => filters.IncomeCategory)
-            .IsInEnum()
-            .When(filters => filters.IncomeCategory.HasValue)
-            .WithMessage("La categoria de ingreso no existe.");
+        RuleFor(query => query.Filters.IncomeCategory)
+            .Must(category => !category.HasValue || Enum.IsDefined(category.Value))
+            .WithMessage("La categoria de ingreso no es valida.");
 
-        RuleFor(filters => filters.PaymentMethod)
-            .IsInEnum()
-            .When(filters => filters.PaymentMethod.HasValue)
-            .WithMessage("El medio de pago no existe.");
-
-        RuleFor(filters => filters)
+        RuleFor(query => query.Filters)
             .Must(filters => !filters.DateFrom.HasValue
                 || !filters.DateTo.HasValue
                 || filters.DateFrom <= filters.DateTo)

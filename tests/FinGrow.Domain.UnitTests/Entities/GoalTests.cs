@@ -184,6 +184,87 @@ public class GoalTests
     }
 
     [Fact]
+    public void The_monthly_commitment_splits_the_target_between_the_creation_and_deadline_months()
+    {
+        // Creada el 15 de marzo con limite el 31 de diciembre: de marzo a diciembre son 10 meses.
+        var goal = CreateGoal();
+
+        goal.PlannedMonths.ShouldBe(10);
+        goal.MonthlyCommitment.ShouldBe(Money.From(100000m, Currency.ARS));
+    }
+
+    [Fact]
+    public void A_goal_due_in_the_same_month_it_was_created_commits_everything_that_month()
+    {
+        var goal = Goal.Create(EmployeeId, "Regalo", Money.From(5000m, Currency.ARS), Today.AddDays(5), Now);
+
+        goal.PlannedMonths.ShouldBe(1);
+        goal.MonthlyCommitment.ShouldBe(Money.From(5000m, Currency.ARS));
+    }
+
+    [Fact]
+    public void A_goal_commits_savings_only_between_its_creation_and_deadline_months()
+    {
+        var goal = CreateGoal();
+
+        goal.IsCommittedIn(new DateOnly(2026, 2, 28)).ShouldBeFalse();
+        goal.IsCommittedIn(new DateOnly(2026, 3, 1)).ShouldBeTrue();
+        goal.IsCommittedIn(new DateOnly(2026, 12, 15)).ShouldBeTrue();
+        goal.IsCommittedIn(new DateOnly(2027, 1, 1)).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void An_achieved_goal_still_commits_in_the_month_it_was_reached_but_not_after()
+    {
+        var goal = CreateGoal();
+        goal.AddContribution(Money.From(1000000m, Currency.ARS), Today, null, Now);
+
+        goal.IsCommittedIn(new DateOnly(2026, 3, 20)).ShouldBeTrue();
+        goal.IsCommittedIn(new DateOnly(2026, 4, 1)).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void A_goal_completed_with_a_backdated_contribution_stops_committing_after_the_contribution_month()
+    {
+        var goal = CreateGoal();
+        goal.AddContribution(Money.From(400000m, Currency.ARS), new DateOnly(2026, 5, 10), null, new DateTimeOffset(2026, 8, 1, 12, 0, 0, TimeSpan.Zero));
+        goal.AddContribution(Money.From(600000m, Currency.ARS), new DateOnly(2026, 6, 5), null, new DateTimeOffset(2026, 9, 1, 12, 0, 0, TimeSpan.Zero));
+
+        goal.AchievedAt.ShouldBe(new DateTimeOffset(2026, 9, 1, 12, 0, 0, TimeSpan.Zero));
+        goal.ReachedOn.ShouldBe(new DateOnly(2026, 6, 5));
+        goal.IsCommittedIn(new DateOnly(2026, 6, 1)).ShouldBeTrue();
+        goal.IsCommittedIn(new DateOnly(2026, 7, 1)).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void The_target_is_reached_by_contribution_date_not_by_registration_order()
+    {
+        var goal = CreateGoal();
+        goal.AddContribution(Money.From(700000m, Currency.ARS), new DateOnly(2026, 6, 1), null, Now);
+        goal.AddContribution(Money.From(300000m, Currency.ARS), new DateOnly(2026, 4, 1), null, Now);
+
+        goal.ReachedOn.ShouldBe(new DateOnly(2026, 6, 1));
+    }
+
+    [Fact]
+    public void A_goal_in_progress_has_not_been_reached()
+    {
+        var goal = CreateGoal();
+        goal.AddContribution(Money.From(1000m, Currency.ARS), Today, null, Now);
+
+        goal.ReachedOn.ShouldBeNull();
+    }
+
+    [Fact]
+    public void A_cancelled_goal_commits_nothing()
+    {
+        var goal = CreateGoal();
+        goal.Cancel(Now);
+
+        goal.IsCommittedIn(Today).ShouldBeFalse();
+    }
+
+    [Fact]
     public void An_active_goal_is_overdue_only_after_its_deadline()
     {
         var goal = CreateGoal();

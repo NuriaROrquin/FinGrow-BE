@@ -14,7 +14,25 @@ using Microsoft.AspNetCore.Mvc;
 public sealed class AuthController(IMediator mediator) : ControllerBase
 {
     [HttpPost("empleado")]
-    public async Task<IActionResult> LoginEmpleado(LoginEmployeeCommand command, CancellationToken cancellationToken) =>
+    public async Task<IActionResult> LoginEmpleado(LoginEmployeeCommand command, CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(command, cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return result.ToActionResult();
+        }
+
+        if (result.Value.TwoFactorChallenge is { } challenge)
+        {
+            return Ok(new TwoFactorChallengeResponse(true, challenge.Value, challenge.ExpiresAt));
+        }
+
+        return StartSession(Result.Success(result.Value.Session!));
+    }
+
+    [HttpPost("empleado/2fa")]
+    public async Task<IActionResult> VerificarDobleFactor(VerifyTwoFactorLoginCommand command, CancellationToken cancellationToken) =>
         StartSession(await mediator.Send(command, cancellationToken));
 
     [HttpPost("empresa")]

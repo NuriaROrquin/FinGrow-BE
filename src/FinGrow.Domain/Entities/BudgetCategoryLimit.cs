@@ -5,9 +5,6 @@ using FinGrow.Domain.Enums;
 using FinGrow.Domain.Errors;
 using FinGrow.Domain.ValueObjects;
 
-/// <summary>
-/// El tope de una categoria dentro de un presupuesto.
-/// </summary>
 public sealed class BudgetCategoryLimit : Entity
 {
     private BudgetCategoryLimit()
