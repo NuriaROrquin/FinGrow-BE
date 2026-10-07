@@ -15,6 +15,7 @@ public sealed class Transaction : AggregateRoot
 {
     public const int MaxDescriptionLength = 300;
     public const int MaxExternalReferenceLength = 200;
+    public const int MaxAiModelLength = 100;
 
     private Transaction()
     {
@@ -91,6 +92,13 @@ public sealed class Transaction : AggregateRoot
     /// cargarlo cuando la integracion re-sincroniza.
     /// </summary>
     public string? ExternalReference { get; private set; }
+
+    public double? AiConfidence { get; private set; }
+
+    public string? AiModel { get; private set; }
+
+    public ConfidenceLevel? AiConfidenceLevel =>
+        AiConfidence is { } score ? ConfidenceScale.LevelOf(score) : null;
 
     public DateTimeOffset CreatedAt { get; private set; }
 
@@ -178,8 +186,56 @@ public sealed class Transaction : AggregateRoot
             throw new DomainException("El movimiento ya estaba confirmado.");
         }
 
+        if (Status != TransactionStatus.Pending)
+        {
+            throw new DomainException("Solo un movimiento pendiente se puede confirmar.");
+        }
+
         Status = TransactionStatus.Confirmed;
         UpdatedAt = confirmedAt;
+    }
+
+    public void Discard(DateTimeOffset discardedAt)
+    {
+        if (Status != TransactionStatus.Pending)
+        {
+            throw new DomainException("Solo un movimiento pendiente se puede descartar.");
+        }
+
+        Status = TransactionStatus.Discarded;
+        UpdatedAt = discardedAt;
+    }
+
+    public void SuggestExpenseCategory(
+        ExpenseCategory category,
+        double confidence,
+        string? model,
+        DateTimeOffset suggestedAt)
+    {
+        if (Type != TransactionType.Expense)
+        {
+            throw new DomainException("Solo un gasto puede recibir una categoria de gasto.");
+        }
+
+        if (Status != TransactionStatus.Pending)
+        {
+            throw new DomainException("La IA solo puede sugerir sobre un movimiento pendiente.");
+        }
+
+        if (!Enum.IsDefined(category))
+        {
+            throw new DomainException($"La categoria de gasto '{category}' no existe.");
+        }
+
+        if (!ConfidenceScale.IsValid(confidence))
+        {
+            throw new DomainException("La confianza de la IA tiene que estar entre 0 y 1.");
+        }
+
+        ExpenseCategory = category;
+        AiConfidence = confidence;
+        AiModel = NormalizeAiModel(model);
+        UpdatedAt = suggestedAt;
     }
 
     public void UpdateDetails(
@@ -224,6 +280,16 @@ public sealed class Transaction : AggregateRoot
         if (Status == TransactionStatus.Confirmed && status == TransactionStatus.Pending)
         {
             throw new DomainException("Una transaccion confirmada no puede volver a pendiente.");
+        }
+
+        if (Status == TransactionStatus.Discarded)
+        {
+            throw new DomainException("Un movimiento descartado no se puede editar.");
+        }
+
+        if (status == TransactionStatus.Discarded)
+        {
+            throw new DomainException("Un movimiento solo se descarta desde la bandeja de pendientes.");
         }
 
         if (type == TransactionType.Expense)
@@ -322,6 +388,18 @@ public sealed class Transaction : AggregateRoot
                 $"La descripcion no puede superar los {MaxDescriptionLength} caracteres."),
             _ => trimmed
         };
+    }
+
+    private static string? NormalizeAiModel(string? model)
+    {
+        var trimmed = model?.Trim();
+
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            return null;
+        }
+
+        return trimmed.Length > MaxAiModelLength ? trimmed[..MaxAiModelLength] : trimmed;
     }
 
     private static string? EnsureValidExternalReference(string? externalReference)

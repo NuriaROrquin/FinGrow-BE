@@ -9,5 +9,6 @@ public enum TransactionStatus
 {
     Pending = 1,
     Confirmed = 2,
-    Eliminated = 3
+    Eliminated = 3,
+    Discarded = 4
 }
