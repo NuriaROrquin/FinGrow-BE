@@ -46,10 +46,12 @@ internal sealed class AiService : IAiService
 
         return payload.Results
             .Where(result => ExpenseCategoryExtensions.TryFromWireValue(result.Category, out _))
+            .Where(result => ConfidenceScale.IsValid(result.Confidence))
             .Select(result => new CategorizedExpense(
                 result.Id,
                 ExpenseCategoryExtensions.FromWireValue(result.Category),
-                result.Confidence))
+                result.Confidence,
+                payload.Model))
             .ToList();
     }
 

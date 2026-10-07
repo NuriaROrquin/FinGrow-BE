@@ -4,7 +4,7 @@ using FinGrow.Domain.Enums;
 
 public sealed record ExpenseToCategorize(Guid Id, string Description, decimal Amount, Currency Currency, DateOnly OccurredOn);
 
-public sealed record CategorizedExpense(Guid Id, ExpenseCategory Category, double Confidence);
+public sealed record CategorizedExpense(Guid Id, ExpenseCategory Category, double Confidence, string? Model = null);
 
 public interface IAiService
 {

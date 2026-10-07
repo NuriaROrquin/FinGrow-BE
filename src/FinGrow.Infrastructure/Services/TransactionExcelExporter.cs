@@ -236,6 +236,7 @@ internal sealed class TransactionExcelExporter(
             Domain.Enums.TransactionStatus.Pending => "Pendiente",
             Domain.Enums.TransactionStatus.Confirmed => "Confirmada",
             Domain.Enums.TransactionStatus.Eliminated => "Eliminada",
+            Domain.Enums.TransactionStatus.Discarded => "Descartada",
             _ => status.ToString(),
         };
 }

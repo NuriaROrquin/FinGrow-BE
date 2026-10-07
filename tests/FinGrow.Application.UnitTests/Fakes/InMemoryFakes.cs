@@ -86,7 +86,9 @@ public sealed class FakeTransactionRepository : ITransactionRepository
 
     public Task<Transaction?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Transactions.FirstOrDefault(
-            transaction => transaction.Id == id && transaction.Status != TransactionStatus.Eliminated));
+            transaction => transaction.Id == id
+                && transaction.Status != TransactionStatus.Eliminated
+                && transaction.Status != TransactionStatus.Discarded));
 
     public Task<IReadOnlySet<string>> ListExistingExternalReferencesAsync(Guid employeeId, TransactionSource source, IReadOnlyCollection<string> externalReferences, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlySet<string>>(Transactions
@@ -98,8 +100,16 @@ public sealed class FakeTransactionRepository : ITransactionRepository
         Task.FromResult<IReadOnlyList<Transaction>>(Transactions
             .Where(transaction =>
                 transaction.EmployeeId == employeeId
-                && transaction.Status != TransactionStatus.Eliminated)
+                && transaction.Status != TransactionStatus.Eliminated
+                && transaction.Status != TransactionStatus.Discarded)
             .OrderByDescending(transaction => transaction.OccurredOn)
+            .ToList());
+
+    public Task<IReadOnlyList<Transaction>> ListPendingByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Transaction>>(Transactions
+            .Where(transaction => transaction.EmployeeId == employeeId && transaction.Status == TransactionStatus.Pending)
+            .OrderByDescending(transaction => transaction.OccurredOn)
+            .ThenByDescending(transaction => transaction.CreatedAt)
             .ToList());
 }
 
@@ -270,6 +280,10 @@ public sealed class FakeAiService : IAiService
 
     public bool Unreachable { get; set; }
 
+    public double Confidence { get; set; } = 0.9;
+
+    public string? Model { get; set; } = "fake-model";
+
     public List<ExpenseToCategorize> Received { get; } = new();
 
     public Task<bool> IsHealthyAsync(CancellationToken cancellationToken = default) => Task.FromResult(!Unreachable);
@@ -285,7 +299,7 @@ public sealed class FakeAiService : IAiService
 
         return Task.FromResult<IReadOnlyList<CategorizedExpense>>(expenses
             .Where(expense => CategoriesByDescription.ContainsKey(expense.Description))
-            .Select(expense => new CategorizedExpense(expense.Id, CategoriesByDescription[expense.Description], 0.9))
+            .Select(expense => new CategorizedExpense(expense.Id, CategoriesByDescription[expense.Description], Confidence, Model))
             .ToList());
     }
 }

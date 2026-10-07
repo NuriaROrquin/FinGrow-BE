@@ -11,6 +11,8 @@ public interface ITransactionRepository
 
     Task<IReadOnlyList<Transaction>> ListByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<Transaction>> ListPendingByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default);
+
     Task<IReadOnlySet<string>> ListExistingExternalReferencesAsync(
         Guid employeeId,
         TransactionSource source,

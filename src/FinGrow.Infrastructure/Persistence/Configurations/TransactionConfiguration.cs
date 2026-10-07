@@ -21,6 +21,10 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
                 """);
 
             table.HasCheckConstraint("ck_transactions_amount_positive", "amount > 0");
+
+            table.HasCheckConstraint(
+                "ck_transactions_ai_confidence_range",
+                "ai_confidence IS NULL OR (ai_confidence >= 0 AND ai_confidence <= 1)");
         });
 
         builder.HasKey(transaction => transaction.Id);
@@ -62,6 +66,13 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
             .IsRequired();
 
         builder.Ignore(transaction => transaction.IsPending);
+
+        builder.Property(transaction => transaction.AiConfidence);
+
+        builder.Property(transaction => transaction.AiModel)
+            .HasMaxLength(Transaction.MaxAiModelLength);
+
+        builder.Ignore(transaction => transaction.AiConfidenceLevel);
 
         builder.Property(transaction => transaction.ExternalReference)
             .HasMaxLength(Transaction.MaxExternalReferenceLength);
