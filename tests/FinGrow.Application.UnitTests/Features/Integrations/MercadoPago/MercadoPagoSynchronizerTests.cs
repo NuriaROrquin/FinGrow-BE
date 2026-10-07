@@ -164,6 +164,62 @@ public class MercadoPagoSynchronizerTests
     }
 
     [Fact]
+    public async Task Expenses_keep_the_confidence_and_model_reported_by_the_ai()
+    {
+        _ai.CategoriesByDescription["Supermercado Coto"] = ExpenseCategory.Alimentos;
+        _ai.Confidence = 0.95;
+        _ai.Model = "claude-sonnet-5";
+        _payments.Payments.Add(Purchase(30, "Supermercado Coto", 15400.50m, "debit_card"));
+
+        await Sync();
+
+        var transaction = _transactions.Transactions.ShouldHaveSingleItem();
+        transaction.AiConfidence.ShouldBe(0.95);
+        transaction.AiConfidenceLevel.ShouldBe(ConfidenceLevel.High);
+        transaction.AiModel.ShouldBe("claude-sonnet-5");
+        transaction.Status.ShouldBe(TransactionStatus.Pending);
+    }
+
+    [Fact]
+    public async Task When_the_ai_is_down_expenses_have_no_confidence()
+    {
+        _ai.Unreachable = true;
+        _payments.Payments.Add(Purchase(31, "Varios", 3400m, "account_money"));
+
+        await Sync();
+
+        var transaction = _transactions.Transactions.ShouldHaveSingleItem();
+        transaction.AiConfidence.ShouldBeNull();
+        transaction.AiConfidenceLevel.ShouldBeNull();
+        transaction.AiModel.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Incomes_do_not_go_through_the_ai_and_have_no_confidence()
+    {
+        _payments.Payments.Add(Received(32, 6000m));
+
+        await Sync();
+
+        _transactions.Transactions.ShouldHaveSingleItem().AiConfidence.ShouldBeNull();
+        _ai.Received.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_discarded_proposal_is_not_proposed_again_on_next_sync()
+    {
+        _payments.Payments.Add(Purchase(33, "Canva", 10285m, "debit_card"));
+        await Sync();
+        _transactions.Transactions.ShouldHaveSingleItem().Discard(Now.AddMinutes(5));
+
+        var second = await Sync();
+
+        second.Value.Imported.ShouldBe(0);
+        second.Value.AlreadyKnown.ShouldBe(1);
+        _transactions.Transactions.ShouldHaveSingleItem().Status.ShouldBe(TransactionStatus.Discarded);
+    }
+
+    [Fact]
     public async Task The_first_sync_looks_back_ninety_days_and_later_ones_resume_with_an_overlap()
     {
         await Sync();

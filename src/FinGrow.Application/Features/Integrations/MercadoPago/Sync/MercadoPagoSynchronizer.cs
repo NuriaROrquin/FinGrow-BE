@@ -221,9 +221,9 @@ internal sealed partial class MercadoPagoSynchronizer
         {
             foreach (var categorized in await _ai.CategorizeExpensesAsync(request, cancellationToken))
             {
-                if (byId.TryGetValue(categorized.Id, out var transaction))
+                if (byId.TryGetValue(categorized.Id, out var transaction) && ConfidenceScale.IsValid(categorized.Confidence))
                 {
-                    transaction.RecategorizeExpense(categorized.Category, now);
+                    transaction.SuggestExpenseCategory(categorized.Category, categorized.Confidence, categorized.Model, now);
                 }
             }
         }
