@@ -2,7 +2,11 @@ namespace FinGrow.Api.Controllers;
 
 using FinGrow.Api.Contracts;
 using FinGrow.Api.Extensions;
+using FinGrow.Application.DTOs;
+using FinGrow.Application.Features.Transactions.ConfirmTransaction;
 using FinGrow.Application.Features.Transactions.CreateTransaction;
+using FinGrow.Application.Features.Transactions.DiscardTransaction;
+using FinGrow.Application.Features.Transactions.ListPendingTransactions;
 using FinGrow.Application.Features.Transactions.GetHistory;
 using FinGrow.Application.Features.Transactions.GetTransactionById;
 using FinGrow.Application.Features.Transactions.GetTransactionSummary;
@@ -75,6 +79,12 @@ public sealed class TransactionsController(
         CancellationToken cancellationToken = default) =>
         (await sender.Send(new GetTransactionHistoryQuery(parameters.ToFilters()), cancellationToken)).ToActionResult();
 
+    [HttpGet("pending")]
+    [ProducesResponseType<PendingTransactionsResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetPending(CancellationToken cancellationToken = default) =>
+        (await sender.Send(new ListPendingTransactionsQuery(), cancellationToken)).ToActionResult();
+
     [HttpGet("export")]
     [Produces("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")]
     public async Task<IActionResult> Export(
@@ -108,6 +118,32 @@ public sealed class TransactionsController(
 
         return (await sender.Send(command, cancellationToken)).ToActionResult();
     }
+
+    [HttpPost("{id:guid}/confirm")]
+    [ProducesResponseType<TransactionResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Confirm(
+        Guid id,
+        ConfirmTransactionCommand command,
+        CancellationToken cancellationToken)
+    {
+        command = command with { Id = id };
+
+        return (await sender.Send(command, cancellationToken)).ToActionResult();
+    }
+
+    [HttpPost("{id:guid}/discard")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Discard(Guid id, CancellationToken cancellationToken) =>
+        (await sender.Send(new DiscardTransactionCommand(id), cancellationToken)).ToActionResult();
 
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken) =>
