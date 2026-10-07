@@ -53,7 +53,11 @@ dos columnas. Combinar importes de monedas distintas lanza `DomainException`, a 
 
 **Un movimiento propuesto no cuenta hasta que lo confirman.** Lo que entra por Gmail, por el bot
 o por el OCR nace con `status = Pending`. Saldo, presupuestos y reportes miran solo los
-confirmados.
+confirmados. El empleado lo revisa en la bandeja (`GET /api/transactions/pending`) y lo
+confirma con sus correcciones (`POST .../{id}/confirm`) o lo descarta (`POST .../{id}/discard`).
+Descartar no borra la fila: queda en `Discarded` porque su `external_reference` es lo que impide
+que la integración vuelva a proponerlo; por eso `ListExistingExternalReferencesAsync` no filtra
+por estado. `Discarded` es "nunca fue un movimiento"; `Eliminated` es "existió y lo borraron".
 
 **Las reglas críticas están además en la base.** Hay `CHECK` que rechazan un gasto con categoría
 de ingreso, un importe cero y una meta con objetivo y progreso en monedas distintas. La
@@ -200,8 +204,11 @@ necesita `IDomainEventDispatcher`, `AddInfrastructure()` solo arranca junto a `A
 
 ## Trabajo pendiente que afecta al modelo
 
-Quedan tres divergencias entre lo construido y el DER objetivo: el responsable de un
-departamento como FK (HU-52), la tabla `users` para credenciales, 2FA y preferencias (HU-01,
-HU-04, HU-46, HU-49) y `ai_confidence` más el estado `Discarded` en `transactions` (HU-12,
-HU-15). Cada una arrastra una migración sobre tablas ya construidas: revisá
+Quedan dos divergencias entre lo construido y el DER objetivo: el responsable de un
+departamento como FK (HU-52) y la tabla `users` para credenciales, 2FA y preferencias (HU-01,
+HU-04, HU-46, HU-49). Cada una arrastra una migración sobre tablas ya construidas: revisá
 [docs/database-schema-target.md](docs/database-schema-target.md) antes de tomar esas historias.
+
+`ai_confidence`, `ai_model` y el estado `Discarded` de `transactions` ya existen (HU-15). HU-12
+reutiliza `ai_confidence` para la confianza del OCR: es un dato del movimiento propuesto, no de
+la categoría.
