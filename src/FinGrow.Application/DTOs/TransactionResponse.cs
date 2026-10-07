@@ -15,7 +15,9 @@ public sealed record TransactionResponse(
     TransactionSource Source,
     TransactionStatus Status,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt)
+    DateTimeOffset UpdatedAt,
+    double? AiConfidence,
+    ConfidenceLevel? AiConfidenceLevel)
 {
     public static TransactionResponse FromEntity(Transaction transaction) => new(
         transaction.Id,
@@ -29,5 +31,7 @@ public sealed record TransactionResponse(
         transaction.Source,
         transaction.Status,
         transaction.CreatedAt,
-        transaction.UpdatedAt);
+        transaction.UpdatedAt,
+        transaction.AiConfidence,
+        transaction.AiConfidenceLevel);
 }
