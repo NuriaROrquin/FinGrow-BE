@@ -3,6 +3,7 @@ namespace FinGrow.Application;
 using System.Reflection;
 using Common.Behaviors;
 using Events;
+using Features.Integrations.ChatTransactions;
 using Features.Integrations.Linking;
 using Features.Integrations.MercadoPago.Sync;
 using Features.Investments.QuoteInvestments;
@@ -27,6 +28,8 @@ public static class DependencyInjection
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
         services.AddScoped<LinkCodeIssuer>();
         services.AddScoped<LinkCodeRedeemer>();
+        services.AddScoped<ChatTransactionProposer>();
+        services.AddScoped<ChatTransactionReviewer>();
         services.AddScoped<MercadoPagoSynchronizer>();
         services.AddScoped<SessionIssuer>();
         services.AddScoped<TwoFactorAccountFinder>();
