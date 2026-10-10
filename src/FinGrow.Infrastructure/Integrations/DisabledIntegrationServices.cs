@@ -20,8 +20,23 @@ internal sealed class DisabledTwilioMediaClient : ITwilioMediaClient
 
 internal sealed class DisabledTelegramBotClient : ITelegramBotClient
 {
+    private const string Disabled = "La integracion de Telegram esta desactivada para este entorno.";
+
     public Task SendMessageAsync(long chatId, string text, CancellationToken cancellationToken = default) =>
-        throw new InvalidOperationException("La integracion de Telegram esta desactivada para este entorno.");
+        throw new InvalidOperationException(Disabled);
+
+    public Task SendMessageAsync(
+        long chatId,
+        string text,
+        IReadOnlyList<IReadOnlyList<TelegramButton>> buttonRows,
+        CancellationToken cancellationToken = default) =>
+        throw new InvalidOperationException(Disabled);
+
+    public Task EditMessageAsync(long chatId, long messageId, string text, CancellationToken cancellationToken = default) =>
+        throw new InvalidOperationException(Disabled);
+
+    public Task AnswerCallbackAsync(string callbackQueryId, string? text = null, CancellationToken cancellationToken = default) =>
+        throw new InvalidOperationException(Disabled);
 }
 
 internal sealed class DisabledMercadoPagoOAuthClient : IMercadoPagoOAuthClient

@@ -351,6 +351,54 @@ public class TransactionTests
     }
 
     [Fact]
+    public void The_AI_can_suggest_an_income_category_for_a_pending_income()
+    {
+        var income = RegisterPendingIncome();
+
+        income.SuggestIncomeCategory(IncomeCategory.Freelance, 0.85, " claude-sonnet-5 ", Now.AddMinutes(2));
+
+        income.IncomeCategory.ShouldBe(IncomeCategory.Freelance);
+        income.ExpenseCategory.ShouldBeNull();
+        income.AiConfidence.ShouldBe(0.85);
+        income.AiConfidenceLevel.ShouldBe(ConfidenceLevel.High);
+        income.AiModel.ShouldBe("claude-sonnet-5");
+        income.UpdatedAt.ShouldBe(Now.AddMinutes(2));
+    }
+
+    [Fact]
+    public void The_AI_cannot_suggest_an_income_category_for_an_expense()
+    {
+        var transaction = RegisterExpense(Money.From(4500m, Currency.ARS));
+
+        Should.Throw<DomainException>(() =>
+            transaction.SuggestIncomeCategory(IncomeCategory.Salario, 0.9, "model", Now));
+        transaction.IncomeCategory.ShouldBeNull();
+    }
+
+    [Fact]
+    public void The_AI_cannot_suggest_an_income_category_on_a_reviewed_income()
+    {
+        var income = RegisterPendingIncome();
+        income.Confirm(Now);
+
+        Should.Throw<DomainException>(() =>
+            income.SuggestIncomeCategory(IncomeCategory.Salario, 0.9, "model", Now.AddMinutes(1)));
+        income.IncomeCategory.ShouldBe(IncomeCategory.Otros);
+    }
+
+    [Theory]
+    [InlineData(-0.01)]
+    [InlineData(1.01)]
+    public void An_income_suggestion_with_a_confidence_outside_zero_to_one_is_rejected(double confidence)
+    {
+        var income = RegisterPendingIncome();
+
+        Should.Throw<DomainException>(() =>
+            income.SuggestIncomeCategory(IncomeCategory.Salario, confidence, "model", Now));
+        income.AiConfidence.ShouldBeNull();
+    }
+
+    [Fact]
     public void Correcting_the_category_keeps_what_the_AI_originally_reported()
     {
         var transaction = RegisterExpense(Money.From(4500m, Currency.ARS));
@@ -433,4 +481,15 @@ public class TransactionTests
         TransactionStatus.Pending,
         Now,
         externalReference: "gmail-message-123");
+
+    private static Transaction RegisterPendingIncome() => Transaction.RegisterIncome(
+        EmployeeId,
+        Money.From(10000m, Currency.ARS),
+        IncomeCategory.Otros,
+        "Freelance",
+        Today,
+        PaymentMethod.BankTransfer,
+        TransactionSource.Telegram,
+        TransactionStatus.Pending,
+        Now);
 }
