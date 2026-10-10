@@ -338,6 +338,13 @@ public sealed class FakeGoalRepository : IGoalRepository
             .Where(goal => goal.EmployeeId == employeeId)
             .OrderByDescending(goal => goal.CreatedAt)
             .ToList());
+
+    public Task<IReadOnlyList<Guid>> ListEmployeesWithActiveGoalsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>(Goals
+            .Where(goal => goal.Status == GoalStatus.Active)
+            .Select(goal => goal.EmployeeId)
+            .Distinct()
+            .ToList());
 }
 
 public sealed class FakeJobRunRepository : IJobRunRepository

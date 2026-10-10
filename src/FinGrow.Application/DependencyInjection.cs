@@ -8,6 +8,7 @@ using Features.Integrations.MercadoPago.Sync;
 using Features.Investments.QuoteInvestments;
 using Features.Metrics.SnapshotMetrics;
 using Features.Notifications;
+using Features.Notifications.Alerts.GoalProgress;
 using Features.Notifications.Delivery;
 using Features.Session;
 using FluentValidation;
@@ -40,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<IScheduledJob, MetricsSnapshotJob>();
         services.AddScoped<IScheduledJob, MercadoPagoSyncJob>();
         services.AddScoped<IScheduledJob, InvestmentQuotesJob>();
+        services.AddScoped<IScheduledJob, GoalProgressAlertsJob>();
 
         return services;
     }

@@ -1,6 +1,7 @@
 namespace FinGrow.Infrastructure.Persistence.Repositories;
 
 using Domain.Entities;
+using Domain.Enums;
 using FinGrow.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,5 +16,12 @@ internal sealed class GoalRepository(FinGrowDbContext dbContext) : IGoalReposito
         await dbContext.Goals
             .Where(goal => goal.EmployeeId == employeeId)
             .OrderByDescending(goal => goal.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Guid>> ListEmployeesWithActiveGoalsAsync(CancellationToken cancellationToken = default) =>
+        await dbContext.Goals
+            .Where(goal => goal.Status == GoalStatus.Active)
+            .Select(goal => goal.EmployeeId)
+            .Distinct()
             .ToListAsync(cancellationToken);
 }

@@ -268,6 +268,7 @@ siguiente.
 | `metrics-snapshot` | `0 4 1 * *` (el 1 de cada mes, 01:00 de Argentina) | Genera las fotos mensuales de métricas por empresa y por departamento (`company_metrics_snapshots` y `department_metrics_snapshots`) del último mes cerrado, y completa las de los meses anteriores que falten desde el alta de cada empresa. Es idempotente: correrlo de nuevo actualiza la foto del último mes cerrado en lugar de duplicarla |
 | `mercadopago-sync` | `0 * * * *` (cada hora) | Recorre las cuentas de Mercado Pago vinculadas y trae los movimientos nuevos como pendientes de revisión. Mercado Pago no avisa por webhook lo que un usuario paga, por eso se consulta |
 | `investment-quotes` | `30 21 * * 1-5` (días hábiles, 18:30 de Argentina) | Guarda en `security_prices` el último precio de cada símbolo de BYMA, cada fondo de ArgentinaDatos y cada cripto de CoinGecko (aunque nadie tenga inversiones con símbolo) y cotiza con esos precios las inversiones cargadas con símbolo y cantidad, registrándoles la valuación de mercado del día. Correrlo de nuevo el mismo día actualiza esa valuación en lugar de duplicarla. Si una fuente no responde, cotiza con las otras y la corrida queda fallida con el motivo; si no responde ninguna, no toca nada |
+| `goal-progress-alerts` | `0 12 * * *` (todos los días, 09:00 de Argentina) | Recorre las metas activas y avisa al empleado cuando una lleva 30 días sin aportes (`GoalStalled`, como máximo uno cada 30 días mientras siga quieta) o cuando se acerca su fecha límite con saldo pendiente (`GoalDeadlineApproaching`, una vez a los 30, a los 7 y a 1 día, con cuánto falta y cuántos días quedan). Si la fecha límite está cerca solo manda esa, que ya dice lo mismo. Correrlo de nuevo el mismo día no repite avisos |
 
 Los endpoints viven bajo `/api/jobs` y se protegen con la cabecera `X-Jobs-Key`, que tiene que
 coincidir con `Jobs:ApiKey`. No usan JWT: los llama un cron, no una persona logueada.
@@ -341,7 +342,8 @@ Para sumar una alerta nueva: un tipo en `NotificationType`, el evento de dominio
 `Application/Features/Notifications/Alerts/` que implementa
 `INotificationHandler<DomainEventEnvelope<TuEvento>>` y llama a `Notifier.NotifyAsync` con el
 criterio y la ventana de deduplicación. Una alerta que depende del paso del tiempo (una meta sin
-aportes) se evalúa desde un trabajo programado y usa el mismo `Notifier`.
+aportes) se evalúa desde un trabajo programado y usa el mismo `Notifier`, como
+`goal-progress-alerts` (`Alerts/GoalProgress/`).
 
 Pendiente fuera de T-07: WhatsApp no es canal todavía (Twilio exige plantillas aprobadas para
 escribirle a alguien fuera de la ventana de 24 horas), no hay mail, no se reintenta una entrega
