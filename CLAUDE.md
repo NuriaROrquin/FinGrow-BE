@@ -122,6 +122,17 @@ Telegram reintenta cualquier respuesta que no sea 2xx y un código ya canjeado s
 el reintento. Una cuenta que no está en `employee_integrations` solo puede mandar su código de
 vinculación.
 
+## Archivos subidos
+
+Un archivo nunca se guarda en PostgreSQL: va a `IFileStorage` (`Infrastructure/Storage/S3FileStorage`,
+protocolo S3: Cloudflare R2 desplegado, S3Mock en compose) y la base guarda solo la clave. Los
+comprobantes son `TransactionReceipt` (`Application/Features/Receipts`): nacen sin movimiento
+para que un OCR fallido no pierda la imagen, y la clave la arma el dominio a partir del empleado
+y del id del comprobante. Lo que sume otro tipo de archivo (los audios de HU-14) reutiliza
+`IFileStorage`. Un almacenamiento que no responde llega como `FileStorageUnavailableException`
+y el caso de uso lo traduce a `Unavailable` (503). Los handlers la atrapan; no dejes que
+escape como 500.
+
 ## Trabajos programados
 
 No hay scheduler dentro del proceso. Los trabajos implementan `IScheduledJob`
