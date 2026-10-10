@@ -1,8 +1,11 @@
 namespace FinGrow.Application.UnitTests.Features.Integrations.Telegram;
 
 using FinGrow.Application.Common;
+using FinGrow.Application.Features.Integrations.ChatTransactions;
 using FinGrow.Application.Features.Integrations.Linking;
+using FinGrow.Application.Features.Integrations.Telegram;
 using FinGrow.Application.Features.Integrations.Telegram.ReceiveTelegramMessage;
+using FinGrow.Application.Interfaces;
 using FinGrow.Application.UnitTests.Fakes;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
@@ -21,6 +24,8 @@ public class ReceiveTelegramMessageHandlerTests
     private readonly FakeTelegramBotClient _bot = new();
     private readonly FakeUnitOfWork _unitOfWork = new();
     private readonly FakeDateTimeProvider _clock = new(Now);
+    private readonly FakeTransactionRepository _transactions = new();
+    private readonly FakeAiService _ai = new();
     private readonly Employee _employee = CreateEmployee();
 
     public ReceiveTelegramMessageHandlerTests() => _employees.Employees.Add(_employee);
@@ -119,26 +124,176 @@ public class ReceiveTelegramMessageHandlerTests
     }
 
     [Fact]
-    public async Task A_linked_chat_is_resolved_to_its_employee()
-    {
-        _integrations.Add(EmployeeIntegration.Create(_employee.Id, IntegrationProvider.Telegram, "123456789", Now));
-
-        var result = await Handle("gasté 500 en el super");
-
-        result.IsSuccess.ShouldBeTrue();
-        _bot.Sent.ShouldHaveSingleItem().Text.ShouldBe(ReceiveTelegramMessageHandler.MessageReceivedReply);
-    }
-
-    [Fact]
     public async Task A_linked_chat_sending_a_code_is_not_relinked()
     {
-        _integrations.Add(EmployeeIntegration.Create(_employee.Id, IntegrationProvider.Telegram, "123456789", Now));
+        LinkChat();
         _linkCodes.Add(IntegrationLinkCode.Create(_employee.Id, IntegrationProvider.Telegram, Code, Now));
 
         await Handle(Code);
 
-        _bot.Sent.ShouldHaveSingleItem().Text.ShouldBe(ReceiveTelegramMessageHandler.MessageReceivedReply);
+        _bot.Sent.ShouldHaveSingleItem().Text.ShouldBe(ChatTransactionText.HelpReply);
         _linkCodes.LinkCodes.Single().UsedAt.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task An_expense_written_in_natural_language_is_proposed_as_a_pending_telegram_transaction()
+    {
+        LinkChat();
+        _ai.ParseResult = Parsed(Expense(paymentMethod: null));
+
+        var result = await Handle("Gasté $500 en supermercado");
+
+        result.IsSuccess.ShouldBeTrue();
+        _ai.ParsedMessages.ShouldHaveSingleItem().ShouldBe(("Gasté $500 en supermercado", Currency.ARS));
+        var transaction = _transactions.Transactions.ShouldHaveSingleItem();
+        transaction.EmployeeId.ShouldBe(_employee.Id);
+        transaction.Type.ShouldBe(TransactionType.Expense);
+        transaction.Amount.ShouldBe(Money.From(500m, Currency.ARS));
+        transaction.ExpenseCategory.ShouldBe(ExpenseCategory.Alimentos);
+        transaction.Description.ShouldBe("Supermercado");
+        transaction.OccurredOn.ShouldBe(new DateOnly(2026, 3, 15));
+        transaction.Source.ShouldBe(TransactionSource.Telegram);
+        transaction.Status.ShouldBe(TransactionStatus.Pending);
+        transaction.PaymentMethod.ShouldBe(ChatTransactionProposer.DefaultPaymentMethod);
+        transaction.ExternalReference.ShouldBe("telegram:123456789:42");
+        transaction.AiConfidence.ShouldBe(0.9);
+        transaction.AiModel.ShouldBe("fake-model");
+        _unitOfWork.SaveCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task The_proposal_shows_type_amount_and_category_and_asks_how_it_was_paid()
+    {
+        LinkChat();
+        _ai.ParseResult = Parsed(Expense(paymentMethod: null));
+
+        await Handle("Gasté $500 en supermercado");
+
+        var (chatId, text, buttonRows) = _bot.SentWithButtons.ShouldHaveSingleItem();
+        chatId.ShouldBe(ChatId);
+        text.ShouldContain("Gasto: $ 500 (ARS)");
+        text.ShouldContain("Categoría: Alimentos");
+        text.ShouldContain("¿Cómo lo pagaste?");
+        var transactionId = _transactions.Transactions.Single().Id;
+        var callbacks = buttonRows.SelectMany(row => row)
+            .Select(button => TelegramTransactionCallback.Parse(button.CallbackData).ShouldNotBeNull())
+            .ToList();
+        callbacks.ShouldAllBe(callback => callback.TransactionId == transactionId);
+        callbacks.Where(callback => callback.Decision == ChatDecision.Confirm)
+            .Select(callback => callback.PaymentMethod)
+            .ShouldBe(new PaymentMethod?[]
+            {
+                PaymentMethod.Cash, PaymentMethod.DebitCard, PaymentMethod.CreditCard, PaymentMethod.BankTransfer, PaymentMethod.DigitalWallet
+            });
+        callbacks.Last().Decision.ShouldBe(ChatDecision.Discard);
+    }
+
+    [Fact]
+    public async Task When_the_message_says_how_it_was_paid_only_confirm_and_discard_are_offered()
+    {
+        LinkChat();
+        _ai.ParseResult = Parsed(Expense(paymentMethod: PaymentMethod.DebitCard));
+
+        await Handle("Pagué $500 en el super con débito");
+
+        _transactions.Transactions.Single().PaymentMethod.ShouldBe(PaymentMethod.DebitCard);
+        var (_, text, buttonRows) = _bot.SentWithButtons.ShouldHaveSingleItem();
+        text.ShouldContain("Débito");
+        text.ShouldContain("¿Lo registro?");
+        buttonRows.ShouldHaveSingleItem().Select(button => button.Text)
+            .ShouldBe(new[] { ChatTransactionText.ConfirmLabel, ChatTransactionText.DiscardLabel });
+    }
+
+    [Fact]
+    public async Task An_income_is_proposed_with_its_income_category_and_never_offers_credit_card()
+    {
+        LinkChat();
+        _ai.ParseResult = Parsed(new ParsedTransaction(
+            TransactionType.Income, 10000m, Currency.ARS, null, IncomeCategory.Freelance, "Freelance", PaymentMethod.CreditCard, 0.85));
+
+        await Handle("Ingreso de $10000 por freelance");
+
+        var transaction = _transactions.Transactions.ShouldHaveSingleItem();
+        transaction.Type.ShouldBe(TransactionType.Income);
+        transaction.IncomeCategory.ShouldBe(IncomeCategory.Freelance);
+        transaction.AiConfidence.ShouldBe(0.85);
+        var (_, text, buttonRows) = _bot.SentWithButtons.ShouldHaveSingleItem();
+        text.ShouldContain("Ingreso: $ 10.000 (ARS)");
+        text.ShouldContain("¿Cómo lo cobraste?");
+        buttonRows.SelectMany(row => row)
+            .Select(button => TelegramTransactionCallback.Parse(button.CallbackData)!.PaymentMethod)
+            .ShouldNotContain(PaymentMethod.CreditCard);
+    }
+
+    [Theory]
+    [InlineData(MessageParsingOutcome.MissingAmount, ChatTransactionText.MissingAmountReply)]
+    [InlineData(MessageParsingOutcome.MultipleTransactions, ChatTransactionText.MultipleTransactionsReply)]
+    [InlineData(MessageParsingOutcome.NotATransaction, ChatTransactionText.HelpReply)]
+    public async Task A_message_that_cannot_be_registered_is_answered_without_creating_a_transaction(
+        MessageParsingOutcome outcome,
+        string expectedReply)
+    {
+        LinkChat();
+        _ai.ParseResult = ParsedMessage.Of(outcome);
+
+        var result = await Handle("Gasté en el super");
+
+        result.IsSuccess.ShouldBeTrue();
+        _bot.Sent.ShouldHaveSingleItem().ShouldBe((ChatId, expectedReply));
+        _bot.SentWithButtons.ShouldBeEmpty();
+        _transactions.Transactions.ShouldBeEmpty();
+        _unitOfWork.SaveCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task When_the_AI_is_down_the_employee_is_told_to_try_again_and_nothing_is_registered()
+    {
+        LinkChat();
+        _ai.Unreachable = true;
+
+        var result = await Handle("Gasté $500 en supermercado");
+
+        result.IsSuccess.ShouldBeTrue();
+        _bot.Sent.ShouldHaveSingleItem().Text.ShouldBe(ChatTransactionText.AiUnavailableReply);
+        _transactions.Transactions.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_message_delivered_twice_by_telegram_is_proposed_only_once()
+    {
+        LinkChat();
+        _ai.ParseResult = Parsed(Expense(paymentMethod: null));
+
+        await Handle("Gasté $500 en supermercado");
+        await Handle("Gasté $500 en supermercado");
+
+        _transactions.Transactions.ShouldHaveSingleItem();
+        _ai.ParsedMessages.ShouldHaveSingleItem();
+        _bot.Sent.ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task A_command_from_a_linked_chat_gets_the_examples_without_asking_the_AI()
+    {
+        LinkChat();
+
+        await Handle("/start");
+
+        _bot.Sent.ShouldHaveSingleItem().Text.ShouldBe(ChatTransactionText.HelpReply);
+        _ai.ParsedMessages.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task The_transaction_is_kept_even_if_the_proposal_cannot_be_delivered()
+    {
+        LinkChat();
+        _ai.ParseResult = Parsed(Expense(paymentMethod: null));
+        _bot.Unreachable = true;
+
+        var result = await Handle("Gasté $500 en supermercado");
+
+        result.IsSuccess.ShouldBeTrue();
+        _transactions.Transactions.ShouldHaveSingleItem().IsPending.ShouldBeTrue();
     }
 
     [Fact]
@@ -158,11 +313,22 @@ public class ReceiveTelegramMessageHandlerTests
     {
         var linker = new LinkCodeRedeemer(
             _integrations, _linkCodes, _employees, _unitOfWork, _clock, NullLogger<LinkCodeRedeemer>.Instance);
+        var proposer = new ChatTransactionProposer(
+            _ai, _transactions, _unitOfWork, _clock, NullLogger<ChatTransactionProposer>.Instance);
         var handler = new ReceiveTelegramMessageHandler(
-            _integrations, linker, _bot, NullLogger<ReceiveTelegramMessageHandler>.Instance);
+            _integrations, linker, proposer, _bot, NullLogger<ReceiveTelegramMessageHandler>.Instance);
 
         return handler.Handle(new ReceiveTelegramMessageCommand(chatId, text, 42), CancellationToken.None);
     }
+
+    private void LinkChat() =>
+        _integrations.Add(EmployeeIntegration.Create(_employee.Id, IntegrationProvider.Telegram, "123456789", Now));
+
+    private static ParsedTransaction Expense(PaymentMethod? paymentMethod) => new(
+        TransactionType.Expense, 500m, Currency.ARS, ExpenseCategory.Alimentos, null, "Supermercado", paymentMethod, 0.9);
+
+    private static ParsedMessage Parsed(ParsedTransaction transaction) =>
+        new(MessageParsingOutcome.Parsed, transaction, "fake-model");
 
     private static Employee CreateEmployee() => Employee.Create(
         Guid.CreateVersion7(),

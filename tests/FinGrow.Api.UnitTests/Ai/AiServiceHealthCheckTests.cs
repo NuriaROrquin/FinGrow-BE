@@ -1,6 +1,7 @@
 namespace FinGrow.Api.UnitTests.Ai;
 
 using FinGrow.Application.Interfaces;
+using FinGrow.Domain.Enums;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -44,6 +45,12 @@ public class AiServiceHealthCheckTests
 
         public Task<IReadOnlyList<CategorizedExpense>> CategorizeExpensesAsync(
             IReadOnlyList<ExpenseToCategorize> expenses,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<ParsedMessage> ParseTransactionMessageAsync(
+            string text,
+            Currency defaultCurrency,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
     }

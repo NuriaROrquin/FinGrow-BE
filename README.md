@@ -243,7 +243,7 @@ Para probar en local:
 3. Registrá el webhook una sola vez, con el secreto que hayas puesto en `Telegram:WebhookSecret`:
 
    ```bash
-   curl "https://api.telegram.org/bot<token>/setWebhook"      -d "url=https://<subdominio>.ngrok-free.app/api/webhooks/telegram"      -d "secret_token=<secreto>"      -d "allowed_updates=[\"message\"]"
+   curl "https://api.telegram.org/bot<token>/setWebhook"      -d "url=https://<subdominio>.ngrok-free.app/api/webhooks/telegram"      -d "secret_token=<secreto>"      -d "allowed_updates=[\"message\",\"callback_query\"]"
    ```
 
    Cada vez que ngrok cambie de URL hay que repetir este paso. `getWebhookInfo` en la misma
@@ -254,6 +254,15 @@ El flujo de vinculación es el mismo que WhatsApp: el empleado pide un código c
 `https://t.me/<bot>?start=<código>`, así que basta tocar "Abrir" y "Iniciar": Telegram manda
 `/start <código>` y el chat queda vinculado. Solo se procesan chats privados; un mensaje en un
 grupo se ignora.
+
+Con el chat vinculado, el empleado registra movimientos escribiéndole al bot en lenguaje natural
+(HU-13): "Gasté $500 en el súper", "Cobré $10000 por un freelance". La API le pide a FinGrow-AI
+que interprete el texto (`POST /api/v1/message-parsing/transactions`), guarda el movimiento como
+pendiente con fuente `Telegram` y contesta con lo que entendió y botones para confirmarlo o
+descartarlo. Si el mensaje no dice el medio de pago, los botones son los medios de pago y tocar
+uno confirma con ese medio; si el empleado no contesta, queda pendiente en la bandeja de la app
+con Efectivo. Si falta el monto, el bot repregunta y no registra nada. Los toques de botón llegan
+como `callback_query`, por eso el webhook tiene que registrarse con ese tipo en `allowed_updates`.
 
 ### Trabajos programados (Dokploy)
 
