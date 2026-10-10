@@ -117,17 +117,57 @@ public sealed class FakeTelegramBotClient : ITelegramBotClient
 {
     public List<(long ChatId, string Text)> Sent { get; } = new();
 
+    public List<(long ChatId, string Text, IReadOnlyList<IReadOnlyList<TelegramButton>> ButtonRows)> SentWithButtons { get; } = new();
+
+    public List<(long ChatId, long MessageId, string Text)> Edited { get; } = new();
+
+    public List<(string CallbackQueryId, string? Text)> AnsweredCallbacks { get; } = new();
+
     public bool Unreachable { get; set; }
 
     public Task SendMessageAsync(long chatId, string text, CancellationToken cancellationToken = default)
+    {
+        ThrowIfUnreachable();
+
+        Sent.Add((chatId, text));
+        return Task.CompletedTask;
+    }
+
+    public Task SendMessageAsync(
+        long chatId,
+        string text,
+        IReadOnlyList<IReadOnlyList<TelegramButton>> buttonRows,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfUnreachable();
+
+        Sent.Add((chatId, text));
+        SentWithButtons.Add((chatId, text, buttonRows));
+        return Task.CompletedTask;
+    }
+
+    public Task EditMessageAsync(long chatId, long messageId, string text, CancellationToken cancellationToken = default)
+    {
+        ThrowIfUnreachable();
+
+        Edited.Add((chatId, messageId, text));
+        return Task.CompletedTask;
+    }
+
+    public Task AnswerCallbackAsync(string callbackQueryId, string? text = null, CancellationToken cancellationToken = default)
+    {
+        ThrowIfUnreachable();
+
+        AnsweredCallbacks.Add((callbackQueryId, text));
+        return Task.CompletedTask;
+    }
+
+    private void ThrowIfUnreachable()
     {
         if (Unreachable)
         {
             throw new HttpRequestException("api.telegram.org no responde");
         }
-
-        Sent.Add((chatId, text));
-        return Task.CompletedTask;
     }
 }
 
@@ -301,6 +341,22 @@ public sealed class FakeAiService : IAiService
             .Where(expense => CategoriesByDescription.ContainsKey(expense.Description))
             .Select(expense => new CategorizedExpense(expense.Id, CategoriesByDescription[expense.Description], Confidence, Model))
             .ToList());
+    }
+
+    public ParsedMessage ParseResult { get; set; } = ParsedMessage.Of(MessageParsingOutcome.NotATransaction, "fake-model");
+
+    public List<(string Text, Currency DefaultCurrency)> ParsedMessages { get; } = new();
+
+    public Task<ParsedMessage> ParseTransactionMessageAsync(string text, Currency defaultCurrency, CancellationToken cancellationToken = default)
+    {
+        if (Unreachable)
+        {
+            throw new HttpRequestException("FinGrow-AI unreachable");
+        }
+
+        ParsedMessages.Add((text, defaultCurrency));
+
+        return Task.FromResult(ParseResult);
     }
 }
 

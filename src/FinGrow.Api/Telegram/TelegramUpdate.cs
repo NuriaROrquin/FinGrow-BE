@@ -4,7 +4,8 @@ using System.Text.Json.Serialization;
 
 public sealed record TelegramUpdate(
     [property: JsonPropertyName("update_id")] long UpdateId,
-    [property: JsonPropertyName("message")] TelegramMessage? Message);
+    [property: JsonPropertyName("message")] TelegramMessage? Message,
+    [property: JsonPropertyName("callback_query")] TelegramCallbackQuery? CallbackQuery = null);
 
 public sealed record TelegramMessage(
     [property: JsonPropertyName("message_id")] long MessageId,
@@ -19,3 +20,12 @@ public sealed record TelegramChat(
 
     public bool IsPrivate => string.Equals(Type, Private, StringComparison.OrdinalIgnoreCase);
 }
+
+public sealed record TelegramCallbackQuery(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("from")] TelegramUser From,
+    [property: JsonPropertyName("message")] TelegramMessage? Message,
+    [property: JsonPropertyName("data")] string? Data);
+
+public sealed record TelegramUser(
+    [property: JsonPropertyName("id")] long Id);

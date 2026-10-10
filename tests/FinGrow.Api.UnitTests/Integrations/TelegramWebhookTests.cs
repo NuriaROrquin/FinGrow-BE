@@ -100,6 +100,71 @@ public class TelegramWebhookTests
         factory.Bot.Sent.ShouldBeEmpty();
     }
 
+    [Fact]
+    public async Task A_linked_chat_writing_an_expense_gets_a_proposal_with_buttons()
+    {
+        using var factory = new WebhookWebApplicationFactory();
+        var client = factory.CreateClient();
+        factory.LinkChat();
+
+        var response = await PostAsync(client, PrivateMessage("Gasté $500 en supermercado"));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var transaction = factory.Transactions.ShouldHaveSingleItem();
+        transaction.Source.ShouldBe(TransactionSource.Telegram);
+        transaction.Status.ShouldBe(TransactionStatus.Pending);
+        var sent = factory.Bot.SentWithButtons.ShouldHaveSingleItem();
+        sent.ChatId.ShouldBe(ChatId);
+        sent.Text.ShouldContain("Alimentos");
+    }
+
+    [Fact]
+    public async Task Tapping_a_button_confirms_the_transaction_and_edits_the_message()
+    {
+        using var factory = new WebhookWebApplicationFactory();
+        var client = factory.CreateClient();
+        factory.LinkChat();
+        await PostAsync(client, PrivateMessage("Gasté $500 en supermercado"));
+        var cashButton = factory.Bot.SentWithButtons.Single().ButtonRows[0][0];
+
+        var response = await PostAsync(client, ButtonTap(cashButton.CallbackData));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        factory.Transactions.Single().Status.ShouldBe(TransactionStatus.Confirmed);
+        factory.Bot.AnsweredCallbacks.ShouldHaveSingleItem().ShouldBe("callback-1");
+        var edited = factory.Bot.Edited.ShouldHaveSingleItem();
+        edited.MessageId.ShouldBe(8);
+        edited.Text.ShouldStartWith("✅ Registrado");
+    }
+
+    [Fact]
+    public async Task A_button_tapped_in_a_group_is_ignored()
+    {
+        using var factory = new WebhookWebApplicationFactory();
+        var client = factory.CreateClient();
+        factory.LinkChat();
+        await PostAsync(client, PrivateMessage("Gasté $500 en supermercado"));
+        var cashButton = factory.Bot.SentWithButtons.Single().ButtonRows[0][0];
+
+        var response = await PostAsync(client, ButtonTap(cashButton.CallbackData, chatType: "group"));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        factory.Transactions.Single().Status.ShouldBe(TransactionStatus.Pending);
+        factory.Bot.AnsweredCallbacks.ShouldBeEmpty();
+    }
+
+    private static object ButtonTap(string data, string chatType = "private") => new
+    {
+        update_id = 101,
+        callback_query = new
+        {
+            id = "callback-1",
+            from = new { id = ChatId },
+            message = new { message_id = 8, chat = new { id = ChatId, type = chatType }, text = "propuesta" },
+            data,
+        },
+    };
+
     private static object PrivateMessage(string text) => new
     {
         update_id = 100,
@@ -141,6 +206,11 @@ public class TelegramWebhookTests
 
         public RecordingTelegramBotClient Bot { get; } = new();
 
+        public List<Transaction> Transactions { get; } = new();
+
+        public void LinkChat() =>
+            Integrations.Add(EmployeeIntegration.Create(Employee.Id, IntegrationProvider.Telegram, "123456789", DateTimeOffset.UtcNow));
+
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.ConfigureAppConfiguration((_, configuration) =>
@@ -167,6 +237,8 @@ public class TelegramWebhookTests
                 services.AddScoped<IIntegrationLinkCodeRepository>(_ => new InMemoryIntegrationLinkCodeRepository(LinkCodes));
                 services.AddScoped<IUnitOfWork, NoOpUnitOfWork>();
                 services.AddSingleton<ITelegramBotClient>(Bot);
+                services.AddScoped<ITransactionRepository>(_ => new InMemoryTransactionRepository(Transactions));
+                services.AddSingleton<IAiService, SupermarketAiService>();
             });
         }
     }
@@ -175,11 +247,86 @@ public class TelegramWebhookTests
     {
         public List<(long ChatId, string Text)> Sent { get; } = new();
 
+        public List<(long ChatId, string Text, IReadOnlyList<IReadOnlyList<TelegramButton>> ButtonRows)> SentWithButtons { get; } = new();
+
+        public List<(long ChatId, long MessageId, string Text)> Edited { get; } = new();
+
+        public List<string> AnsweredCallbacks { get; } = new();
+
         public Task SendMessageAsync(long chatId, string text, CancellationToken cancellationToken = default)
         {
             Sent.Add((chatId, text));
             return Task.CompletedTask;
         }
+
+        public Task SendMessageAsync(
+            long chatId,
+            string text,
+            IReadOnlyList<IReadOnlyList<TelegramButton>> buttonRows,
+            CancellationToken cancellationToken = default)
+        {
+            SentWithButtons.Add((chatId, text, buttonRows));
+            return Task.CompletedTask;
+        }
+
+        public Task EditMessageAsync(long chatId, long messageId, string text, CancellationToken cancellationToken = default)
+        {
+            Edited.Add((chatId, messageId, text));
+            return Task.CompletedTask;
+        }
+
+        public Task AnswerCallbackAsync(string callbackQueryId, string? text = null, CancellationToken cancellationToken = default)
+        {
+            AnsweredCallbacks.Add(callbackQueryId);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class SupermarketAiService : IAiService
+    {
+        public Task<bool> IsHealthyAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
+
+        public Task<IReadOnlyList<CategorizedExpense>> CategorizeExpensesAsync(
+            IReadOnlyList<ExpenseToCategorize> expenses,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<ParsedMessage> ParseTransactionMessageAsync(
+            string text,
+            Currency defaultCurrency,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new ParsedMessage(
+                MessageParsingOutcome.Parsed,
+                new ParsedTransaction(TransactionType.Expense, 500m, defaultCurrency, ExpenseCategory.Alimentos, null, "Supermercado", null, 0.9),
+                "fake-model"));
+    }
+
+    private sealed class InMemoryTransactionRepository : ITransactionRepository
+    {
+        private readonly List<Transaction> _transactions;
+
+        public InMemoryTransactionRepository(List<Transaction> transactions) => _transactions = transactions;
+
+        public void Add(Transaction transaction) => _transactions.Add(transaction);
+
+        public Task<Transaction?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+            Task.FromResult(_transactions.FirstOrDefault(transaction => transaction.Id == id));
+
+        public Task<IReadOnlyList<Transaction>> ListByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Transaction>>(_transactions.Where(transaction => transaction.EmployeeId == employeeId).ToList());
+
+        public Task<IReadOnlyList<Transaction>> ListPendingByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Transaction>>(_transactions.Where(transaction => transaction.EmployeeId == employeeId && transaction.IsPending).ToList());
+
+        public Task<IReadOnlySet<string>> ListExistingExternalReferencesAsync(
+            Guid employeeId,
+            TransactionSource source,
+            IReadOnlyCollection<string> externalReferences,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlySet<string>>(_transactions
+                .Where(transaction => transaction.EmployeeId == employeeId && transaction.Source == source && transaction.ExternalReference is not null && externalReferences.Contains(transaction.ExternalReference))
+                .Select(transaction => transaction.ExternalReference!)
+                .ToHashSet(StringComparer.Ordinal));
     }
 
     private sealed class InMemoryEmployeeRepository : IEmployeeRepository
