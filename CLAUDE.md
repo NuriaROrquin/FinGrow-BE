@@ -47,6 +47,8 @@ se cargan siempre con su agregado (`AutoInclude`).
 `FinGrow-AI/app/domain/enums.py` y se guardan en la base con el texto que usa la IA
 (`ahorro_inversion`, no `AhorroInversion`). Hay un test que rompe el build si las dos listas se
 separan: si falla, no lo ajustes sin cambiar los dos lados.
+Desde HU-13 pasa lo mismo con `IncomeCategory` (`IncomeCategoryTests`): la IA también clasifica
+ingresos al interpretar un mensaje del bot.
 
 **Un importe nunca viaja solo.** `Money` es un value object de monto + moneda que se guarda como
 dos columnas. Combinar importes de monedas distintas lanza `DomainException`, a propósito.
@@ -121,6 +123,14 @@ WhatsApp responde inline con `TwiMlResult`; Telegram responde `200` y manda el t
 Telegram reintenta cualquier respuesta que no sea 2xx y un código ya canjeado se rechazaría en
 el reintento. Una cuenta que no está en `employee_integrations` solo puede mandar su código de
 vinculación.
+
+**Registrar movimientos desde un chat (HU-13)** vive en `Integrations/ChatTransactions`, que no
+sabe de qué canal viene el texto: `ChatTransactionProposer` le pide a FinGrow-AI que lo
+interprete y crea el movimiento como `Pending` (con `external_reference` = canal + id del
+mensaje, para que un reintento del webhook no lo duplique), y `ChatTransactionReviewer` lo
+confirma o descarta. Telegram lo muestra con botones (`TelegramTransactionCallback` arma y lee el
+`callback_data`, limitado a 64 bytes) y `AnswerTelegramCallback` procesa el toque. Para sumar
+WhatsApp alcanza con una capa propia del canal que use esas dos piezas.
 
 ## Trabajos programados
 
