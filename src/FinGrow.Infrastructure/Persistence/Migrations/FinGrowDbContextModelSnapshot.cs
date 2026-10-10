@@ -1371,7 +1371,9 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_transaction_receipts_storage_key");
 
                     b.HasIndex("TransactionId")
-                        .HasDatabaseName("ix_transaction_receipts_transaction_id");
+                        .IsUnique()
+                        .HasDatabaseName("ix_transaction_receipts_transaction_id")
+                        .HasFilter("transaction_id IS NOT NULL");
 
                     b.ToTable("transaction_receipts", null, t =>
                         {

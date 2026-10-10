@@ -105,6 +105,8 @@ public sealed class TransactionReceipt : AggregateRoot
         TransactionId = transaction.Id;
     }
 
+    public void Detach() => TransactionId = null;
+
     private static string? NormalizeFileName(string? fileName)
     {
         var name = Path.GetFileName(fileName?.Trim());

@@ -43,6 +43,8 @@ internal sealed class TransactionReceiptConfiguration : IEntityTypeConfiguration
 
         builder.HasIndex(receipt => receipt.StorageKey).IsUnique();
         builder.HasIndex(receipt => receipt.EmployeeId);
-        builder.HasIndex(receipt => receipt.TransactionId);
+        builder.HasIndex(receipt => receipt.TransactionId)
+            .IsUnique()
+            .HasFilter("transaction_id IS NOT NULL");
     }
 }

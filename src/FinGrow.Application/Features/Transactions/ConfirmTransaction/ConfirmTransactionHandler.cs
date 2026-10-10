@@ -10,6 +10,7 @@ using MediatR;
 
 internal sealed class ConfirmTransactionHandler(
     ITransactionRepository transactionRepository,
+    ITransactionReceiptRepository receiptRepository,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
     IDateTimeProvider dateTimeProvider)
@@ -54,6 +55,8 @@ internal sealed class ConfirmTransactionHandler(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(TransactionResponse.FromEntity(transaction));
+        var receipt = await receiptRepository.GetByTransactionIdAsync(transaction.Id, cancellationToken);
+
+        return Result.Success(TransactionResponse.FromEntity(transaction, receipt?.Id));
     }
 }

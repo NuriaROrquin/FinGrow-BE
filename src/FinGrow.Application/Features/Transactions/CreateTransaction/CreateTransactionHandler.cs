@@ -23,17 +23,14 @@ internal sealed class CreateTransactionHandler(
 
         if (request.ReceiptId is { } receiptId)
         {
-            receipt = await receiptRepository.GetByIdAsync(receiptId, cancellationToken);
+            var found = await ReceiptAttachment.FindOwnedAsync(receiptRepository, receiptId, request.EmployeeId, cancellationToken);
 
-            if (receipt is null)
+            if (found.IsFailure)
             {
-                return Result.Failure<TransactionResponse>(ReceiptErrors.NotFound(receiptId));
+                return Result.Failure<TransactionResponse>(found.Error);
             }
 
-            if (receipt.EmployeeId != request.EmployeeId)
-            {
-                return Result.Failure<TransactionResponse>(ReceiptErrors.NotOwned);
-            }
+            receipt = found.Value;
         }
 
         var amount = Money.From(request.Amount, request.Currency);
@@ -66,6 +63,6 @@ internal sealed class CreateTransactionHandler(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(TransactionResponse.FromEntity(transaction));
+        return Result.Success(TransactionResponse.FromEntity(transaction, receipt?.Id));
     }
 }

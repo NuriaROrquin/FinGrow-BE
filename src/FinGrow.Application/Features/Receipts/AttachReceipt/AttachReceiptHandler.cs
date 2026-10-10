@@ -19,17 +19,14 @@ internal sealed class AttachReceiptHandler(
     {
         var employeeId = currentUser.UserId!.Value;
 
-        var receipt = await receipts.GetByIdAsync(request.ReceiptId, cancellationToken);
+        var found = await ReceiptAttachment.FindOwnedAsync(receipts, request.ReceiptId, employeeId, cancellationToken);
 
-        if (receipt is null)
+        if (found.IsFailure)
         {
-            return Result.Failure<TransactionReceiptResponse>(ReceiptErrors.NotFound(request.ReceiptId));
+            return Result.Failure<TransactionReceiptResponse>(found.Error);
         }
 
-        if (receipt.EmployeeId != employeeId)
-        {
-            return Result.Failure<TransactionReceiptResponse>(ReceiptErrors.NotOwned);
-        }
+        var receipt = found.Value;
 
         var transaction = await transactions.GetByIdAsync(request.TransactionId, cancellationToken);
 
@@ -43,7 +40,7 @@ internal sealed class AttachReceiptHandler(
             return Result.Failure<TransactionReceiptResponse>(ReceiptErrors.TransactionNotOwned);
         }
 
-        receipt.AttachTo(transaction);
+        await ReceiptAttachment.AttachAsync(receipts, receipt, transaction, cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
