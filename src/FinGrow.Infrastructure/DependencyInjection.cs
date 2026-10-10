@@ -2,6 +2,8 @@ namespace FinGrow.Infrastructure;
 
 using System.Net.Http.Headers;
 using System.Text;
+using Amazon.Runtime;
+using Amazon.S3;
 using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Repositories;
 using FinGrow.Infrastructure.Ai;
@@ -19,6 +21,7 @@ using FinGrow.Infrastructure.Persistence.Protection;
 using FinGrow.Infrastructure.Persistence.Repositories;
 using FinGrow.Infrastructure.Persistence.Seeding;
 using FinGrow.Infrastructure.Services;
+using FinGrow.Infrastructure.Storage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -47,6 +50,7 @@ public static class DependencyInjection
         services.AddByma(configuration);
         services.AddArgentinaDatos(configuration);
         services.AddCoinGecko(configuration);
+        services.AddFileStorage(configuration);
 
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, CurrentUser>();
@@ -87,6 +91,7 @@ public static class DependencyInjection
 
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<FinGrowDbContext>());
         services.AddScoped<ITransactionRepository, TransactionRepository>();
+        services.AddScoped<ITransactionReceiptRepository, TransactionReceiptRepository>();
         services.AddScoped<ITransactionReadRepository, TransactionReadRepository>();
         services.AddScoped<ITransactionExcelExporter, TransactionExcelExporter>();
         services.AddScoped<IGoalRepository, GoalRepository>();
@@ -290,6 +295,37 @@ public static class DependencyInjection
                     client.DefaultRequestHeaders.Add(CoinGeckoOptions.ApiKeyHeader, options.ApiKey);
                 }
             });
+
+        return services;
+    }
+
+    private static IServiceCollection AddFileStorage(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<S3StorageOptions>()
+            .Bind(configuration.GetSection(S3StorageOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddSingleton<IAmazonS3>(provider =>
+        {
+            var options = provider.GetRequiredService<IOptions<S3StorageOptions>>().Value;
+
+            return new AmazonS3Client(
+                new BasicAWSCredentials(options.AccessKey, options.SecretKey),
+                new AmazonS3Config
+                {
+                    ServiceURL = options.ServiceUrl,
+                    AuthenticationRegion = options.Region,
+                    ForcePathStyle = options.ForcePathStyle,
+                    Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds),
+                    // Los checksums que el SDK agrega por defecto desde la v4 no los entienden
+                    // ni R2 ni S3Mock: se mandan solo cuando la operacion los exige.
+                    RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED,
+                    ResponseChecksumValidation = ResponseChecksumValidation.WHEN_REQUIRED,
+                });
+        });
+
+        services.AddSingleton<IFileStorage, S3FileStorage>();
 
         return services;
     }
