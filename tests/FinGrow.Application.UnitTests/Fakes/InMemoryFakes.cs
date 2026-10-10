@@ -674,3 +674,56 @@ public sealed class FakeNotificationChannelSettingRepository : INotificationChan
     public Task<IReadOnlyList<NotificationChannelSetting>> ListByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<NotificationChannelSetting>>(Settings.Where(setting => setting.EmployeeId == employeeId).ToList());
 }
+
+public sealed class FakeTransactionReceiptRepository : ITransactionReceiptRepository
+{
+    public List<TransactionReceipt> Receipts { get; } = new();
+
+    public void Add(TransactionReceipt receipt) => Receipts.Add(receipt);
+
+    public Task<TransactionReceipt?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Receipts.FirstOrDefault(receipt => receipt.Id == id));
+}
+
+public sealed class FakeFileStorage : IFileStorage
+{
+    public Dictionary<string, (byte[] Content, string ContentType)> Files { get; } = new(StringComparer.Ordinal);
+
+    public bool Unreachable { get; set; }
+
+    public Task SaveAsync(string key, Stream content, string contentType, CancellationToken cancellationToken = default)
+    {
+        EnsureReachable();
+
+        using var copy = new MemoryStream();
+        content.CopyTo(copy);
+        Files[key] = (copy.ToArray(), contentType);
+
+        return Task.CompletedTask;
+    }
+
+    public Task<StoredFile?> OpenAsync(string key, CancellationToken cancellationToken = default)
+    {
+        EnsureReachable();
+
+        return Task.FromResult(Files.TryGetValue(key, out var file)
+            ? new StoredFile(new MemoryStream(file.Content), file.ContentType, file.Content.Length)
+            : null);
+    }
+
+    public Task DeleteAsync(string key, CancellationToken cancellationToken = default)
+    {
+        EnsureReachable();
+
+        Files.Remove(key);
+        return Task.CompletedTask;
+    }
+
+    private void EnsureReachable()
+    {
+        if (Unreachable)
+        {
+            throw new FileStorageUnavailableException("el almacenamiento no responde");
+        }
+    }
+}
