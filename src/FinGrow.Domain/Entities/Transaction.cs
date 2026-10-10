@@ -217,25 +217,37 @@ public sealed class Transaction : AggregateRoot
             throw new DomainException("Solo un gasto puede recibir una categoria de gasto.");
         }
 
-        if (Status != TransactionStatus.Pending)
-        {
-            throw new DomainException("La IA solo puede sugerir sobre un movimiento pendiente.");
-        }
-
         if (!Enum.IsDefined(category))
         {
             throw new DomainException($"La categoria de gasto '{category}' no existe.");
         }
 
-        if (!ConfidenceScale.IsValid(confidence))
-        {
-            throw new DomainException("La confianza de la IA tiene que estar entre 0 y 1.");
-        }
+        EnsureAiCanSuggest(confidence);
 
         ExpenseCategory = category;
-        AiConfidence = confidence;
-        AiModel = NormalizeAiModel(model);
-        UpdatedAt = suggestedAt;
+        RecordAiSuggestion(confidence, model, suggestedAt);
+    }
+
+    public void SuggestIncomeCategory(
+        IncomeCategory category,
+        double confidence,
+        string? model,
+        DateTimeOffset suggestedAt)
+    {
+        if (Type != TransactionType.Income)
+        {
+            throw new DomainException("Solo un ingreso puede recibir una categoria de ingreso.");
+        }
+
+        if (!Enum.IsDefined(category))
+        {
+            throw new DomainException($"La categoria de ingreso '{category}' no existe.");
+        }
+
+        EnsureAiCanSuggest(confidence);
+
+        IncomeCategory = category;
+        RecordAiSuggestion(confidence, model, suggestedAt);
     }
 
     public void UpdateDetails(
@@ -388,6 +400,26 @@ public sealed class Transaction : AggregateRoot
                 $"La descripcion no puede superar los {MaxDescriptionLength} caracteres."),
             _ => trimmed
         };
+    }
+
+    private void EnsureAiCanSuggest(double confidence)
+    {
+        if (Status != TransactionStatus.Pending)
+        {
+            throw new DomainException("La IA solo puede sugerir sobre un movimiento pendiente.");
+        }
+
+        if (!ConfidenceScale.IsValid(confidence))
+        {
+            throw new DomainException("La confianza de la IA tiene que estar entre 0 y 1.");
+        }
+    }
+
+    private void RecordAiSuggestion(double confidence, string? model, DateTimeOffset suggestedAt)
+    {
+        AiConfidence = confidence;
+        AiModel = NormalizeAiModel(model);
+        UpdatedAt = suggestedAt;
     }
 
     private static string? NormalizeAiModel(string? model)
