@@ -228,6 +228,9 @@ mismo código funciona contra Cloudflare R2 en los entornos desplegados y contra
 | `GET /api/receipts/{id}/file` | Devuelve el archivo. Responde 403 si el comprobante es de otro empleado |
 | `POST /api/receipts/{id}/attach` | Asocia el comprobante a un movimiento (`{ "transactionId": "..." }`), por ejemplo uno cargado a mano después de que falló el OCR. Si ya estaba asociado a otro, lo mueve |
 | `POST /api/transactions` con `receiptId` | Crea el movimiento y le asocia el comprobante en la misma operación: o se guardan los dos, o ninguno. 404 si el comprobante no existe, 403 si es de otro empleado |
+| `PUT /api/transactions/{id}` con `receiptId` | Igual que al crear, pero sobre un movimiento existente. Sin `receiptId`, conserva el comprobante que tenía |
+
+**Un movimiento tiene como máximo un comprobante** (índice único en `transaction_receipts.transaction_id`): asociarle otro reemplaza al anterior, que queda suelto. Las respuestas de los movimientos (listado, detalle, crear, editar, pendientes y confirmar) informan su `receiptId`, o `null` si no tiene.
 
 Un comprobante nace sin movimiento: si el OCR falla, la imagen ya quedó guardada y se asocia
 después. Si el almacenamiento no responde, la subida devuelve 503 y no se crea nada en la base.
