@@ -4,6 +4,7 @@ using FinGrow.Application.Common;
 using FinGrow.Application.Features.Transactions.GetHistory;
 using FinGrow.Application.Features.Transactions.GetTransactionSummary;
 using FinGrow.Application.Interfaces;
+using FinGrow.Application.UnitTests.Fakes;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.ValueObjects;
@@ -22,6 +23,35 @@ public sealed class GetTransactionHistoryQueryTests
         result.IsSuccess.ShouldBeTrue();
         repository.RequestedEmployeeId.ShouldBe(userId);
     }
+
+    [Fact]
+    public async Task Each_item_says_which_receipt_it_has()
+    {
+        var employeeId = Guid.CreateVersion7();
+        var withReceipt = NewHistoryExpense(employeeId);
+        var withoutReceipt = NewHistoryExpense(employeeId);
+        var receipts = new FakeTransactionReceiptRepository();
+        var receipt = TransactionReceipt.Upload(employeeId, "image/png", 10, null, DateTimeOffset.UnixEpoch);
+        receipt.AttachTo(withReceipt);
+        receipts.Receipts.Add(receipt);
+        var handler = CreateHandler(new FakeTransactionReadRepository(new[] { withReceipt, withoutReceipt }), employeeId, receipts);
+
+        var result = await handler.Handle(new GetTransactionHistoryQuery(new TransactionFilters()), CancellationToken.None);
+
+        result.Value.Items.Single(item => item.Id == withReceipt.Id).ReceiptId.ShouldBe(receipt.Id);
+        result.Value.Items.Single(item => item.Id == withoutReceipt.Id).ReceiptId.ShouldBeNull();
+    }
+
+    private static Transaction NewHistoryExpense(Guid employeeId) => Transaction.RegisterExpense(
+        employeeId,
+        Money.From(1000m, Currency.ARS),
+        ExpenseCategory.Alimentos,
+        "Supermercado",
+        new DateOnly(2026, 9, 1),
+        PaymentMethod.Cash,
+        TransactionSource.Manual,
+        TransactionStatus.Confirmed,
+        DateTimeOffset.UnixEpoch);
 
     [Fact]
     public async Task Handler_uses_confirmed_status_by_default()
@@ -147,8 +177,9 @@ public sealed class GetTransactionHistoryQueryTests
 
     private static GetTransactionHistoryQueryHandler CreateHandler(
         FakeTransactionReadRepository repository,
-        Guid? userId) =>
-        new(repository, new FakeCurrentUser(userId));
+        Guid? userId,
+        FakeTransactionReceiptRepository? receipts = null) =>
+        new(repository, receipts ?? new FakeTransactionReceiptRepository(), new FakeCurrentUser(userId));
 
     private sealed class FakeCurrentUser(Guid? userId) : ICurrentUser
     {

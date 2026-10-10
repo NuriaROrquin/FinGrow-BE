@@ -78,6 +78,7 @@ public class CreateTransactionHandlerTests
 
         result.IsSuccess.ShouldBeTrue();
         receipt.TransactionId.ShouldBe(result.Value.Id);
+        result.Value.ReceiptId.ShouldBe(receipt.Id);
         _unitOfWork.SaveCount.ShouldBe(1);
     }
 

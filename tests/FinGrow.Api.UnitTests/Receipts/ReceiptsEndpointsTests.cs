@@ -305,6 +305,16 @@ public class ReceiptsEndpointsTests
 
         public Task<TransactionReceipt?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
             Task.FromResult(receipts.FirstOrDefault(receipt => receipt.Id == id));
+
+        public Task<TransactionReceipt?> GetByTransactionIdAsync(Guid transactionId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(receipts.FirstOrDefault(receipt => receipt.TransactionId == transactionId));
+
+        public Task<IReadOnlyDictionary<Guid, Guid>> GetIdsByTransactionAsync(
+            IReadOnlyCollection<Guid> transactionIds,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyDictionary<Guid, Guid>>(receipts
+                .Where(receipt => receipt.TransactionId is { } id && transactionIds.Contains(id))
+                .ToDictionary(receipt => receipt.TransactionId!.Value, receipt => receipt.Id));
     }
 
     private sealed class InMemoryTransactionRepository(List<Transaction> transactions) : ITransactionRepository

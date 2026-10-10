@@ -683,6 +683,16 @@ public sealed class FakeTransactionReceiptRepository : ITransactionReceiptReposi
 
     public Task<TransactionReceipt?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Receipts.FirstOrDefault(receipt => receipt.Id == id));
+
+    public Task<TransactionReceipt?> GetByTransactionIdAsync(Guid transactionId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Receipts.FirstOrDefault(receipt => receipt.TransactionId == transactionId));
+
+    public Task<IReadOnlyDictionary<Guid, Guid>> GetIdsByTransactionAsync(
+        IReadOnlyCollection<Guid> transactionIds,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyDictionary<Guid, Guid>>(Receipts
+            .Where(receipt => receipt.TransactionId is { } id && transactionIds.Contains(id))
+            .ToDictionary(receipt => receipt.TransactionId!.Value, receipt => receipt.Id));
 }
 
 public sealed class FakeFileStorage : IFileStorage

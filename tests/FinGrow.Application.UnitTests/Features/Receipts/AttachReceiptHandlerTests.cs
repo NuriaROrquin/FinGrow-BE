@@ -91,6 +91,21 @@ public class AttachReceiptHandlerTests
         _unitOfWork.SaveCount.ShouldBe(1);
     }
 
+    [Fact]
+    public async Task Attaching_to_a_transaction_that_already_has_a_receipt_replaces_it()
+    {
+        var transaction = AddExpense(_user.UserId!.Value);
+        var previous = AddReceipt(_user.UserId!.Value);
+        previous.AttachTo(transaction);
+        var replacement = AddReceipt(_user.UserId!.Value);
+
+        var result = await Handle(replacement.Id, transaction.Id);
+
+        result.IsSuccess.ShouldBeTrue();
+        replacement.TransactionId.ShouldBe(transaction.Id);
+        previous.TransactionId.ShouldBeNull();
+    }
+
     private TransactionReceipt AddReceipt(Guid employeeId)
     {
         var receipt = TransactionReceipt.Upload(employeeId, "image/png", 10, null, Now);

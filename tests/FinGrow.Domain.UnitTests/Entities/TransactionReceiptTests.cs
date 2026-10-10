@@ -125,6 +125,17 @@ public class TransactionReceiptTests
     }
 
     [Fact]
+    public void Detaching_leaves_the_receipt_loose()
+    {
+        var receipt = TransactionReceipt.Upload(EmployeeId, "image/png", 10, null, UploadedAt);
+        receipt.AttachTo(NewExpense(EmployeeId));
+
+        receipt.Detach();
+
+        receipt.TransactionId.ShouldBeNull();
+    }
+
+    [Fact]
     public void A_receipt_cannot_be_attached_to_a_transaction_of_another_employee()
     {
         var receipt = TransactionReceipt.Upload(EmployeeId, "image/png", 10, null, UploadedAt);
