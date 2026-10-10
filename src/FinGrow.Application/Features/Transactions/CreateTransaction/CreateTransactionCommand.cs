@@ -14,4 +14,5 @@ public sealed record CreateTransactionCommand(
     IncomeCategory? IncomeCategory,
     string Description,
     DateOnly OccurredOn,
-    PaymentMethod PaymentMethod) : IRequest<Result<TransactionResponse>>;
+    PaymentMethod PaymentMethod,
+    Guid? ReceiptId = null) : IRequest<Result<TransactionResponse>>;
