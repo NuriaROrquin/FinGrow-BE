@@ -104,6 +104,7 @@ public static class DependencyInjection
         services.AddScoped<IJobRunRepository, JobRunRepository>();
         services.AddScoped<IMetricsSnapshotRepository, MetricsSnapshotRepository>();
         services.AddScoped<IFinancialHealthScoreRepository, FinancialHealthScoreRepository>();
+        services.AddScoped<IFinancialHealthReadRepository, FinancialHealthReadRepository>();
         services.AddScoped<IPeriodActivityReadRepository, PeriodActivityReadRepository>();
         services.AddScoped<IGoalRepository, GoalRepository>();
         services.AddScoped<IBudgetRepository, BudgetRepository>();

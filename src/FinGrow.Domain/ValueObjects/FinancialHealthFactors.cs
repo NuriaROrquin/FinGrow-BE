@@ -14,6 +14,7 @@ public sealed class FinancialHealthFactors : ValueObject
     public const int CushionWeight = 15;
     public const decimal TargetSavingsRate = 0.20m;
     public const decimal TargetCushionMonths = 3m;
+    public const int SpendingAverageMonths = 3;
 
     private const decimal Full = 100m;
     private const int DecimalPlaces = 2;

@@ -419,6 +419,11 @@ public sealed class FakeGoalRepository : IGoalRepository
             .OrderByDescending(goal => goal.CreatedAt)
             .ToList());
 
+    public Task<IReadOnlyList<Goal>> ListByEmployeesAsync(IReadOnlyCollection<Guid> employeeIds, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Goal>>(Goals
+            .Where(goal => employeeIds.Contains(goal.EmployeeId))
+            .ToList());
+
     public Task<IReadOnlyList<Guid>> ListEmployeesWithActiveGoalsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Guid>>(Goals
             .Where(goal => goal.Status == GoalStatus.Active)
