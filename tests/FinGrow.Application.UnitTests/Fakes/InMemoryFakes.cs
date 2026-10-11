@@ -284,6 +284,53 @@ public sealed class FakeMercadoPagoOAuthClient : IMercadoPagoOAuthClient
         Task.FromResult(Tokens);
 }
 
+public sealed class FakeGmailOAuthClient : IGmailOAuthClient
+{
+    public static readonly Uri AuthorizationBase = new("https://accounts.google.test/o/oauth2/v2/auth");
+
+    public GmailTokens Tokens { get; set; } = new("access-token", "refresh-token", TimeSpan.FromHours(1), CanReadMail: true);
+
+    public string EmailAddress { get; set; } = "juan.perez@gmail.com";
+
+    public bool Unreachable { get; set; }
+
+    public List<string> ExchangedCodes { get; } = new();
+
+    public List<string> RevokedTokens { get; } = new();
+
+    public Uri BuildAuthorizationUrl(string state) => new(AuthorizationBase, $"?state={state}");
+
+    public Task<GmailTokens> ExchangeCodeAsync(string code, CancellationToken cancellationToken = default)
+    {
+        ThrowIfUnreachable();
+        ExchangedCodes.Add(code);
+
+        return Task.FromResult(Tokens);
+    }
+
+    public Task<GmailTokens> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Tokens);
+
+    public Task<string> GetEmailAddressAsync(string accessToken, CancellationToken cancellationToken = default) =>
+        Task.FromResult(EmailAddress);
+
+    public Task RevokeAsync(string token, CancellationToken cancellationToken = default)
+    {
+        ThrowIfUnreachable();
+        RevokedTokens.Add(token);
+
+        return Task.CompletedTask;
+    }
+
+    private void ThrowIfUnreachable()
+    {
+        if (Unreachable)
+        {
+            throw new HttpRequestException("Google unreachable");
+        }
+    }
+}
+
 public sealed class FakeMercadoPagoPaymentsClient : IMercadoPagoPaymentsClient
 {
     public List<MercadoPagoPayment> Payments { get; } = new();

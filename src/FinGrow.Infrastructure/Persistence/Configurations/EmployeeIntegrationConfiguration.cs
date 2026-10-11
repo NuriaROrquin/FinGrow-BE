@@ -24,6 +24,11 @@ internal sealed class EmployeeIntegrationConfiguration : IEntityTypeConfiguratio
 
         builder.Property(integration => integration.LinkedAt).IsRequired();
 
+        builder.Property(integration => integration.Status)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
         builder.OwnsOne(integration => integration.Grant, grant =>
         {
             grant.Property(value => value.AccessToken)

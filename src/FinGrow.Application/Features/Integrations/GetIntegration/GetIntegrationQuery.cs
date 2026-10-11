@@ -6,7 +6,11 @@ using MediatR;
 
 public sealed record GetIntegrationQuery(IntegrationProvider Provider) : IRequest<Result<IntegrationResponse>>;
 
-public sealed record IntegrationResponse(bool Linked, string? ExternalAccountId, DateTimeOffset? LinkedAt)
+public sealed record IntegrationResponse(
+    bool Linked,
+    string? ExternalAccountId,
+    DateTimeOffset? LinkedAt,
+    IntegrationStatus? Status)
 {
-    public static readonly IntegrationResponse NotLinked = new(false, null, null);
+    public static readonly IntegrationResponse NotLinked = new(false, null, null, null);
 }

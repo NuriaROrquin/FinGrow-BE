@@ -25,6 +25,7 @@ public sealed class EmployeeIntegration : AggregateRoot
         Provider = provider;
         ExternalAccountId = externalAccountId;
         LinkedAt = linkedAt;
+        Status = IntegrationStatus.Active;
         CreatedAt = linkedAt;
         UpdatedAt = linkedAt;
     }
@@ -36,6 +37,8 @@ public sealed class EmployeeIntegration : AggregateRoot
     public string ExternalAccountId { get; private set; } = string.Empty;
 
     public DateTimeOffset LinkedAt { get; private set; }
+
+    public IntegrationStatus Status { get; private set; }
 
     public OAuthGrant? Grant { get; private set; }
 
@@ -68,6 +71,7 @@ public sealed class EmployeeIntegration : AggregateRoot
     {
         ExternalAccountId = EnsureValidExternalAccountId(externalAccountId);
         LinkedAt = linkedAt;
+        Status = IntegrationStatus.Active;
         UpdatedAt = linkedAt;
     }
 
@@ -81,6 +85,13 @@ public sealed class EmployeeIntegration : AggregateRoot
         }
 
         Grant = grant;
+        Status = IntegrationStatus.Active;
+        UpdatedAt = now;
+    }
+
+    public void MarkFailed(DateTimeOffset now)
+    {
+        Status = IntegrationStatus.Failed;
         UpdatedAt = now;
     }
 

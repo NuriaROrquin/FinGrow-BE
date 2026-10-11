@@ -93,6 +93,11 @@ variables de entorno usando `__` como separador de sección.
 | `MercadoPago:RedirectUri` | `MercadoPago__RedirectUri` | URL pública de `GET /api/integrations/mercadopago/oauth/callback`, idéntica a la cargada en la aplicación de Mercado Pago. MP no acepta `localhost`: en local se usa un túnel (ngrok) |
 | `MercadoPago:FrontendReturnUrl` | `MercadoPago__FrontendReturnUrl` | Página del frontend a la que vuelve el navegador al terminar la vinculación; recibe `?mercadopago=linked` o `?mercadopago=error&reason=...` (default `http://localhost:3000/dashboard/settings`) |
 | `MercadoPago:TimeoutSeconds` | `MercadoPago__TimeoutSeconds` | Timeout de las llamadas a la API de Mercado Pago (default 30) |
+| `Gmail:ClientId` | `Gmail__ClientId` | Client ID del cliente OAuth "Aplicación web" creado en [Google Cloud Console](https://console.cloud.google.com/auth/clients) del proyecto FinGrow, con la Gmail API habilitada |
+| `Gmail:ClientSecret` | `Gmail__ClientSecret` | Client Secret de ese cliente; autentica el canje, la renovación y la revocación de tokens |
+| `Gmail:RedirectUri` | `Gmail__RedirectUri` | URL de `GET /api/integrations/gmail/oauth/callback`, idéntica a una de las cargadas en el cliente OAuth. Google acepta `localhost`: en desarrollo ya viene configurada para el puerto 5210 |
+| `Gmail:FrontendReturnUrl` | `Gmail__FrontendReturnUrl` | Página del frontend a la que vuelve el navegador al terminar la vinculación; recibe `?gmail=linked` o `?gmail=error&reason=...` (default `http://localhost:3000/dashboard/settings`) |
+| `Gmail:TimeoutSeconds` | `Gmail__TimeoutSeconds` | Timeout de las llamadas a Google (default 30) |
 | `TokenEncryption:Key` | `TokenEncryption__Key` | Clave AES-256 en base64 (`openssl rand -base64 32`) con la que se cifran en la base los tokens OAuth de las integraciones. Cambiarla deja ilegibles los tokens ya guardados |
 | `Jobs:ApiKey` | `Jobs__ApiKey` | Clave (mínimo 16 caracteres, `openssl rand -base64 24`) que tiene que traer la cabecera `X-Jobs-Key` para disparar o consultar los trabajos programados en `/api/jobs`. Es la que usa el cron de Dokploy; ver [Trabajos programados](#trabajos-programados-dokploy) |
 | `DolarApi:BaseUrl` | `DolarApi__BaseUrl` | URL base de [DolarApi](https://dolarapi.com), de donde sale la cotización del dólar MEP que usa la pantalla de Inversiones (default `https://dolarapi.com/`). Es pública y no pide credenciales |
@@ -123,11 +128,13 @@ dotnet user-secrets set "Twilio:AccountSid" "<Account SID de Twilio>" --project 
 dotnet user-secrets set "Twilio:AuthToken" "<Auth Token de Twilio>" --project src/FinGrow.Api
 dotnet user-secrets set "Telegram:BotToken" "<token del bot>" --project src/FinGrow.Api
 dotnet user-secrets set "Telegram:WebhookSecret" "<secreto inventado para el webhook>" --project src/FinGrow.Api
+dotnet user-secrets set "Gmail:ClientId" "<Client ID del cliente OAuth de Google>" --project src/FinGrow.Api
+dotnet user-secrets set "Gmail:ClientSecret" "<Client Secret de ese cliente>" --project src/FinGrow.Api
 dotnet user-secrets set "TokenEncryption:Key" "$(openssl rand -base64 32)" --project src/FinGrow.Api
 dotnet user-secrets set "Jobs:ApiKey" "$(openssl rand -base64 24)" --project src/FinGrow.Api
 ```
 
-Si `Jwt:SecretKey`, `AiService:ApiKey` o las credenciales de Twilio o Telegram faltan, la API no arranca y
+Si `Jwt:SecretKey`, `AiService:ApiKey` o las credenciales de Twilio, Telegram o Gmail faltan, la API no arranca y
 el log dice cuál es. Con `dotnet run` contra una FinGrow-AI levantada con `uvicorn` y `API_KEY`
 vacía, `AiService:ApiKey` puede ser cualquier texto porque la IA no lo valida. Con Docker y en
 producción los dos servicios tienen que compartir el mismo valor.
@@ -408,7 +415,7 @@ src/
 │   ├── Persistence/        DbContext, Configurations, Repositories, Migrations
 │   ├── Identity/           Resolución del usuario autenticado
 │   ├── Ai/                 Cliente HTTP hacia FinGrow-AI
-│   ├── Integrations/       Twilio (firma de webhooks y descarga de adjuntos) y Telegram (secreto del webhook y Bot API); Gmail después
+│   ├── Integrations/       Twilio (firma de webhooks y descarga de adjuntos) y Telegram (secreto del webhook y Bot API), Mercado Pago y Gmail (OAuth)
 │   └── Services/
 └── FinGrow.Api/
     ├── Controllers/

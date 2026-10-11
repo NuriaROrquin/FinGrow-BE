@@ -59,6 +59,28 @@ public class EmployeeIntegrationTests
     }
 
     [Fact]
+    public void A_new_integration_starts_active()
+    {
+        var integration = EmployeeIntegration.Create(EmployeeId, IntegrationProvider.Gmail, "juan.perez@gmail.com", Now);
+
+        integration.Status.ShouldBe(IntegrationStatus.Active);
+    }
+
+    [Fact]
+    public void A_failed_integration_becomes_active_again_when_reauthorized()
+    {
+        var integration = EmployeeIntegration.Create(EmployeeId, IntegrationProvider.Gmail, "juan.perez@gmail.com", Now);
+        integration.MarkFailed(Now.AddDays(1));
+
+        integration.Status.ShouldBe(IntegrationStatus.Failed);
+        integration.UpdatedAt.ShouldBe(Now.AddDays(1));
+
+        integration.Authorize(OAuthGrant.From("access", "refresh", Now.AddDays(2)), Now.AddDays(2));
+
+        integration.Status.ShouldBe(IntegrationStatus.Active);
+    }
+
+    [Fact]
     public void A_chat_provider_never_holds_a_grant()
     {
         var integration = EmployeeIntegration.Create(EmployeeId, IntegrationProvider.Telegram, "12345", Now);
