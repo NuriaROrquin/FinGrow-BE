@@ -30,4 +30,20 @@ public class EmailTests
     {
         Should.Throw<DomainException>(() => Email.From(candidate));
     }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("sinarroba.com")]
+    [InlineData("juan@empresa")]
+    [InlineData("juan perez@empresa.com")]
+    public void IsValid_rejects_the_same_emails_that_cannot_be_constructed(string candidate)
+    {
+        Email.IsValid(candidate).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void IsValid_accepts_an_email_with_spaces_around_and_uppercase()
+    {
+        Email.IsValid("  Juan.Perez@Empresa.COM ").ShouldBeTrue();
+    }
 }

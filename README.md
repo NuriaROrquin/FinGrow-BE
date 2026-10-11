@@ -21,7 +21,7 @@ El backend consume la API de IA por HTTP; el frontend nunca la llama directo.
 
 ## Puesta en marcha
 
-Con Docker, que levanta la base, la API y FinGrow-AI juntas:
+Con Docker, que levanta la base, la API, FinGrow-AI y un S3 local para los comprobantes:
 
 ```bash
 docker compose up --build
@@ -117,6 +117,13 @@ variables de entorno usando `__` como separador de sección.
 | `CoinGecko:CacheMinutes` | `CoinGecko__CacheMinutes` | Minutos que se reutilizan los precios bajados (default 10) |
 | `CoinGecko:TopCoins` | `CoinGecko__TopCoins` | Cuántas criptomonedas, de mayor a menor capitalización, se cotizan (default y máximo 250) |
 | `Cors:AllowedOrigins` | `Cors__AllowedOrigins__0` | Orígenes habilitados para el frontend |
+| `Storage:ServiceUrl` | `Storage__ServiceUrl` | URL del almacenamiento compatible con S3 donde viven los comprobantes. En Cloudflare R2 es `https://<account-id>.r2.cloudflarestorage.com`; en desarrollo, el S3Mock de compose (`http://localhost:9090`). Ver [Comprobantes](#comprobantes-cloudflare-r2) |
+| `Storage:BucketName` | `Storage__BucketName` | Bucket de los comprobantes. Uno por entorno, siempre privado |
+| `Storage:AccessKey` | `Storage__AccessKey` | Access Key ID del token de API de R2 |
+| `Storage:SecretKey` | `Storage__SecretKey` | Secret Access Key de ese token |
+| `Storage:Region` | `Storage__Region` | Región del bucket. En R2 es `auto` (default) |
+| `Storage:ForcePathStyle` | `Storage__ForcePathStyle` | Arma las URLs como `<host>/<bucket>` en lugar de `<bucket>.<host>` (default `true`, que es lo que necesitan R2 y S3Mock) |
+| `Storage:TimeoutSeconds` | `Storage__TimeoutSeconds` | Timeout de cada operación contra el almacenamiento (default 30) |
 
 Los secretos no se commitean. En desarrollo local:
 
@@ -212,6 +219,49 @@ Clase A"), no por un símbolo.
   la corrida queda fallida con el motivo. `GET /api/security-prices` cotiza mientras se carga el
   formulario y, si la fuente no tiene precio o no responde, usa ese último precio. Las cuentas
   vinculadas a IOL se cotizan aparte con T-19.
+
+### Comprobantes (Cloudflare R2)
+
+Los archivos que suben los empleados (fotos y PDF de comprobantes, HU-12) no se guardan en
+PostgreSQL: van a un almacenamiento compatible con S3 y la tabla `transaction_receipts` guarda
+solo su clave. El código habla el protocolo S3 (`IFileStorage` → `S3FileStorage`), así que el
+mismo código funciona contra Cloudflare R2 en los entornos desplegados y contra
+[S3Mock](https://github.com/adobe/S3Mock) en desarrollo; lo único que cambia es la sección
+`Storage`.
+
+| Endpoint | Qué hace |
+|---|---|
+| `POST /api/receipts` | Sube un comprobante (`multipart/form-data`, campo `file`). Acepta JPG, PNG y PDF de hasta 10 MB, y contrasta el tipo declarado con los primeros bytes del archivo |
+| `GET /api/receipts/{id}/file` | Devuelve el archivo. Responde 403 si el comprobante es de otro empleado |
+| `POST /api/transactions` con `receiptId` | Crea el movimiento y le asocia el comprobante en la misma operación: o se guardan los dos, o ninguno. 404 si el comprobante no existe, 403 si es de otro empleado |
+| `PUT /api/transactions/{id}` con `receiptId` | Igual que al crear, pero sobre un movimiento existente. Si ya tenía uno, lo reemplaza. Sin `receiptId`, conserva el que tenía |
+| `DELETE /api/transactions/{id}/receipt` | Quita el comprobante del movimiento, que queda sin ninguno |
+
+**Un movimiento tiene como máximo un comprobante** (índice único en `transaction_receipts.transaction_id`): asociarle otro reemplaza al anterior, que queda suelto. Las respuestas de los movimientos (listado, detalle, crear, editar, pendientes y confirmar) informan su `receiptId`, o `null` si no tiene.
+
+Un comprobante que deja de usarse (se reemplaza, se quita o se borra su movimiento) **no se borra en el momento**: queda suelto, sin movimiento, y lo limpia el trabajo de SCRUM-132.
+
+Un comprobante nace sin movimiento: si el OCR falla, la imagen ya quedó guardada y se asocia
+después. Si el almacenamiento no responde, la subida devuelve 503 y no se crea nada en la base.
+
+**En local** no hay que configurar nada: `docker compose up` levanta S3Mock con el bucket
+`fingrow-receipts` ya creado y `appsettings.Development.json` apunta a él. Nada de lo que se sube
+en desarrollo sale de tu máquina.
+
+**En un entorno desplegado** (una sola vez por entorno):
+
+1. En el panel de Cloudflare, *R2 Object Storage* → **Create bucket**. Nombre por entorno
+   (`fingrow-receipts-dev`, `fingrow-receipts-prod`), ubicación automática. No habilites el acceso
+   público: los archivos solo se sirven a través de la API, que controla de quién es cada uno.
+2. *R2 Object Storage* → **Manage API tokens** → **Create API token**, con permiso
+   **Object Read & Write** limitado a ese bucket. Cloudflare muestra el *Access Key ID*, el
+   *Secret Access Key* y el endpoint S3 (`https://<account-id>.r2.cloudflarestorage.com`). El
+   secreto se ve una sola vez.
+3. En Dokploy, en las variables de entorno del servicio de la API: `Storage__ServiceUrl`,
+   `Storage__BucketName`, `Storage__AccessKey` y `Storage__SecretKey`.
+
+**La API no arranca sin la sección `Storage` completa** (se valida al iniciar), así que las
+variables tienen que estar cargadas antes de desplegar esta versión.
 
 ### WhatsApp (Twilio)
 
@@ -325,9 +375,10 @@ pasos, siempre en este orden:
    el mismo tipo con el mismo criterio dentro de la ventana, no se vuelve a avisar.
 2. **Persistencia.** La notificación queda en la tabla `notifications`, que es la bandeja de la
    app y el historial de todo lo que se avisó. Por eso la bandeja no se puede apagar.
-3. **Entrega.** Se manda además por cada canal externo que el empleado no haya desactivado. Hoy
-   el único es Telegram, y solo si el empleado tiene el chat vinculado. Si un canal falla, se
-   loguea y la notificación queda igual en la bandeja.
+3. **Entrega.** Se empuja al instante a las pestañas abiertas del destinatario (SignalR, ver más
+   abajo) y se manda además por cada canal externo que el empleado no haya desactivado. Hoy el
+   único externo es Telegram, y solo si el empleado tiene el chat vinculado. Si un canal falla,
+   se loguea y la notificación queda igual en la bandeja.
 
 El destinatario puede ser un empleado o la empresa (`recipient_type`), así que la misma bandeja
 sirve para las alertas de bienestar del panel de empresa. Los canales externos son solo para
@@ -352,6 +403,16 @@ empleado a mano, por foto o por chat no avisa: ya está mirando la app.
 
 Un canal sin preferencia guardada está activo: quien vincula Telegram empieza a recibir alertas
 por ahí hasta que lo apague.
+
+**Tiempo real.** El frontend escucha el hub de SignalR `/hubs/notifications`
+(`Api/Notifications/`) en lugar de consultar el contador cada tanto. Cada notificación nueva
+llega con el evento `NotificationReceived` y el mismo JSON que un ítem de
+`GET /api/notifications`, solo a las conexiones de su destinatario (empleado o empresa) y a
+todas sus pestañas. El hub se autentica con la misma cookie de sesión que la API y cierra la
+conexión cuando vence el access token: el front renueva la sesión y se reconecta. Traefik
+(Dokploy) deja pasar WebSockets sin configuración extra; si un proxy los bloquea, SignalR cae a
+Server-Sent Events o long polling. Funciona con una sola réplica de la API: con más de una hace
+falta un backplane (Redis) para que el aviso llegue a la conexión que está en otra réplica.
 
 Para sumar una alerta nueva: un tipo en `NotificationType`, el evento de dominio que la dispara
 (levantado por el agregado con `Raise`) y una clase `internal` bajo

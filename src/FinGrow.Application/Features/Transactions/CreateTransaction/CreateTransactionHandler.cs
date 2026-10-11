@@ -2,6 +2,7 @@ namespace FinGrow.Application.Features.Transactions.CreateTransaction;
 
 using FinGrow.Application.Common;
 using FinGrow.Application.DTOs;
+using FinGrow.Application.Features.Receipts;
 using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
@@ -11,12 +12,27 @@ using MediatR;
 
 internal sealed class CreateTransactionHandler(
     ITransactionRepository transactionRepository,
+    ITransactionReceiptRepository receiptRepository,
     IUnitOfWork unitOfWork,
     IDateTimeProvider dateTimeProvider) : IRequestHandler<CreateTransactionCommand, Result<TransactionResponse>>
 {
 
     public async Task<Result<TransactionResponse>> Handle(CreateTransactionCommand request, CancellationToken cancellationToken)
     {
+        TransactionReceipt? receipt = null;
+
+        if (request.ReceiptId is { } receiptId)
+        {
+            var found = await ReceiptAttachment.FindOwnedAsync(receiptRepository, receiptId, request.EmployeeId, cancellationToken);
+
+            if (found.IsFailure)
+            {
+                return Result.Failure<TransactionResponse>(found.Error);
+            }
+
+            receipt = found.Value;
+        }
+
         var amount = Money.From(request.Amount, request.Currency);
         var createdAt = dateTimeProvider.UtcNow;
 
@@ -43,8 +59,10 @@ internal sealed class CreateTransactionHandler(
                 createdAt);
 
         transactionRepository.Add(transaction);
+        receipt?.AttachTo(transaction);
+
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(TransactionResponse.FromEntity(transaction));
+        return Result.Success(TransactionResponse.FromEntity(transaction, receipt?.Id));
     }
 }

@@ -18,5 +18,9 @@ public sealed class ListCoursesQueryValidator : AbstractValidator<ListCoursesQue
         RuleFor(query => query.ProgressStatus)
             .IsInEnum()
             .WithMessage("El estado de progreso no es valido.");
+
+        RuleFor(query => query.RelatedInvestmentType)
+            .IsInEnum()
+            .WithMessage("El tipo de activo no es valido.");
     }
 }

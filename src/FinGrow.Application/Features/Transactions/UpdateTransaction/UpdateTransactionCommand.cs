@@ -15,4 +15,5 @@ public sealed record UpdateTransactionCommand(
     string Description,
     DateOnly OccurredOn,
     PaymentMethod PaymentMethod,
-    TransactionStatus Status) : IRequest<Result<TransactionResponse>>;
+    TransactionStatus Status,
+    Guid? ReceiptId = null) : IRequest<Result<TransactionResponse>>;

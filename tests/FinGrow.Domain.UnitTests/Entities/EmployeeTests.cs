@@ -47,6 +47,87 @@ public class EmployeeTests
     }
 
     [Fact]
+    public void An_employee_created_in_a_department_starts_its_assignment_history()
+    {
+        var departmentId = Guid.CreateVersion7();
+
+        var employee = Employee.Create(
+            CompanyId,
+            departmentId,
+            "Juan Perez",
+            Email.From("juan@empresa.com"),
+            null,
+            "hash",
+            Currency.ARS,
+            new DateOnly(2026, 1, 15),
+            Now);
+
+        var assignment = employee.DepartmentAssignments.ShouldHaveSingleItem();
+        assignment.DepartmentId.ShouldBe(departmentId);
+        assignment.StartedAt.ShouldBe(Now);
+        assignment.IsCurrent.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void An_employee_without_a_department_has_no_assignment_history()
+    {
+        CreateEmployee().DepartmentAssignments.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Changing_the_department_closes_the_previous_assignment_and_opens_a_new_one()
+    {
+        var employee = CreateEmployee();
+        var sales = Guid.CreateVersion7();
+        var marketing = Guid.CreateVersion7();
+        employee.AssignToDepartment(sales, Now.AddDays(1));
+
+        employee.AssignToDepartment(marketing, Now.AddDays(30));
+
+        employee.DepartmentAssignments.Count.ShouldBe(2);
+        var previous = employee.DepartmentAssignments.Single(assignment => assignment.DepartmentId == sales);
+        previous.StartedAt.ShouldBe(Now.AddDays(1));
+        previous.EndedAt.ShouldBe(Now.AddDays(30));
+        var current = employee.DepartmentAssignments.Single(assignment => assignment.IsCurrent);
+        current.DepartmentId.ShouldBe(marketing);
+        current.StartedAt.ShouldBe(Now.AddDays(30));
+    }
+
+    [Fact]
+    public void Leaving_every_department_only_closes_the_current_assignment()
+    {
+        var employee = CreateEmployee();
+        employee.AssignToDepartment(Guid.CreateVersion7(), Now.AddDays(1));
+
+        employee.AssignToDepartment(null, Now.AddDays(2));
+
+        employee.DepartmentId.ShouldBeNull();
+        employee.DepartmentAssignments.ShouldHaveSingleItem().EndedAt.ShouldBe(Now.AddDays(2));
+    }
+
+    [Fact]
+    public void Assigning_the_same_department_again_does_not_touch_the_history()
+    {
+        var employee = CreateEmployee();
+        var sales = Guid.CreateVersion7();
+        employee.AssignToDepartment(sales, Now.AddDays(1));
+
+        employee.AssignToDepartment(sales, Now.AddDays(5));
+
+        employee.DepartmentAssignments.ShouldHaveSingleItem().IsCurrent.ShouldBeTrue();
+        employee.UpdatedAt.ShouldBe(Now.AddDays(1));
+    }
+
+    [Fact]
+    public void An_assignment_cannot_end_before_it_started()
+    {
+        var employee = CreateEmployee();
+        employee.AssignToDepartment(Guid.CreateVersion7(), Now.AddDays(10));
+
+        Should.Throw<DomainException>(() => employee.AssignToDepartment(Guid.CreateVersion7(), Now));
+    }
+
+    [Fact]
     public void A_deactivated_employee_cannot_log_in()
     {
         var employee = CreateEmployee();
@@ -148,6 +229,41 @@ public class EmployeeTests
             DateFormat.DayMonthYear,
             Now));
         employee.Theme.ShouldBe(Theme.System);
+    }
+
+    [Fact]
+    public void The_company_can_correct_the_name_email_and_phone()
+    {
+        var employee = CreateEmployee();
+
+        employee.UpdateDetails(" Juan Pérez ", Email.From("jperez@empresa.com"), null, Now.AddDays(1));
+
+        employee.FullName.ShouldBe("Juan Pérez");
+        employee.Email.Value.ShouldBe("jperez@empresa.com");
+        employee.PhoneNumber.ShouldBeNull();
+        employee.UpdatedAt.ShouldBe(Now.AddDays(1));
+    }
+
+    [Fact]
+    public void Correcting_the_details_keeps_the_personal_data_of_the_employee()
+    {
+        var employee = CreateEmployee();
+        employee.UpdateProfile("Juan Perez", null, "30123456", new DateOnly(1990, 5, 20), "Av. Siempre Viva 742", Now);
+
+        employee.UpdateDetails("Juan Perez", Email.From("juan.perez@empresa.com"), null, Now.AddDays(1));
+
+        employee.NationalId.ShouldBe("30123456");
+        employee.BirthDate.ShouldBe(new DateOnly(1990, 5, 20));
+        employee.Address.ShouldBe("Av. Siempre Viva 742");
+    }
+
+    [Fact]
+    public void Correcting_the_details_validates_the_phone_like_the_profile_does()
+    {
+        var employee = CreateEmployee();
+
+        Should.Throw<DomainException>(() =>
+            employee.UpdateDetails("Juan Perez", Email.From("juan.perez@empresa.com"), "hola", Now));
     }
 
     private static Employee CreateEmployee() => Employee.Create(

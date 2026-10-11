@@ -343,6 +343,22 @@ public class TelegramWebhookTests
 
         public Task<Employee?> GetByEmailAsync(Email email, CancellationToken cancellationToken) =>
             Task.FromResult(_employee.Email == email ? _employee : null);
+
+        public Task<IReadOnlyDictionary<Guid, int>> CountByDepartmentAsync(Guid companyId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<Employee>> ListByCompanyAsync(Guid companyId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<Employee>> ListByDepartmentAsync(Guid departmentId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<Employee>> ListByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public void Add(Employee employee) => throw new NotSupportedException();
+
+        public void Remove(Employee employee) => throw new NotSupportedException();
     }
 
     private sealed class InMemoryEmployeeIntegrationRepository : IEmployeeIntegrationRepository

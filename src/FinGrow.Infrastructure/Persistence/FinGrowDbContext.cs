@@ -19,7 +19,11 @@ public sealed class FinGrowDbContext : DbContext, IUnitOfWork
 
     public DbSet<Employee> Employees => Set<Employee>();
 
+    public DbSet<EmployeeDepartmentAssignment> EmployeeDepartmentAssignments => Set<EmployeeDepartmentAssignment>();
+
     public DbSet<Transaction> Transactions => Set<Transaction>();
+
+    public DbSet<TransactionReceipt> TransactionReceipts => Set<TransactionReceipt>();
 
     public DbSet<Budget> Budgets => Set<Budget>();
 

@@ -59,6 +59,9 @@ public sealed class Article : AggregateRoot
 
     public bool IsPublished => PublishedAt is not null;
 
+    public bool IsInvestmentContent =>
+        Category == EducationCategory.Investments || RelatedInvestmentType is not null;
+
     public static Article Create(
         string slug,
         string title,

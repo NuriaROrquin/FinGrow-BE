@@ -11,7 +11,6 @@ public sealed class Department : Entity
 {
     public const int MaxNameLength = 120;
     public const int MaxDescriptionLength = 500;
-    public const int MaxManagerNameLength = 150;
 
     private Department()
     {
@@ -22,14 +21,14 @@ public sealed class Department : Entity
         Guid companyId,
         string name,
         string? description,
-        string? managerName,
+        Guid? managerId,
         DateTimeOffset createdAt)
         : base(id)
     {
         CompanyId = companyId;
         Name = name;
         Description = description;
-        ManagerName = managerName;
+        ManagerId = managerId;
         IsActive = true;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
@@ -41,8 +40,7 @@ public sealed class Department : Entity
 
     public string? Description { get; private set; }
 
-    /// <summary>Responsable a cargo. Texto libre: hoy no es necesariamente un empleado de la plataforma.</summary>
-    public string? ManagerName { get; private set; }
+    public Guid? ManagerId { get; private set; }
 
     public bool IsActive { get; private set; }
 
@@ -50,27 +48,29 @@ public sealed class Department : Entity
 
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    public DateTimeOffset? DeactivatedAt { get; private set; }
+
     internal static Department Create(
         Guid companyId,
         string name,
         string? description,
-        string? managerName,
+        Guid? managerId,
         DateTimeOffset createdAt) =>
         new(Guid.CreateVersion7(),
             companyId,
             EnsureValidName(name),
             Truncated(description, MaxDescriptionLength, "La descripcion"),
-            Truncated(managerName, MaxManagerNameLength, "El nombre del responsable"),
+            EnsureValidManager(managerId),
             createdAt);
 
     public bool HasName(string name) =>
         string.Equals(Name, (name ?? string.Empty).Trim(), StringComparison.OrdinalIgnoreCase);
 
-    public void Update(string name, string? description, string? managerName, DateTimeOffset updatedAt)
+    public void Update(string name, string? description, Guid? managerId, DateTimeOffset updatedAt)
     {
         Name = EnsureValidName(name);
         Description = Truncated(description, MaxDescriptionLength, "La descripcion");
-        ManagerName = Truncated(managerName, MaxManagerNameLength, "El nombre del responsable");
+        ManagerId = EnsureValidManager(managerId);
         UpdatedAt = updatedAt;
     }
 
@@ -80,15 +80,30 @@ public sealed class Department : Entity
     /// </summary>
     public void Deactivate(DateTimeOffset updatedAt)
     {
+        if (!IsActive)
+        {
+            return;
+        }
+
         IsActive = false;
+        DeactivatedAt = updatedAt;
         UpdatedAt = updatedAt;
     }
 
     public void Activate(DateTimeOffset updatedAt)
     {
+        if (IsActive)
+        {
+            return;
+        }
+
         IsActive = true;
+        DeactivatedAt = null;
         UpdatedAt = updatedAt;
     }
+
+    public bool WasActiveDuring(DateTimeOffset periodStart, DateTimeOffset periodEndExclusive) =>
+        CreatedAt < periodEndExclusive && (IsActive || DeactivatedAt >= periodStart);
 
     private static string EnsureValidName(string name)
     {
@@ -102,6 +117,11 @@ public sealed class Department : Entity
             _ => trimmed
         };
     }
+
+    private static Guid? EnsureValidManager(Guid? managerId) =>
+        managerId == Guid.Empty
+            ? throw new DomainException("El responsable del departamento tiene que ser un empleado.")
+            : managerId;
 
     private static string? Truncated(string? value, int maxLength, string label)
     {

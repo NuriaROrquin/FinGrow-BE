@@ -18,6 +18,30 @@ public sealed class FakeEmployeeRepository : IEmployeeRepository
 
     public Task<Employee?> GetByEmailAsync(Email email, CancellationToken cancellationToken) =>
         Task.FromResult(Employees.FirstOrDefault(employee => employee.Email == email));
+
+    public Task<IReadOnlyDictionary<Guid, int>> CountByDepartmentAsync(
+        Guid companyId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyDictionary<Guid, int>>(Employees
+            .Where(employee => employee.CompanyId == companyId && employee.DepartmentId is not null)
+            .GroupBy(employee => employee.DepartmentId!.Value)
+            .ToDictionary(group => group.Key, group => group.Count()));
+
+    public Task<IReadOnlyList<Employee>> ListByCompanyAsync(Guid companyId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Employee>>(Employees
+            .Where(employee => employee.CompanyId == companyId)
+            .OrderBy(employee => employee.FullName, StringComparer.Ordinal)
+            .ToList());
+
+    public Task<IReadOnlyList<Employee>> ListByDepartmentAsync(Guid departmentId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Employee>>(Employees.Where(employee => employee.DepartmentId == departmentId).ToList());
+
+    public Task<IReadOnlyList<Employee>> ListByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Employee>>(Employees.Where(employee => ids.Contains(employee.Id)).ToList());
+
+    public void Add(Employee employee) => Employees.Add(employee);
+
+    public void Remove(Employee employee) => Employees.Remove(employee);
 }
 
 public sealed class FakeCompanyRepository : ICompanyRepository
@@ -664,11 +688,13 @@ public sealed class FakeCourseRepository : ICourseRepository
     public Task<IReadOnlyList<Course>> ListPublishedAsync(
         CourseLevel? level,
         int? maxDurationMinutes,
+        InvestmentType? relatedInvestmentType,
         CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Course>>(Courses
             .Where(course => course.IsPublished)
             .Where(course => level is null || course.Level == level)
             .Where(course => maxDurationMinutes is null || course.DurationMinutes <= maxDurationMinutes)
+            .Where(course => relatedInvestmentType is null || course.RelatedInvestmentType == relatedInvestmentType)
             .OrderBy(course => course.Level)
             .ThenBy(course => course.Title)
             .ToList());
@@ -694,11 +720,13 @@ public sealed class FakeArticleRepository : IArticleRepository
     public Task<IReadOnlyList<Article>> ListPublishedAsync(
         EducationCategory? category,
         int? maxReadingTimeMinutes,
+        InvestmentType? relatedInvestmentType,
         CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Article>>(Articles
             .Where(article => article.IsPublished)
             .Where(article => category is null || article.Category == category)
             .Where(article => maxReadingTimeMinutes is null || article.ReadingTimeMinutes <= maxReadingTimeMinutes)
+            .Where(article => relatedInvestmentType is null || article.RelatedInvestmentType == relatedInvestmentType)
             .OrderByDescending(article => article.PublishedAt)
             .ThenBy(article => article.Title)
             .ToList());
@@ -771,6 +799,12 @@ public sealed class FakeNotificationRepository : INotificationRepository
     public Task<IReadOnlyList<Notification>> ListUnreadAsync(NotificationRecipient recipient, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Notification>>(Filtered(recipient, unreadOnly: true).ToList());
 
+    public Task RemoveAllForAsync(NotificationRecipient recipient, CancellationToken cancellationToken = default)
+    {
+        Notifications.RemoveAll(notification => notification.IsAddressedTo(recipient));
+        return Task.CompletedTask;
+    }
+
     private IEnumerable<Notification> Filtered(NotificationRecipient recipient, bool unreadOnly) =>
         Notifications.Where(notification => notification.IsAddressedTo(recipient) && (!unreadOnly || !notification.IsRead));
 }
@@ -783,4 +817,73 @@ public sealed class FakeNotificationChannelSettingRepository : INotificationChan
 
     public Task<IReadOnlyList<NotificationChannelSetting>> ListByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<NotificationChannelSetting>>(Settings.Where(setting => setting.EmployeeId == employeeId).ToList());
+}
+
+public sealed class FakeTransactionReceiptRepository : ITransactionReceiptRepository
+{
+    public List<TransactionReceipt> Receipts { get; } = new();
+
+    public void Add(TransactionReceipt receipt) => Receipts.Add(receipt);
+
+    public Task<TransactionReceipt?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Receipts.FirstOrDefault(receipt => receipt.Id == id));
+
+    public Task<TransactionReceipt?> GetByTransactionIdAsync(Guid transactionId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Receipts.FirstOrDefault(receipt => receipt.TransactionId == transactionId));
+
+    public Task<IReadOnlyDictionary<Guid, Guid>> GetIdsByTransactionAsync(
+        IReadOnlyCollection<Guid> transactionIds,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyDictionary<Guid, Guid>>(Receipts
+            .Where(receipt => receipt.TransactionId is { } id && transactionIds.Contains(id))
+            .ToDictionary(receipt => receipt.TransactionId!.Value, receipt => receipt.Id));
+
+    public Task<IReadOnlyList<string>> ListStorageKeysByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<string>>(Receipts
+            .Where(receipt => receipt.EmployeeId == employeeId)
+            .Select(receipt => receipt.StorageKey)
+            .ToList());
+}
+
+public sealed class FakeFileStorage : IFileStorage
+{
+    public Dictionary<string, (byte[] Content, string ContentType)> Files { get; } = new(StringComparer.Ordinal);
+
+    public bool Unreachable { get; set; }
+
+    public Task SaveAsync(string key, Stream content, string contentType, CancellationToken cancellationToken = default)
+    {
+        EnsureReachable();
+
+        using var copy = new MemoryStream();
+        content.CopyTo(copy);
+        Files[key] = (copy.ToArray(), contentType);
+
+        return Task.CompletedTask;
+    }
+
+    public Task<StoredFile?> OpenAsync(string key, CancellationToken cancellationToken = default)
+    {
+        EnsureReachable();
+
+        return Task.FromResult(Files.TryGetValue(key, out var file)
+            ? new StoredFile(new MemoryStream(file.Content), file.ContentType, file.Content.Length)
+            : null);
+    }
+
+    public Task DeleteAsync(string key, CancellationToken cancellationToken = default)
+    {
+        EnsureReachable();
+
+        Files.Remove(key);
+        return Task.CompletedTask;
+    }
+
+    private void EnsureReachable()
+    {
+        if (Unreachable)
+        {
+            throw new FileStorageUnavailableException("el almacenamiento no responde");
+        }
+    }
 }

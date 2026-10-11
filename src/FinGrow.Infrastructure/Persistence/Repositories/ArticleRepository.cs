@@ -10,6 +10,7 @@ internal sealed class ArticleRepository(FinGrowDbContext dbContext) : IArticleRe
     public async Task<IReadOnlyList<Article>> ListPublishedAsync(
         EducationCategory? category,
         int? maxReadingTimeMinutes,
+        InvestmentType? relatedInvestmentType,
         CancellationToken cancellationToken = default)
     {
         var query = dbContext.Articles
@@ -24,6 +25,11 @@ internal sealed class ArticleRepository(FinGrowDbContext dbContext) : IArticleRe
         if (maxReadingTimeMinutes is not null)
         {
             query = query.Where(article => article.ReadingTimeMinutes <= maxReadingTimeMinutes);
+        }
+
+        if (relatedInvestmentType is not null)
+        {
+            query = query.Where(article => article.RelatedInvestmentType == relatedInvestmentType);
         }
 
         return await query

@@ -132,6 +132,69 @@ confirma o descarta. Telegram lo muestra con botones (`TelegramTransactionCallba
 `callback_data`, limitado a 64 bytes) y `AnswerTelegramCallback` procesa el toque. Para sumar
 WhatsApp alcanza con una capa propia del canal que use esas dos piezas.
 
+## Panel de la empresa
+
+`api/company/departments` y `api/company/employees` (`[Authorize(Roles = Rol.Empresa)]`)
+administran la plantilla de la empresa del token. Hasta que exista el filtro global de T-10,
+**cada handler filtra por `ICurrentUser.CompanyId`** y responde `NotFound` (no `Forbidden`)
+ante un recurso de otra empresa, para no confirmar que existe.
+
+- **El alta de un empleado devuelve una contraseña temporal una sola vez**
+  (`CreatedEmployeeResponse`); en la base queda solo el hash. Mandarla por mail es T-17: cuando
+  exista, se engancha en `CreateEmployeeCommandHandler`.
+- **El email de un empleado es único en toda la plataforma**, no por empresa: es su credencial
+  de login.
+- **Eliminar un empleado es definitivo.** La cascada se lleva sus movimientos, metas,
+  presupuestos, inversiones e integraciones; el handler borra además sus notificaciones (no
+  tienen FK porque el destinatario es polimórfico) y los archivos de sus comprobantes. Si el
+  almacenamiento no responde, la baja se mantiene y se loguea. Para cortar el acceso
+  conservando los datos está la desactivación (HU-55).
+- **Desactivar corta el acceso sin borrar nada** (`PUT .../{id}/access`): revoca los refresh
+  tokens y el login responde `Auth.AccesoDesactivado` (403), recién después de verificar la
+  contraseña para no revelar qué cuentas existen. El access token emitido sigue valiendo hasta
+  que expira, igual que al cambiar la contraseña.
+- **El departamento de un empleado tiene historial** (`employee_department_assignments`, hija
+  del agregado `Employee`): `AssignToDepartment` cierra la asignación vigente y abre otra, y un
+  índice único parcial impide dos abiertas a la vez. `metrics-snapshot` toma el departamento que
+  el empleado tenía al cierre de cada mes, así que rehacer la foto de un mes cerrado no mueve a
+  nadie de departamento hacia atrás. No leas `Employee.DepartmentId` para un período pasado.
+- **Un departamento se desactiva, no se borra, cuando hay historia** (`PUT .../{id}/status`,
+  HU-53). Al desactivarlo sus empleados salen en la misma operación hacia `moveEmployeesTo`
+  (otro departamento activo) o quedan sin departamento: nunca queda gente en uno inactivo, y
+  el alta y el cambio de departamento rechazan los inactivos. `DeactivatedAt` es lo que permite
+  que `metrics-snapshot` lo siga fotografiando en los meses en que estuvo activo
+  (`Department.WasActiveDuring`); reactivarlo lo limpia.
+- **El responsable de un departamento es un empleado** (`departments.manager_id`, HU-52), no un
+  texto. Al asignarlo tiene que ser un empleado activo de la misma empresa
+  (`DepartmentManagerEligibility`); si después pierde el acceso sigue figurando como responsable
+  hasta que lo cambien, y si lo eliminan la FK lo deja en `NULL`. Como empleados y departamentos
+  se apuntan entre sí, un alta de los dos a la vez necesita dos `SaveChanges` (ver el seeder).
+  Las respuestas de departamentos se arman en `DepartmentResponseBuilder`, que trae el nombre
+  del responsable y la cantidad de empleados.
+
+## Contenido educativo e inversiones
+
+Artículos y cursos se vinculan a un tipo de activo con `RelatedInvestmentType`, y
+`/api/articles` y `/api/courses` filtran por él (`?investmentType=Cedear`, HU-35): así la
+pantalla de inversiones trae lo que corresponde a cada activo. `EducationCatalogTests` rompe
+el build si un `InvestmentType` nuevo queda sin contenido relacionado. Qué cuenta como
+contenido de inversiones lo decide el dominio (`IsInvestmentContent`: categoría `Investments` o
+un tipo de activo vinculado) y viaja en la respuesta. El front muestra la aclaración de que es
+material educativo y no asesoramiento financiero certificado: no la saques ni dupliques el
+criterio en otro lado.
+
+## Archivos subidos
+
+Un archivo nunca se guarda en PostgreSQL: va a `IFileStorage` (`Infrastructure/Storage/S3FileStorage`,
+protocolo S3: Cloudflare R2 desplegado, S3Mock en compose) y la base guarda solo la clave. Los
+comprobantes son `TransactionReceipt` (`Application/Features/Receipts`): nacen sin movimiento
+para que un OCR fallido no pierda la imagen, y la clave la arma el dominio a partir del empleado
+y del id del comprobante. Lo que sume otro tipo de archivo (los audios de HU-14) reutiliza
+`IFileStorage`. Un almacenamiento que no responde llega como `FileStorageUnavailableException`
+y el caso de uso lo traduce a `Unavailable` (503). Los handlers la atrapan; no dejes que
+escape como 500. Un movimiento tiene un solo comprobante, y lo que deja de usar uno lo suelta
+con `Detach()`, no lo borra: el borrado real es del trabajo de limpieza (SCRUM-132).
+
 ## Trabajos programados
 
 No hay scheduler dentro del proceso. Los trabajos implementan `IScheduledJob`
@@ -176,6 +239,11 @@ necesita `IDomainEventDispatcher`, `AddInfrastructure()` solo arranca junto a `A
   la clave lo que distingue una alerta de otra (categoría, período, meta).
 - **La bandeja de la app no es un canal configurable**: es el historial de las alertas. Hay un
   `CHECK` que impide guardar una preferencia para `InApp`.
+- **El tiempo real es el sender de `InApp`.** `SignalRNotificationSender` (`Api/Notifications/`)
+  empuja cada notificación ya guardada al hub `/hubs/notifications`; como `InApp` no se puede
+  apagar, corre siempre. `NotificationRecipientUserIdProvider` identifica cada conexión como
+  `{tipo}:{id}` a partir del rol y el id del token, porque el destinatario es el par y no solo
+  el id. El hub no expone métodos al cliente: solo emite `NotificationReceived`.
 
 ## Convenciones
 
@@ -214,10 +282,10 @@ necesita `IDomainEventDispatcher`, `AddInfrastructure()` solo arranca junto a `A
 
 ## Trabajo pendiente que afecta al modelo
 
-Quedan dos divergencias entre lo construido y el DER objetivo: el responsable de un
-departamento como FK (HU-52) y la tabla `users` para credenciales, 2FA y preferencias (HU-01,
-HU-04, HU-46, HU-49). Cada una arrastra una migración sobre tablas ya construidas: revisá
-[docs/database-schema-target.md](docs/database-schema-target.md) antes de tomar esas historias.
+Queda una divergencia entre lo construido y el DER objetivo: la tabla `users` para
+credenciales, 2FA y preferencias (HU-01, HU-04, HU-46, HU-49). Arrastra una migración sobre
+tablas ya construidas: revisá [docs/database-schema-target.md](docs/database-schema-target.md)
+antes de tomar esas historias.
 
 `ai_confidence`, `ai_model` y el estado `Discarded` de `transactions` ya existen (HU-15). HU-12
 reutiliza `ai_confidence` para la confianza del OCR: es un dato del movimiento propuesto, no de

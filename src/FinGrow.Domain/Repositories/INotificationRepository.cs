@@ -27,4 +27,6 @@ public interface INotificationRepository
     Task<int> CountAsync(NotificationRecipient recipient, bool unreadOnly, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<Notification>> ListUnreadAsync(NotificationRecipient recipient, CancellationToken cancellationToken = default);
+
+    Task RemoveAllForAsync(NotificationRecipient recipient, CancellationToken cancellationToken = default);
 }

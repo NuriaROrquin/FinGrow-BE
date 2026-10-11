@@ -37,7 +37,7 @@ public class DiscardTransactionHandlerTests
 
         await Handle(proposal.Id);
 
-        var inbox = await new ListPendingTransactionsHandler(_transactions, _user)
+        var inbox = await new ListPendingTransactionsHandler(_transactions, new FakeTransactionReceiptRepository(), _user)
             .Handle(new ListPendingTransactionsQuery(), CancellationToken.None);
         inbox.Value.Items.ShouldBeEmpty();
         (await _transactions.ListByEmployeeAsync(_user.UserId!.Value)).ShouldBeEmpty();

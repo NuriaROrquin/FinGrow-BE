@@ -8,6 +8,7 @@ public interface ICourseRepository
     Task<IReadOnlyList<Course>> ListPublishedAsync(
         CourseLevel? level,
         int? maxDurationMinutes,
+        InvestmentType? relatedInvestmentType,
         CancellationToken cancellationToken = default);
 
     Task<Course?> GetPublishedBySlugAsync(string slug, CancellationToken cancellationToken = default);

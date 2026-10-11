@@ -15,7 +15,7 @@ internal sealed class ListTransactionsHandler(ITransactionRepository transaction
         var transactions = await transactionRepository.ListByEmployeeAsync(request.EmployeeId, cancellationToken);
 
         IReadOnlyList<TransactionResponse> response = transactions
-            .Select(TransactionResponse.FromEntity)
+            .Select(transaction => TransactionResponse.FromEntity(transaction, receiptId: null))
             .ToList();
 
         return Result.Success(response);

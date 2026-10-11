@@ -4,6 +4,7 @@ using FinGrow.Api.Extensions;
 using FinGrow.Api.Gmail;
 using FinGrow.Api.Jobs;
 using FinGrow.Api.MercadoPago;
+using FinGrow.Api.Notifications;
 using FinGrow.Application;
 using FinGrow.Infrastructure;
 using FinGrow.Infrastructure.Persistence;
@@ -17,6 +18,7 @@ builder.Host.UseSerilog((context, configuration) =>
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddSessionCookieAuthentication();
+builder.Services.AddNotificationsHub();
 builder.Services.AddOptions<MercadoPagoReturnOptions>()
     .Bind(builder.Configuration.GetSection(MercadoPagoReturnOptions.SectionName))
     .ValidateDataAnnotations()
@@ -66,6 +68,7 @@ app.UseCors(frontendCorsPolicy);
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapNotificationsHub();
 app.MapHealthChecks("/health");
 
 await app.RunAsync();

@@ -394,7 +394,6 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("FinGrow.Domain.Entities.Department", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -406,6 +405,10 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<DateTimeOffset?>("DeactivatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deactivated_at");
+
                     b.Property<string>("Description")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -415,10 +418,9 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
-                    b.Property<string>("ManagerName")
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)")
-                        .HasColumnName("manager_name");
+                    b.Property<Guid?>("ManagerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("manager_id");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -432,6 +434,9 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_departments");
+
+                    b.HasIndex("ManagerId")
+                        .HasDatabaseName("ix_departments_manager_id");
 
                     b.HasIndex("CompanyId", "Name")
                         .IsUnique()
@@ -598,6 +603,48 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_employees_email");
 
                     b.ToTable("employees", (string)null);
+                });
+
+            modelBuilder.Entity("FinGrow.Domain.Entities.EmployeeDepartmentAssignment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("DepartmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("department_id");
+
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("employee_id");
+
+                    b.Property<DateTimeOffset?>("EndedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ended_at");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_employee_department_assignments");
+
+                    b.HasIndex("EmployeeId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_employee_department_assignments_employee_id_current")
+                        .HasFilter("ended_at IS NULL");
+
+                    b.HasIndex("DepartmentId", "StartedAt")
+                        .HasDatabaseName("ix_employee_department_assignments_department_id_started_at");
+
+                    b.HasIndex("EmployeeId", "StartedAt")
+                        .HasDatabaseName("ix_employee_department_assignments_employee_id_started_at");
+
+                    b.ToTable("employee_department_assignments", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_employee_department_assignments_period", "ended_at IS NULL OR ended_at >= started_at");
+                        });
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.EmployeeIntegration", b =>
@@ -1322,7 +1369,68 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_transactions_amount_positive", "amount > 0");
 
-                            t.HasCheckConstraint("ck_transactions_category_matches_type", "(type = 'Expense' AND expense_category IS NOT NULL AND income_category IS NULL)\r\nOR (type = 'Income' AND income_category IS NOT NULL AND expense_category IS NULL)");
+                            t.HasCheckConstraint("ck_transactions_category_matches_type", "(type = 'Expense' AND expense_category IS NOT NULL AND income_category IS NULL)\nOR (type = 'Income' AND income_category IS NOT NULL AND expense_category IS NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("FinGrow.Domain.Entities.TransactionReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("content_type");
+
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("employee_id");
+
+                    b.Property<string>("FileName")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("file_name");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("size_bytes");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("storage_key");
+
+                    b.Property<Guid?>("TransactionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("transaction_id");
+
+                    b.Property<DateTimeOffset>("UploadedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("uploaded_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_transaction_receipts");
+
+                    b.HasIndex("EmployeeId")
+                        .HasDatabaseName("ix_transaction_receipts_employee_id");
+
+                    b.HasIndex("StorageKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_transaction_receipts_storage_key");
+
+                    b.HasIndex("TransactionId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_transaction_receipts_transaction_id")
+                        .HasFilter("transaction_id IS NOT NULL");
+
+                    b.ToTable("transaction_receipts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_transaction_receipts_size_range", "size_bytes > 0 AND size_bytes <= 10485760");
                         });
                 });
 
@@ -1460,6 +1568,12 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_departments_companies_company_id");
+
+                    b.HasOne("FinGrow.Domain.Entities.Employee", null)
+                        .WithMany()
+                        .HasForeignKey("ManagerId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_departments_employees_manager_id");
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.DepartmentMetricsSnapshot", b =>
@@ -1544,6 +1658,23 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                     b.Navigation("Company");
 
                     b.Navigation("Department");
+                });
+
+            modelBuilder.Entity("FinGrow.Domain.Entities.EmployeeDepartmentAssignment", b =>
+                {
+                    b.HasOne("FinGrow.Domain.Entities.Department", null)
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_employee_department_assignments_departments_department_id");
+
+                    b.HasOne("FinGrow.Domain.Entities.Employee", null)
+                        .WithMany("DepartmentAssignments")
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_employee_department_assignments_employees_employee_id");
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.EmployeeIntegration", b =>
@@ -1852,6 +1983,22 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                     b.Navigation("Employee");
                 });
 
+            modelBuilder.Entity("FinGrow.Domain.Entities.TransactionReceipt", b =>
+                {
+                    b.HasOne("FinGrow.Domain.Entities.Employee", null)
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_transaction_receipts_employees_employee_id");
+
+                    b.HasOne("FinGrow.Domain.Entities.Transaction", null)
+                        .WithMany()
+                        .HasForeignKey("TransactionId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_transaction_receipts_transactions_transaction_id");
+                });
+
             modelBuilder.Entity("FinGrow.Domain.Entities.Budget", b =>
                 {
                     b.Navigation("Limits");
@@ -1865,6 +2012,11 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("FinGrow.Domain.Entities.Course", b =>
                 {
                     b.Navigation("Lessons");
+                });
+
+            modelBuilder.Entity("FinGrow.Domain.Entities.Employee", b =>
+                {
+                    b.Navigation("DepartmentAssignments");
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.Goal", b =>

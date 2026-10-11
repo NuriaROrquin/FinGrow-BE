@@ -30,7 +30,12 @@ internal sealed class PeriodActivityReadRepository : IPeriodActivityReadReposito
             .OrderBy(employee => employee.Id)
             .Select(employee => new EmployeePeriodActivity(
                 employee.Id,
-                employee.DepartmentId,
+                _dbContext.EmployeeDepartmentAssignments
+                    .Where(assignment => assignment.EmployeeId == employee.Id
+                        && assignment.StartedAt < endExclusive
+                        && (assignment.EndedAt == null || assignment.EndedAt >= endExclusive))
+                    .Select(assignment => (Guid?)assignment.DepartmentId)
+                    .FirstOrDefault(),
                 _dbContext.Transactions.Count(transaction =>
                     transaction.EmployeeId == employee.Id
                     && transaction.Status == TransactionStatus.Confirmed

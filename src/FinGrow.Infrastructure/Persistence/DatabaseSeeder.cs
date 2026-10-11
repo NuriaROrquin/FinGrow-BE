@@ -65,8 +65,8 @@ public sealed partial class DatabaseSeeder
 
         // Los departamentos se agregan por el agregado Company (generan su propio Id en memoria),
         // asi despues puedo asignar empleados a cada uno sin haber guardado todavia.
-        var tecnologia = company.AddDepartment("Tecnología", "Desarrollo de producto y sistemas", "Laura Fernández", SeedTimestamp);
-        var administracion = company.AddDepartment("Administración", "Finanzas, compras y RRHH", "Diego Suárez", SeedTimestamp);
+        var tecnologia = company.AddDepartment("Tecnología", "Desarrollo de producto y sistemas", null, SeedTimestamp);
+        var administracion = company.AddDepartment("Administración", "Finanzas, compras y RRHH", null, SeedTimestamp);
 
         var employees = new[]
         {
@@ -79,6 +79,11 @@ public sealed partial class DatabaseSeeder
 
         _dbContext.Companies.Add(company);
         _dbContext.Employees.AddRange(employees);
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        company.UpdateDepartment(tecnologia.Id, tecnologia.Name, tecnologia.Description, employees[0].Id, SeedTimestamp);
+        company.UpdateDepartment(administracion.Id, administracion.Name, administracion.Description, employees[3].Id, SeedTimestamp);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 

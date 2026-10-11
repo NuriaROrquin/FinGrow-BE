@@ -11,6 +11,7 @@ using FinGrow.Application.Features.Transactions.GetHistory;
 using FinGrow.Application.Features.Transactions.GetTransactionById;
 using FinGrow.Application.Features.Transactions.GetTransactionSummary;
 using FinGrow.Application.Features.Transactions.DeleteTransaction;
+using FinGrow.Application.Features.Transactions.RemoveTransactionReceipt;
 using FinGrow.Application.Features.Transactions.UpdateTransaction;
 using FinGrow.Application.Interfaces;
 using FinGrow.Application.Features.Transactions.GetMonthlyExpenses;
@@ -148,4 +149,11 @@ public sealed class TransactionsController(
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken) =>
         (await sender.Send(new DeleteTransactionCommand(id), cancellationToken)).ToActionResult();
+
+    [HttpDelete("{id:guid}/receipt")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RemoveReceipt(Guid id, CancellationToken cancellationToken) =>
+        (await sender.Send(new RemoveTransactionReceiptCommand(id), cancellationToken)).ToActionResult();
 }

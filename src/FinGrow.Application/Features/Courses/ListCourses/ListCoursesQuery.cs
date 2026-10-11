@@ -9,5 +9,6 @@ public sealed record ListCoursesQuery(
     Guid EmployeeId,
     CourseLevel? Level,
     int? MaxDurationMinutes,
-    CourseProgressStatus? ProgressStatus)
+    CourseProgressStatus? ProgressStatus,
+    InvestmentType? RelatedInvestmentType)
     : IRequest<Result<IReadOnlyList<CourseSummaryResponse>>>;
