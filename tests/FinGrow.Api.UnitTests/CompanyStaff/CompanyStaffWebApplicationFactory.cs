@@ -89,8 +89,67 @@ internal sealed class CompanyStaffWebApplicationFactory : WebApplicationFactory<
         {
             services.AddScoped<ICompanyRepository>(_ => new InMemoryCompanyRepository(Companies));
             services.AddScoped<IEmployeeRepository>(_ => new InMemoryEmployeeRepository(Employees));
+            services.AddScoped<ITransactionReceiptRepository, NoReceiptsRepository>();
+            services.AddScoped<INotificationRepository>(_ => new RecordingNotificationRepository(ClearedRecipients));
             services.AddScoped<IUnitOfWork, NoOpUnitOfWork>();
         });
+    }
+
+    public List<NotificationRecipient> ClearedRecipients { get; } = new();
+
+    private sealed class NoReceiptsRepository : ITransactionReceiptRepository
+    {
+        public void Add(TransactionReceipt receipt) => throw new NotSupportedException();
+
+        public Task<TransactionReceipt?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<TransactionReceipt?> GetByTransactionIdAsync(Guid transactionId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyDictionary<Guid, Guid>> GetIdsByTransactionAsync(
+            IReadOnlyCollection<Guid> transactionIds,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<string>> ListStorageKeysByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
+    }
+
+    private sealed class RecordingNotificationRepository(List<NotificationRecipient> cleared) : INotificationRepository
+    {
+        public void Add(Notification notification) => throw new NotSupportedException();
+
+        public Task<Notification?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<bool> ExistsSinceAsync(
+            NotificationRecipient recipient,
+            NotificationType type,
+            string deduplicationKey,
+            DateTimeOffset since,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<Notification>> ListAsync(
+            NotificationRecipient recipient,
+            bool unreadOnly,
+            int skip,
+            int take,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<int> CountAsync(NotificationRecipient recipient, bool unreadOnly, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<Notification>> ListUnreadAsync(NotificationRecipient recipient, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task RemoveAllForAsync(NotificationRecipient recipient, CancellationToken cancellationToken = default)
+        {
+            cleared.Add(recipient);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class InMemoryCompanyRepository(List<Company> companies) : ICompanyRepository
