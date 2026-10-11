@@ -18,6 +18,14 @@ public sealed class FakeEmployeeRepository : IEmployeeRepository
 
     public Task<Employee?> GetByEmailAsync(Email email, CancellationToken cancellationToken) =>
         Task.FromResult(Employees.FirstOrDefault(employee => employee.Email == email));
+
+    public Task<IReadOnlyDictionary<Guid, int>> CountByDepartmentAsync(
+        Guid companyId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyDictionary<Guid, int>>(Employees
+            .Where(employee => employee.CompanyId == companyId && employee.DepartmentId is not null)
+            .GroupBy(employee => employee.DepartmentId!.Value)
+            .ToDictionary(group => group.Key, group => group.Count()));
 }
 
 public sealed class FakeCompanyRepository : ICompanyRepository

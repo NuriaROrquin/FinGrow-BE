@@ -16,4 +16,13 @@ internal sealed class EmployeeRepository : IEmployeeRepository
 
     public Task<Employee?> GetByEmailAsync(Email email, CancellationToken cancellationToken) =>
         _dbContext.Set<Employee>().SingleOrDefaultAsync(employee => employee.Email == email, cancellationToken);
+
+    public async Task<IReadOnlyDictionary<Guid, int>> CountByDepartmentAsync(
+        Guid companyId,
+        CancellationToken cancellationToken = default) =>
+        await _dbContext.Employees
+            .Where(employee => employee.CompanyId == companyId && employee.DepartmentId != null)
+            .GroupBy(employee => employee.DepartmentId!.Value)
+            .Select(group => new { DepartmentId = group.Key, Employees = group.Count() })
+            .ToDictionaryAsync(row => row.DepartmentId, row => row.Employees, cancellationToken);
 }
