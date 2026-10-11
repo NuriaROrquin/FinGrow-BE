@@ -149,6 +149,15 @@ ante un recurso de otra empresa, para no confirmar que existe.
   tienen FK porque el destinatario es polimórfico) y los archivos de sus comprobantes. Si el
   almacenamiento no responde, la baja se mantiene y se loguea. Para cortar el acceso
   conservando los datos está la desactivación (HU-55).
+- **Desactivar corta el acceso sin borrar nada** (`PUT .../{id}/access`): revoca los refresh
+  tokens y el login responde `Auth.AccesoDesactivado` (403), recién después de verificar la
+  contraseña para no revelar qué cuentas existen. El access token emitido sigue valiendo hasta
+  que expira, igual que al cambiar la contraseña.
+- **El departamento de un empleado tiene historial** (`employee_department_assignments`, hija
+  del agregado `Employee`): `AssignToDepartment` cierra la asignación vigente y abre otra, y un
+  índice único parcial impide dos abiertas a la vez. `metrics-snapshot` toma el departamento que
+  el empleado tenía al cierre de cada mes, así que rehacer la foto de un mes cerrado no mueve a
+  nadie de departamento hacia atrás. No leas `Employee.DepartmentId` para un período pasado.
 
 ## Archivos subidos
 

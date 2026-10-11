@@ -126,6 +126,66 @@ public class CompanyEmployeesEndpointsTests
     }
 
     [Fact]
+    public async Task Changing_the_department_moves_the_employee()
+    {
+        using var factory = new CompanyStaffWebApplicationFactory();
+        var sales = factory.Company.AddDepartment("Ventas", null, null, CompanyStaffWebApplicationFactory.CreatedAt);
+        var marketing = factory.Company.AddDepartment("Marketing", null, null, CompanyStaffWebApplicationFactory.CreatedAt);
+        var employee = factory.AddEmployee(sales, "ana@acme.com");
+        var client = factory.CreateCompanyClient();
+
+        var response = await client.PutAsJsonAsync(
+            new Uri($"{EmployeesPath}/{employee.Id}/department", UriKind.Relative),
+            new { departmentId = marketing.Id });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        employee.DepartmentId.ShouldBe(marketing.Id);
+        (await response.Content.ReadAsStringAsync()).ShouldContain("\"departmentName\":\"Marketing\"");
+    }
+
+    [Fact]
+    public async Task Deactivating_an_employee_cuts_the_access_and_the_login_explains_why()
+    {
+        using var factory = new CompanyStaffWebApplicationFactory();
+        var created = await factory.CreateCompanyClient().PostAsJsonAsync(
+            new Uri(EmployeesPath, UriKind.Relative),
+            new { fullName = "Juan Pérez", email = "juan@acme.com" });
+        using var body = JsonDocument.Parse(await created.Content.ReadAsStringAsync());
+        var temporaryPassword = body.RootElement.GetProperty("temporaryPassword").GetString();
+        var employee = factory.Employees.Single();
+
+        var response = await factory.CreateCompanyClient().PutAsJsonAsync(
+            new Uri($"{EmployeesPath}/{employee.Id}/access", UriKind.Relative),
+            new { isActive = false });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        employee.IsActive.ShouldBeFalse();
+        factory.Employees.ShouldContain(employee);
+        factory.RevokedUsers.ShouldHaveSingleItem().ShouldBe(employee.Id);
+
+        var login = await factory.CreateClient().PostAsJsonAsync(
+            new Uri("/login/empleado", UriKind.Relative),
+            new { email = "juan@acme.com", password = temporaryPassword });
+        login.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        (await login.Content.ReadAsStringAsync()).ShouldContain("Tu acceso a FinGrow está desactivado");
+    }
+
+    [Fact]
+    public async Task Changing_the_access_without_saying_which_state_responds_400()
+    {
+        using var factory = new CompanyStaffWebApplicationFactory();
+        var employee = factory.AddEmployee(department: null, email: "ana@acme.com");
+        var client = factory.CreateCompanyClient();
+
+        var response = await client.PutAsJsonAsync(
+            new Uri($"{EmployeesPath}/{employee.Id}/access", UriKind.Relative),
+            new { });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        employee.IsActive.ShouldBeTrue();
+    }
+
+    [Fact]
     public async Task An_employee_token_is_rejected_with_403()
     {
         using var factory = new CompanyStaffWebApplicationFactory();

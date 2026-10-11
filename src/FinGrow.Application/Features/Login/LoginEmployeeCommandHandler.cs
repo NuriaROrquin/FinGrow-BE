@@ -13,6 +13,9 @@ internal sealed class LoginEmployeeCommandHandler : IRequestHandler<LoginEmploye
     private static readonly Error CredencialesInvalidas =
         Error.Unauthorized("Auth.CredencialesInvalidas", "El email o la contraseña son incorrectos.");
 
+    private static readonly Error AccesoDesactivado =
+        Error.Forbidden("Auth.AccesoDesactivado", "Tu acceso a FinGrow está desactivado. Consultá con tu empresa.");
+
     private readonly IEmployeeRepository _employeeRepository;
     private readonly IPasswordHasher _passwordHasher;
     private readonly SessionIssuer _sessionIssuer;
@@ -57,7 +60,7 @@ internal sealed class LoginEmployeeCommandHandler : IRequestHandler<LoginEmploye
 
         if (!employee.IsActive)
         {
-            return Result.Failure<LoginResult>(CredencialesInvalidas);
+            return Result.Failure<LoginResult>(AccesoDesactivado);
         }
 
         if (employee.IsTwoFactorEnabled)
