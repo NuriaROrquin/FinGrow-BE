@@ -251,6 +251,9 @@ public class NotificationsEndpointsTests
         public Task<IReadOnlyList<Notification>> ListUnreadAsync(NotificationRecipient recipient, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<Notification>>(Filtered(recipient, unreadOnly: true).ToList());
 
+        public Task RemoveAllForAsync(NotificationRecipient recipient, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         private IEnumerable<Notification> Filtered(NotificationRecipient recipient, bool unreadOnly) =>
             notifications.Where(notification => notification.IsAddressedTo(recipient) && (!unreadOnly || !notification.IsRead));
     }

@@ -10,13 +10,14 @@ public class ListArticlesQueryValidatorTests
     [Fact]
     public void A_query_without_filters_passes()
     {
-        _validator.Validate(new ListArticlesQuery(null, null)).IsValid.ShouldBeTrue();
+        _validator.Validate(new ListArticlesQuery(null, null, null)).IsValid.ShouldBeTrue();
     }
 
     [Fact]
-    public void A_query_with_category_and_reading_time_passes()
+    public void A_query_with_every_filter_passes()
     {
-        _validator.Validate(new ListArticlesQuery(EducationCategory.Savings, 5)).IsValid.ShouldBeTrue();
+        _validator.Validate(new ListArticlesQuery(EducationCategory.Savings, 5, InvestmentType.Cedear))
+            .IsValid.ShouldBeTrue();
     }
 
     [Theory]
@@ -24,12 +25,18 @@ public class ListArticlesQueryValidatorTests
     [InlineData(-3)]
     public void A_non_positive_reading_time_is_rejected(int minutes)
     {
-        _validator.Validate(new ListArticlesQuery(null, minutes)).IsValid.ShouldBeFalse();
+        _validator.Validate(new ListArticlesQuery(null, minutes, null)).IsValid.ShouldBeFalse();
     }
 
     [Fact]
     public void An_unknown_category_is_rejected()
     {
-        _validator.Validate(new ListArticlesQuery((EducationCategory)99, null)).IsValid.ShouldBeFalse();
+        _validator.Validate(new ListArticlesQuery((EducationCategory)99, null, null)).IsValid.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void An_unknown_investment_type_is_rejected()
+    {
+        _validator.Validate(new ListArticlesQuery(null, null, (InvestmentType)99)).IsValid.ShouldBeFalse();
     }
 }

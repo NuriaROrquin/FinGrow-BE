@@ -88,7 +88,7 @@ internal sealed partial class MetricsSnapshotJob : IScheduledJob
     }
 
     private static bool ExistedDuring(Department department, MetricsPeriod period) =>
-        department.IsActive && department.CreatedAt < period.EndInstantExclusive;
+        department.WasActiveDuring(period.StartInstant, period.EndInstantExclusive);
 
     private async Task SnapshotCompanyAsync(
         Company company,

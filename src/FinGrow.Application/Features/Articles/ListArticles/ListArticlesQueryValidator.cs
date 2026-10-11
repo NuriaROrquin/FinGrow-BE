@@ -14,5 +14,9 @@ public sealed class ListArticlesQueryValidator : AbstractValidator<ListArticlesQ
             .GreaterThan(0)
             .When(query => query.MaxReadingTimeMinutes.HasValue)
             .WithMessage("El tiempo maximo de lectura tiene que ser mayor a cero.");
+
+        RuleFor(query => query.RelatedInvestmentType)
+            .IsInEnum()
+            .WithMessage("El tipo de activo no es valido.");
     }
 }

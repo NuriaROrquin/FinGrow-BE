@@ -41,6 +41,13 @@ public sealed class Email : ValueObject
         return new Email(normalized);
     }
 
+    public static bool IsValid(string value)
+    {
+        var normalized = (value ?? string.Empty).Trim().ToLowerInvariant();
+
+        return normalized.Length is > 0 and <= MaxLength && IsWellFormed(normalized);
+    }
+
     public override string ToString() => Value;
 
     protected override IEnumerable<object?> GetEqualityComponents()

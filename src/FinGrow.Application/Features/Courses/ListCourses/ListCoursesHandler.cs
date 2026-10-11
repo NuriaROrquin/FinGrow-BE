@@ -18,6 +18,7 @@ internal sealed class ListCoursesHandler(
         var courses = await courseRepository.ListPublishedAsync(
             request.Level,
             request.MaxDurationMinutes,
+            request.RelatedInvestmentType,
             cancellationToken);
 
         var completedLessonIds = await courseRepository.ListCompletedLessonIdsAsync(request.EmployeeId, cancellationToken);

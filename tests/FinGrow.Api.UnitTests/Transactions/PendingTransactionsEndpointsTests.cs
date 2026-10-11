@@ -333,6 +333,9 @@ public class PendingTransactionsEndpointsTests
             IReadOnlyCollection<Guid> transactionIds,
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyDictionary<Guid, Guid>>(new Dictionary<Guid, Guid>());
+
+        public Task<IReadOnlyList<string>> ListStorageKeysByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
     }
 
     private sealed class NoOpUnitOfWork : IUnitOfWork

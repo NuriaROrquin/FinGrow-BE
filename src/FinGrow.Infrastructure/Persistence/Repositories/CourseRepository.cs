@@ -10,6 +10,7 @@ internal sealed class CourseRepository(FinGrowDbContext dbContext) : ICourseRepo
     public async Task<IReadOnlyList<Course>> ListPublishedAsync(
         CourseLevel? level,
         int? maxDurationMinutes,
+        InvestmentType? relatedInvestmentType,
         CancellationToken cancellationToken = default)
     {
         var query = dbContext.Courses
@@ -24,6 +25,11 @@ internal sealed class CourseRepository(FinGrowDbContext dbContext) : ICourseRepo
         if (maxDurationMinutes is not null)
         {
             query = query.Where(course => course.Lessons.Sum(lesson => lesson.DurationMinutes) <= maxDurationMinutes);
+        }
+
+        if (relatedInvestmentType is not null)
+        {
+            query = query.Where(course => course.RelatedInvestmentType == relatedInvestmentType);
         }
 
         var courses = await query.ToListAsync(cancellationToken);
