@@ -2,6 +2,7 @@ namespace FinGrow.Application.UnitTests.Features.Employees.DeleteEmployee;
 
 using FinGrow.Application.Common;
 using FinGrow.Application.Features.Employees.DeleteEmployee;
+using FinGrow.Application.UnitTests.Fakes;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.ValueObjects;
@@ -10,6 +11,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 public class DeleteEmployeeCommandHandlerTests
 {
     private readonly CompanyStaffScenario _scenario = new();
+    private readonly FakeRefreshTokenRepository _refreshTokens = new();
 
     private DeleteEmployeeCommandHandler CreateHandler() =>
         new(
@@ -17,8 +19,10 @@ public class DeleteEmployeeCommandHandlerTests
             _scenario.Employees,
             _scenario.Receipts,
             _scenario.Notifications,
+            _refreshTokens,
             _scenario.FileStorage,
             _scenario.UnitOfWork,
+            _scenario.Clock,
             NullLogger<DeleteEmployeeCommandHandler>.Instance);
 
     private TransactionReceipt AddReceipt(Employee employee)
@@ -57,6 +61,18 @@ public class DeleteEmployeeCommandHandlerTests
         _scenario.FileStorage.Files.ShouldContainKey(colleagueReceipt.StorageKey);
         _scenario.Notifications.Notifications.ShouldHaveSingleItem()
             .IsAddressedTo(NotificationRecipient.Employee(colleague.Id)).ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task The_open_sessions_of_the_employee_are_revoked()
+    {
+        var employee = _scenario.AddEmployee(department: null);
+        var session = RefreshToken.Issue(employee.Id, _scenario.Company.Id, Rol.Empleado, "refresh-token-value", CompanyStaffScenario.CreatedAt);
+        _refreshTokens.Add(session);
+
+        await CreateHandler().Handle(new DeleteEmployeeCommand(employee.Id), CancellationToken.None);
+
+        session.IsActive(CompanyStaffScenario.Now).ShouldBeFalse();
     }
 
     [Fact]

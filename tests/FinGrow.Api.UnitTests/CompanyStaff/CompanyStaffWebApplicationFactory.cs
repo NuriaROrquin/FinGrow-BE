@@ -91,11 +91,30 @@ internal sealed class CompanyStaffWebApplicationFactory : WebApplicationFactory<
             services.AddScoped<IEmployeeRepository>(_ => new InMemoryEmployeeRepository(Employees));
             services.AddScoped<ITransactionReceiptRepository, NoReceiptsRepository>();
             services.AddScoped<INotificationRepository>(_ => new RecordingNotificationRepository(ClearedRecipients));
+            services.AddScoped<IRefreshTokenRepository>(_ => new RecordingRefreshTokenRepository(RevokedUsers));
             services.AddScoped<IUnitOfWork, NoOpUnitOfWork>();
         });
     }
 
     public List<NotificationRecipient> ClearedRecipients { get; } = new();
+
+    public List<Guid> RevokedUsers { get; } = new();
+
+    private sealed class RecordingRefreshTokenRepository(List<Guid> revokedUsers) : IRefreshTokenRepository
+    {
+        public Task<RefreshToken?> FindByHashAsync(string tokenHash, CancellationToken cancellationToken = default) =>
+            Task.FromResult<RefreshToken?>(null);
+
+        public void Add(RefreshToken refreshToken)
+        {
+        }
+
+        public Task RevokeAllForUserAsync(Guid userId, DateTimeOffset revokedAt, CancellationToken cancellationToken = default)
+        {
+            revokedUsers.Add(userId);
+            return Task.CompletedTask;
+        }
+    }
 
     private sealed class NoReceiptsRepository : ITransactionReceiptRepository
     {

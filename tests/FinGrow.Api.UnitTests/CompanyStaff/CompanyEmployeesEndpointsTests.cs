@@ -100,7 +100,7 @@ public class CompanyEmployeesEndpointsTests
     }
 
     [Fact]
-    public async Task Deleting_an_employee_removes_it_and_clears_their_notifications()
+    public async Task Deleting_an_employee_removes_it_revokes_their_sessions_and_clears_their_notifications()
     {
         using var factory = new CompanyStaffWebApplicationFactory();
         var employee = factory.AddEmployee(department: null, email: "ana@acme.com");
@@ -111,6 +111,7 @@ public class CompanyEmployeesEndpointsTests
         response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
         factory.Employees.ShouldBeEmpty();
         factory.ClearedRecipients.ShouldHaveSingleItem().ShouldBe(NotificationRecipient.Employee(employee.Id));
+        factory.RevokedUsers.ShouldHaveSingleItem().ShouldBe(employee.Id);
     }
 
     [Fact]
