@@ -7,6 +7,7 @@ using MediatR;
 
 internal sealed class DeleteTransactionHandler(
     ITransactionRepository transactionRepository,
+    ITransactionReceiptRepository receiptRepository,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
     IDateTimeProvider dateTimeProvider)
@@ -29,6 +30,7 @@ internal sealed class DeleteTransactionHandler(
         }
 
         transaction.Eliminate(dateTimeProvider.UtcNow);
+        (await receiptRepository.GetByTransactionIdAsync(transaction.Id, cancellationToken))?.Detach();
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
