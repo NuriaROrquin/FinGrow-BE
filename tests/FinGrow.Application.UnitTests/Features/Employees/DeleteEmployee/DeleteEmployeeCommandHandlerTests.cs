@@ -67,7 +67,8 @@ public class DeleteEmployeeCommandHandlerTests
     public async Task The_open_sessions_of_the_employee_are_revoked()
     {
         var employee = _scenario.AddEmployee(department: null);
-        var session = RefreshToken.Issue(employee.Id, _scenario.Company.Id, Rol.Empleado, "refresh-token-value", CompanyStaffScenario.CreatedAt);
+        var session = RefreshToken.Issue(employee.Id, _scenario.Company.Id, Rol.Empleado, "refresh-token-value", CompanyStaffScenario.Now.AddMinutes(-5));
+        session.IsActive(CompanyStaffScenario.Now).ShouldBeTrue();
         _refreshTokens.Add(session);
 
         await CreateHandler().Handle(new DeleteEmployeeCommand(employee.Id), CancellationToken.None);
