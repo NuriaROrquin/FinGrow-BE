@@ -164,6 +164,13 @@ ante un recurso de otra empresa, para no confirmar que existe.
   el alta y el cambio de departamento rechazan los inactivos. `DeactivatedAt` es lo que permite
   que `metrics-snapshot` lo siga fotografiando en los meses en que estuvo activo
   (`Department.WasActiveDuring`); reactivarlo lo limpia.
+- **El responsable de un departamento es un empleado** (`departments.manager_id`, HU-52), no un
+  texto. Al asignarlo tiene que ser un empleado activo de la misma empresa
+  (`DepartmentManagerEligibility`); si después pierde el acceso sigue figurando como responsable
+  hasta que lo cambien, y si lo eliminan la FK lo deja en `NULL`. Como empleados y departamentos
+  se apuntan entre sí, un alta de los dos a la vez necesita dos `SaveChanges` (ver el seeder).
+  Las respuestas de departamentos se arman en `DepartmentResponseBuilder`, que trae el nombre
+  del responsable y la cantidad de empleados.
 
 ## Archivos subidos
 
@@ -264,10 +271,10 @@ necesita `IDomainEventDispatcher`, `AddInfrastructure()` solo arranca junto a `A
 
 ## Trabajo pendiente que afecta al modelo
 
-Quedan dos divergencias entre lo construido y el DER objetivo: el responsable de un
-departamento como FK (HU-52) y la tabla `users` para credenciales, 2FA y preferencias (HU-01,
-HU-04, HU-46, HU-49). Cada una arrastra una migración sobre tablas ya construidas: revisá
-[docs/database-schema-target.md](docs/database-schema-target.md) antes de tomar esas historias.
+Queda una divergencia entre lo construido y el DER objetivo: la tabla `users` para
+credenciales, 2FA y preferencias (HU-01, HU-04, HU-46, HU-49). Arrastra una migración sobre
+tablas ya construidas: revisá [docs/database-schema-target.md](docs/database-schema-target.md)
+antes de tomar esas historias.
 
 `ai_confidence`, `ai_model` y el estado `Discarded` de `transactions` ya existen (HU-15). HU-12
 reutiliza `ai_confidence` para la confianza del OCR: es un dato del movimiento propuesto, no de
