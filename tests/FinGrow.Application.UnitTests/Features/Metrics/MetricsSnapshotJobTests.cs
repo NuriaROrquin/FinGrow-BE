@@ -111,7 +111,21 @@ public class MetricsSnapshotJobTests
     }
 
     [Fact]
-    public async Task Inactive_departments_are_not_photographed()
+    public async Task A_department_is_not_photographed_for_the_months_after_it_was_deactivated()
+    {
+        var company = NewCompany("Acme", CompanyCreatedAt);
+        var closed = company.AddDepartment("Cerrado", null, null, CompanyCreatedAt);
+        closed.Deactivate(new DateTimeOffset(2026, 7, 25, 12, 0, 0, TimeSpan.Zero));
+        _companies.Companies.Add(company);
+
+        await Job().ExecuteAsync(CancellationToken.None);
+
+        _snapshots.CompanySnapshots.Count.ShouldBe(2);
+        _snapshots.DepartmentSnapshots.ShouldHaveSingleItem().Period.ShouldBe(July);
+    }
+
+    [Fact]
+    public async Task A_department_deactivated_after_the_month_closed_keeps_its_photo_of_that_month()
     {
         var company = NewCompany("Acme", CompanyCreatedAt);
         var closed = company.AddDepartment("Cerrado", null, null, CompanyCreatedAt);
@@ -120,8 +134,7 @@ public class MetricsSnapshotJobTests
 
         await Job().ExecuteAsync(CancellationToken.None);
 
-        _snapshots.CompanySnapshots.Count.ShouldBe(2);
-        _snapshots.DepartmentSnapshots.ShouldBeEmpty();
+        _snapshots.DepartmentSnapshots.Select(snapshot => snapshot.Period).ShouldBe(new[] { July, August });
     }
 
     [Fact]
