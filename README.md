@@ -368,9 +368,10 @@ pasos, siempre en este orden:
    el mismo tipo con el mismo criterio dentro de la ventana, no se vuelve a avisar.
 2. **Persistencia.** La notificación queda en la tabla `notifications`, que es la bandeja de la
    app y el historial de todo lo que se avisó. Por eso la bandeja no se puede apagar.
-3. **Entrega.** Se manda además por cada canal externo que el empleado no haya desactivado. Hoy
-   el único es Telegram, y solo si el empleado tiene el chat vinculado. Si un canal falla, se
-   loguea y la notificación queda igual en la bandeja.
+3. **Entrega.** Se empuja al instante a las pestañas abiertas del destinatario (SignalR, ver más
+   abajo) y se manda además por cada canal externo que el empleado no haya desactivado. Hoy el
+   único externo es Telegram, y solo si el empleado tiene el chat vinculado. Si un canal falla,
+   se loguea y la notificación queda igual en la bandeja.
 
 El destinatario puede ser un empleado o la empresa (`recipient_type`), así que la misma bandeja
 sirve para las alertas de bienestar del panel de empresa. Los canales externos son solo para
@@ -395,6 +396,16 @@ empleado a mano, por foto o por chat no avisa: ya está mirando la app.
 
 Un canal sin preferencia guardada está activo: quien vincula Telegram empieza a recibir alertas
 por ahí hasta que lo apague.
+
+**Tiempo real.** El frontend escucha el hub de SignalR `/hubs/notifications`
+(`Api/Notifications/`) en lugar de consultar el contador cada tanto. Cada notificación nueva
+llega con el evento `NotificationReceived` y el mismo JSON que un ítem de
+`GET /api/notifications`, solo a las conexiones de su destinatario (empleado o empresa) y a
+todas sus pestañas. El hub se autentica con la misma cookie de sesión que la API y cierra la
+conexión cuando vence el access token: el front renueva la sesión y se reconecta. Traefik
+(Dokploy) deja pasar WebSockets sin configuración extra; si un proxy los bloquea, SignalR cae a
+Server-Sent Events o long polling. Funciona con una sola réplica de la API: con más de una hace
+falta un backplane (Redis) para que el aviso llegue a la conexión que está en otra réplica.
 
 Para sumar una alerta nueva: un tipo en `NotificationType`, el evento de dominio que la dispara
 (levantado por el agregado con `Raise`) y una clase `internal` bajo

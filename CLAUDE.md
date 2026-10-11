@@ -215,6 +215,11 @@ necesita `IDomainEventDispatcher`, `AddInfrastructure()` solo arranca junto a `A
   la clave lo que distingue una alerta de otra (categoría, período, meta).
 - **La bandeja de la app no es un canal configurable**: es el historial de las alertas. Hay un
   `CHECK` que impide guardar una preferencia para `InApp`.
+- **El tiempo real es el sender de `InApp`.** `SignalRNotificationSender` (`Api/Notifications/`)
+  empuja cada notificación ya guardada al hub `/hubs/notifications`; como `InApp` no se puede
+  apagar, corre siempre. `NotificationRecipientUserIdProvider` identifica cada conexión como
+  `{tipo}:{id}` a partir del rol y el id del token, porque el destinatario es el par y no solo
+  el id. El hub no expone métodos al cliente: solo emite `NotificationReceived`.
 
 ## Convenciones
 
