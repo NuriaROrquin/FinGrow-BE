@@ -158,6 +158,12 @@ ante un recurso de otra empresa, para no confirmar que existe.
   índice único parcial impide dos abiertas a la vez. `metrics-snapshot` toma el departamento que
   el empleado tenía al cierre de cada mes, así que rehacer la foto de un mes cerrado no mueve a
   nadie de departamento hacia atrás. No leas `Employee.DepartmentId` para un período pasado.
+- **Un departamento se desactiva, no se borra, cuando hay historia** (`PUT .../{id}/status`,
+  HU-53). Al desactivarlo sus empleados salen en la misma operación hacia `moveEmployeesTo`
+  (otro departamento activo) o quedan sin departamento: nunca queda gente en uno inactivo, y
+  el alta y el cambio de departamento rechazan los inactivos. `DeactivatedAt` es lo que permite
+  que `metrics-snapshot` lo siga fotografiando en los meses en que estuvo activo
+  (`Department.WasActiveDuring`); reactivarlo lo limpia.
 
 ## Archivos subidos
 
