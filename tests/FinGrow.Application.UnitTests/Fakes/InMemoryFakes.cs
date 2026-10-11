@@ -641,11 +641,13 @@ public sealed class FakeCourseRepository : ICourseRepository
     public Task<IReadOnlyList<Course>> ListPublishedAsync(
         CourseLevel? level,
         int? maxDurationMinutes,
+        InvestmentType? relatedInvestmentType,
         CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Course>>(Courses
             .Where(course => course.IsPublished)
             .Where(course => level is null || course.Level == level)
             .Where(course => maxDurationMinutes is null || course.DurationMinutes <= maxDurationMinutes)
+            .Where(course => relatedInvestmentType is null || course.RelatedInvestmentType == relatedInvestmentType)
             .OrderBy(course => course.Level)
             .ThenBy(course => course.Title)
             .ToList());
@@ -671,11 +673,13 @@ public sealed class FakeArticleRepository : IArticleRepository
     public Task<IReadOnlyList<Article>> ListPublishedAsync(
         EducationCategory? category,
         int? maxReadingTimeMinutes,
+        InvestmentType? relatedInvestmentType,
         CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Article>>(Articles
             .Where(article => article.IsPublished)
             .Where(article => category is null || article.Category == category)
             .Where(article => maxReadingTimeMinutes is null || article.ReadingTimeMinutes <= maxReadingTimeMinutes)
+            .Where(article => relatedInvestmentType is null || article.RelatedInvestmentType == relatedInvestmentType)
             .OrderByDescending(article => article.PublishedAt)
             .ThenBy(article => article.Title)
             .ToList());

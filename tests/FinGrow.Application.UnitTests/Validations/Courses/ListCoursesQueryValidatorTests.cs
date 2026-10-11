@@ -10,8 +10,9 @@ public class ListCoursesQueryValidatorTests
     private static ListCoursesQuery Query(
         CourseLevel? level = null,
         int? maxDuration = null,
-        CourseProgressStatus? status = null) =>
-        new(Guid.CreateVersion7(), level, maxDuration, status);
+        CourseProgressStatus? status = null,
+        InvestmentType? investmentType = null) =>
+        new(Guid.CreateVersion7(), level, maxDuration, status, investmentType);
 
     [Fact]
     public void A_query_without_filters_is_valid() =>
@@ -19,7 +20,8 @@ public class ListCoursesQueryValidatorTests
 
     [Fact]
     public void A_query_with_every_filter_is_valid() =>
-        _validator.Validate(Query(CourseLevel.Beginner, 45, CourseProgressStatus.InProgress)).IsValid.ShouldBeTrue();
+        _validator.Validate(Query(CourseLevel.Beginner, 45, CourseProgressStatus.InProgress, InvestmentType.Etf))
+            .IsValid.ShouldBeTrue();
 
     [Theory]
     [InlineData(0)]
@@ -34,4 +36,8 @@ public class ListCoursesQueryValidatorTests
     [Fact]
     public void An_unknown_progress_status_is_rejected() =>
         _validator.Validate(Query(status: (CourseProgressStatus)99)).IsValid.ShouldBeFalse();
+
+    [Fact]
+    public void An_unknown_investment_type_is_rejected() =>
+        _validator.Validate(Query(investmentType: (InvestmentType)99)).IsValid.ShouldBeFalse();
 }

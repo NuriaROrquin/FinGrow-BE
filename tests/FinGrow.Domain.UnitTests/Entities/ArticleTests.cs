@@ -52,6 +52,44 @@ public class ArticleTests
             Article.Create("Fondo de emergencia", "Fondo", "Resumen", "Contenido", EducationCategory.Savings, 4, null, Now));
     }
 
+    [Fact]
+    public void An_article_about_an_investment_type_is_investment_content()
+    {
+        var article = Article.Create(
+            "cedears-para-principiantes",
+            "CEDEARs para principiantes",
+            "Que son y como se compran.",
+            "## Que es un CEDEAR",
+            EducationCategory.Savings,
+            6,
+            InvestmentType.Cedear,
+            Now);
+
+        article.IsInvestmentContent.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void An_article_of_the_investments_category_is_investment_content_even_without_a_type()
+    {
+        var article = Article.Create(
+            "diversificar",
+            "Como diversificar",
+            "No pongas todo en el mismo lugar.",
+            "## Diversificar",
+            EducationCategory.Investments,
+            5,
+            null,
+            Now);
+
+        article.IsInvestmentContent.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void An_article_unrelated_to_investments_is_not_investment_content()
+    {
+        CreateArticle().IsInvestmentContent.ShouldBeFalse();
+    }
+
     private static Article CreateArticle(int readingTimeMinutes = 4) =>
         Article.Create(
             "fondo-de-emergencia",
