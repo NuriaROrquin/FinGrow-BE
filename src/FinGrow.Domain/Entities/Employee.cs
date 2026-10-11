@@ -158,6 +158,16 @@ public sealed class Employee : AggregateRoot, ITwoFactorAccount
         UpdatedAt = updatedAt;
     }
 
+    public void UpdateDetails(string fullName, Email email, string? phoneNumber, DateTimeOffset updatedAt)
+    {
+        ArgumentNullException.ThrowIfNull(email);
+
+        FullName = EnsureValidFullName(fullName);
+        Email = email;
+        PhoneNumber = EnsureValidPhoneNumber(phoneNumber);
+        UpdatedAt = updatedAt;
+    }
+
     public static bool IsValidPhoneNumber(string phoneNumber)
     {
         var digits = phoneNumber.Count(char.IsAsciiDigit);
