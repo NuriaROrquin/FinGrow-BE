@@ -120,6 +120,8 @@ internal sealed class CompanyStaffWebApplicationFactory : WebApplicationFactory<
     {
         public void Add(TransactionReceipt receipt) => throw new NotSupportedException();
 
+        public void Remove(TransactionReceipt receipt) => throw new NotSupportedException();
+
         public Task<TransactionReceipt?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
@@ -133,6 +135,9 @@ internal sealed class CompanyStaffWebApplicationFactory : WebApplicationFactory<
 
         public Task<IReadOnlyList<string>> ListStorageKeysByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
+
+        public Task<IReadOnlyList<TransactionReceipt>> ListDetachedUploadedBeforeAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class RecordingNotificationRepository(List<NotificationRecipient> cleared) : INotificationRepository
