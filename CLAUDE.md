@@ -229,6 +229,8 @@ Un correo nunca se manda directo desde un handler: se encola con `OutboundEmail.
 Resend no deshace ese cambio. El evento `OutboundEmailQueued` dispara el primer intento apenas se
 guarda, y `OutboundEmailDispatcher` (`Application/Features/OutboundEmails/`) registra el resultado:
 `Sent`, `Failed` con el próximo intento, o `Abandoned` después de `OutboundEmail.MaxAttempts`.
+Los reintentos los hace el trabajo `email-delivery`. Un correo recién encolado le pertenece a su
+primer intento durante `OutboundEmail.FirstAttemptGrace`: así el trabajo no lo manda a la vez.
 
 - **El cuerpo va cifrado y se borra cuando el correo deja de esperar envío**: puede llevar
   credenciales. Un `CHECK` impide que un correo enviado o abandonado conserve el cuerpo.
