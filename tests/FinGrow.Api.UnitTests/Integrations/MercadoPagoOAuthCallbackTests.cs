@@ -138,6 +138,9 @@ public class MercadoPagoOAuthCallbackTests
 
         public Task<Employee?> GetByEmailAsync(Email email, CancellationToken cancellationToken) =>
             Task.FromResult(_employee.Email == email ? _employee : null);
+
+        public Task<IReadOnlyDictionary<Guid, int>> CountByDepartmentAsync(Guid companyId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class InMemoryEmployeeIntegrationRepository : IEmployeeIntegrationRepository
