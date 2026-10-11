@@ -5,7 +5,7 @@ using FinGrow.Application.Features.Departments.DeleteDepartment;
 
 public class DeleteDepartmentCommandHandlerTests
 {
-    private readonly DepartmentsScenario _scenario = new();
+    private readonly CompanyStaffScenario _scenario = new();
 
     private DeleteDepartmentCommandHandler CreateHandler() =>
         new(_scenario.CurrentUser, _scenario.Companies, _scenario.Employees, _scenario.UnitOfWork, _scenario.Clock);
@@ -43,7 +43,7 @@ public class DeleteDepartmentCommandHandlerTests
     public async Task An_inactive_employee_still_blocks_the_removal()
     {
         var sales = _scenario.AddDepartment("Ventas");
-        _scenario.AddEmployee(sales).Deactivate(DepartmentsScenario.Now);
+        _scenario.AddEmployee(sales).Deactivate(CompanyStaffScenario.Now);
 
         var result = await CreateHandler().Handle(new DeleteDepartmentCommand(sales.Id), CancellationToken.None);
 
