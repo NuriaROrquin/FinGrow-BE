@@ -127,6 +127,31 @@ public sealed class Goal : AggregateRoot
         return ReachedOn is not { } reachedOn || MonthNumber(reachedOn) >= month;
     }
 
+    public Money ContributedIn(DateOnly anyDayOfMonth)
+    {
+        var month = MonthNumber(anyDayOfMonth);
+
+        return _contributions
+            .Where(contribution => MonthNumber(contribution.ContributedOn) == month)
+            .Aggregate(Money.Zero(TargetAmount.Currency), (total, contribution) => total.Add(contribution.Amount));
+    }
+
+    public decimal? CommitmentFulfilledIn(DateOnly anyDayOfMonth)
+    {
+        if (!IsCommittedIn(anyDayOfMonth))
+        {
+            return null;
+        }
+
+        if (MonthlyCommitment.IsZero
+            || (ReachedOn is { } reachedOn && MonthNumber(reachedOn) == MonthNumber(anyDayOfMonth)))
+        {
+            return 1m;
+        }
+
+        return Math.Min(1m, ContributedIn(anyDayOfMonth).Amount / MonthlyCommitment.Amount);
+    }
+
     /// <summary>
     /// Fecha del aporte con el que el acumulado llego al objetivo, recorriendo los aportes por su fecha.
     /// Difiere de <see cref="AchievedAt"/> cuando el aporte se carga con fecha atrasada: AchievedAt es
