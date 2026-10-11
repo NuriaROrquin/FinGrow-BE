@@ -47,6 +47,9 @@ internal sealed class NotificationRepository(FinGrowDbContext dbContext) : INoti
         CancellationToken cancellationToken = default) =>
         await Filtered(recipient, unreadOnly: true).ToListAsync(cancellationToken);
 
+    public Task RemoveAllForAsync(NotificationRecipient recipient, CancellationToken cancellationToken = default) =>
+        AddressedTo(recipient).ExecuteDeleteAsync(cancellationToken);
+
     private IQueryable<Notification> Filtered(NotificationRecipient recipient, bool unreadOnly) =>
         unreadOnly
             ? AddressedTo(recipient).Where(notification => notification.ReadAt == null)

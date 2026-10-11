@@ -150,6 +150,41 @@ public class EmployeeTests
         employee.Theme.ShouldBe(Theme.System);
     }
 
+    [Fact]
+    public void The_company_can_correct_the_name_email_and_phone()
+    {
+        var employee = CreateEmployee();
+
+        employee.UpdateDetails(" Juan Pérez ", Email.From("jperez@empresa.com"), null, Now.AddDays(1));
+
+        employee.FullName.ShouldBe("Juan Pérez");
+        employee.Email.Value.ShouldBe("jperez@empresa.com");
+        employee.PhoneNumber.ShouldBeNull();
+        employee.UpdatedAt.ShouldBe(Now.AddDays(1));
+    }
+
+    [Fact]
+    public void Correcting_the_details_keeps_the_personal_data_of_the_employee()
+    {
+        var employee = CreateEmployee();
+        employee.UpdateProfile("Juan Perez", null, "30123456", new DateOnly(1990, 5, 20), "Av. Siempre Viva 742", Now);
+
+        employee.UpdateDetails("Juan Perez", Email.From("juan.perez@empresa.com"), null, Now.AddDays(1));
+
+        employee.NationalId.ShouldBe("30123456");
+        employee.BirthDate.ShouldBe(new DateOnly(1990, 5, 20));
+        employee.Address.ShouldBe("Av. Siempre Viva 742");
+    }
+
+    [Fact]
+    public void Correcting_the_details_validates_the_phone_like_the_profile_does()
+    {
+        var employee = CreateEmployee();
+
+        Should.Throw<DomainException>(() =>
+            employee.UpdateDetails("Juan Perez", Email.From("juan.perez@empresa.com"), "hola", Now));
+    }
+
     private static Employee CreateEmployee() => Employee.Create(
         CompanyId,
         departmentId: null,

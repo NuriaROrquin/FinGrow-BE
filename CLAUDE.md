@@ -132,6 +132,24 @@ confirma o descarta. Telegram lo muestra con botones (`TelegramTransactionCallba
 `callback_data`, limitado a 64 bytes) y `AnswerTelegramCallback` procesa el toque. Para sumar
 WhatsApp alcanza con una capa propia del canal que use esas dos piezas.
 
+## Panel de la empresa
+
+`api/company/departments` y `api/company/employees` (`[Authorize(Roles = Rol.Empresa)]`)
+administran la plantilla de la empresa del token. Hasta que exista el filtro global de T-10,
+**cada handler filtra por `ICurrentUser.CompanyId`** y responde `NotFound` (no `Forbidden`)
+ante un recurso de otra empresa, para no confirmar que existe.
+
+- **El alta de un empleado devuelve una contraseña temporal una sola vez**
+  (`CreatedEmployeeResponse`); en la base queda solo el hash. Mandarla por mail es T-17: cuando
+  exista, se engancha en `CreateEmployeeCommandHandler`.
+- **El email de un empleado es único en toda la plataforma**, no por empresa: es su credencial
+  de login.
+- **Eliminar un empleado es definitivo.** La cascada se lleva sus movimientos, metas,
+  presupuestos, inversiones e integraciones; el handler borra además sus notificaciones (no
+  tienen FK porque el destinatario es polimórfico) y los archivos de sus comprobantes. Si el
+  almacenamiento no responde, la baja se mantiene y se loguea. Para cortar el acceso
+  conservando los datos está la desactivación (HU-55).
+
 ## Archivos subidos
 
 Un archivo nunca se guarda en PostgreSQL: va a `IFileStorage` (`Infrastructure/Storage/S3FileStorage`,

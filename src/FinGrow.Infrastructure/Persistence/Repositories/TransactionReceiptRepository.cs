@@ -28,4 +28,13 @@ internal sealed class TransactionReceiptRepository(FinGrowDbContext dbContext) :
             .Where(receipt => receipt.TransactionId != null && transactionIds.Contains(receipt.TransactionId.Value))
             .ToDictionaryAsync(receipt => receipt.TransactionId!.Value, receipt => receipt.Id, cancellationToken);
     }
+
+    public async Task<IReadOnlyList<string>> ListStorageKeysByEmployeeAsync(
+        Guid employeeId,
+        CancellationToken cancellationToken = default) =>
+        await dbContext.TransactionReceipts
+            .AsNoTracking()
+            .Where(receipt => receipt.EmployeeId == employeeId)
+            .Select(receipt => receipt.StorageKey)
+            .ToListAsync(cancellationToken);
 }

@@ -13,4 +13,6 @@ public interface ITransactionReceiptRepository
     Task<IReadOnlyDictionary<Guid, Guid>> GetIdsByTransactionAsync(
         IReadOnlyCollection<Guid> transactionIds,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<string>> ListStorageKeysByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default);
 }

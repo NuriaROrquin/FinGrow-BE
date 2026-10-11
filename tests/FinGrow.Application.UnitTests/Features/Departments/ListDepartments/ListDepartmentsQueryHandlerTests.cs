@@ -7,7 +7,7 @@ using FinGrow.Domain.ValueObjects;
 
 public class ListDepartmentsQueryHandlerTests
 {
-    private readonly DepartmentsScenario _scenario = new();
+    private readonly CompanyStaffScenario _scenario = new();
 
     private ListDepartmentsQueryHandler CreateHandler() =>
         new(_scenario.CurrentUser, _scenario.Companies, _scenario.Employees);
@@ -40,8 +40,8 @@ public class ListDepartmentsQueryHandlerTests
             Email.From("hola@otra.com"),
             "hash",
             Currency.ARS,
-            DepartmentsScenario.CreatedAt);
-        other.AddDepartment("Finanzas", null, null, DepartmentsScenario.CreatedAt);
+            CompanyStaffScenario.CreatedAt);
+        other.AddDepartment("Finanzas", null, null, CompanyStaffScenario.CreatedAt);
         _scenario.Companies.Companies.Add(other);
 
         var result = await CreateHandler().Handle(new ListDepartmentsQuery(), CancellationToken.None);

@@ -5,7 +5,7 @@ using FinGrow.Application.Features.Departments.CreateDepartment;
 
 public class CreateDepartmentCommandHandlerTests
 {
-    private readonly DepartmentsScenario _scenario = new();
+    private readonly CompanyStaffScenario _scenario = new();
 
     private CreateDepartmentCommandHandler CreateHandler() =>
         new(_scenario.CurrentUser, _scenario.Companies, _scenario.UnitOfWork, _scenario.Clock);
@@ -26,7 +26,7 @@ public class CreateDepartmentCommandHandlerTests
         department.Description.ShouldBe("Ventas y atención al cliente");
         department.ManagerName.ShouldBe("María González");
         department.CompanyId.ShouldBe(_scenario.Company.Id);
-        department.CreatedAt.ShouldBe(DepartmentsScenario.Now);
+        department.CreatedAt.ShouldBe(CompanyStaffScenario.Now);
         result.Value.Id.ShouldBe(department.Id);
         result.Value.EmployeeCount.ShouldBe(0);
         result.Value.IsActive.ShouldBeTrue();

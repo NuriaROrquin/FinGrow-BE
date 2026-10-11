@@ -5,7 +5,7 @@ using FinGrow.Application.Features.Departments.UpdateDepartment;
 
 public class UpdateDepartmentCommandHandlerTests
 {
-    private readonly DepartmentsScenario _scenario = new();
+    private readonly CompanyStaffScenario _scenario = new();
 
     private UpdateDepartmentCommandHandler CreateHandler() =>
         new(_scenario.CurrentUser, _scenario.Companies, _scenario.Employees, _scenario.UnitOfWork, _scenario.Clock);
@@ -24,7 +24,7 @@ public class UpdateDepartmentCommandHandlerTests
         sales.Name.ShouldBe("Ventas Online");
         sales.Description.ShouldBe("Canal digital");
         sales.ManagerName.ShouldBe("Carlos Rodríguez");
-        sales.UpdatedAt.ShouldBe(DepartmentsScenario.Now);
+        sales.UpdatedAt.ShouldBe(CompanyStaffScenario.Now);
         result.Value.EmployeeCount.ShouldBe(1);
         _scenario.UnitOfWork.SaveCount.ShouldBe(1);
     }
