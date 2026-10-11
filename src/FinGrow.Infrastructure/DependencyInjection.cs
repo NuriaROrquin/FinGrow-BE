@@ -1,5 +1,6 @@
 namespace FinGrow.Infrastructure;
 
+using System.ComponentModel.DataAnnotations;
 using System.Net.Http.Headers;
 using System.Text;
 using Amazon.Runtime;
@@ -16,6 +17,7 @@ using FinGrow.Infrastructure.Integrations.DolarApi;
 using FinGrow.Infrastructure.Integrations.MercadoPago;
 using FinGrow.Infrastructure.Integrations.Telegram;
 using FinGrow.Infrastructure.Integrations.Twilio;
+using FinGrow.Infrastructure.Mailing;
 using FinGrow.Infrastructure.Persistence;
 using FinGrow.Infrastructure.Persistence.Protection;
 using FinGrow.Infrastructure.Persistence.Repositories;
@@ -51,6 +53,7 @@ public static class DependencyInjection
         services.AddArgentinaDatos(configuration);
         services.AddCoinGecko(configuration);
         services.AddFileStorage(configuration);
+        services.AddEmail(configuration);
 
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, CurrentUser>();
@@ -325,6 +328,28 @@ public static class DependencyInjection
         });
 
         services.AddSingleton<IFileStorage, S3FileStorage>();
+
+        return services;
+    }
+
+    private static IServiceCollection AddEmail(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<EmailOptions>()
+            .Bind(configuration.GetSection(EmailOptions.SectionName))
+            .ValidateDataAnnotations()
+            .Validate(
+                options => string.IsNullOrWhiteSpace(options.RedirectAllTo) || new EmailAddressAttribute().IsValid(options.RedirectAllTo),
+                "Email:RedirectAllTo tiene que ser una direccion de correo valida.")
+            .ValidateOnStart();
+
+        services.AddHttpClient<IEmailSender, ResendEmailSender>((provider, client) =>
+        {
+            var options = provider.GetRequiredService<IOptions<EmailOptions>>().Value;
+
+            client.BaseAddress = new Uri("https://api.resend.com/");
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", options.ResendApiKey);
+        });
 
         return services;
     }
