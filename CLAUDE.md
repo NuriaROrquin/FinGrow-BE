@@ -172,6 +172,16 @@ ante un recurso de otra empresa, para no confirmar que existe.
   Las respuestas de departamentos se arman en `DepartmentResponseBuilder`, que trae el nombre
   del responsable y la cantidad de empleados.
 
+- **Las métricas del panel son agregadas y nunca llevan datos de un empleado** (HU-56).
+  `GET api/company/metrics/participation` calcula en vivo el mes en curso con la misma lectura
+  que `metrics-snapshot` (`IPeriodActivityReadRepository`), así el panel y las fotos no pueden
+  definir "participar" de dos maneras: total = todos los empleados dados de alta, activos = los
+  que tienen el acceso habilitado, tasa = participantes sobre activos. Con menos de
+  `AggregatePrivacy.MinimumGroupSize` activos la participación viaja en `null` con
+  `isParticipationHidden`, porque en un grupo chico la tasa delata a cada uno. Ese piso es
+  provisorio: la capa de anonimización de T-11 lo reemplaza, y toda métrica nueva por grupo
+  (departamento incluido) tiene que pasar por él.
+
 ## Contenido educativo e inversiones
 
 Artículos y cursos se vinculan a un tipo de activo con `RelatedInvestmentType`, y
