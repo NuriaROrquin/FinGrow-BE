@@ -36,6 +36,9 @@ public sealed class FakeEmployeeRepository : IEmployeeRepository
     public Task<IReadOnlyList<Employee>> ListByDepartmentAsync(Guid departmentId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Employee>>(Employees.Where(employee => employee.DepartmentId == departmentId).ToList());
 
+    public Task<IReadOnlyList<Employee>> ListByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Employee>>(Employees.Where(employee => ids.Contains(employee.Id)).ToList());
+
     public void Add(Employee employee) => Employees.Add(employee);
 
     public void Remove(Employee employee) => Employees.Remove(employee);

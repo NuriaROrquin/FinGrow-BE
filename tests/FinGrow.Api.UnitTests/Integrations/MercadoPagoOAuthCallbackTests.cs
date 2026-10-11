@@ -148,6 +148,9 @@ public class MercadoPagoOAuthCallbackTests
         public Task<IReadOnlyList<Employee>> ListByDepartmentAsync(Guid departmentId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<IReadOnlyList<Employee>> ListByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public void Add(Employee employee) => throw new NotSupportedException();
 
         public void Remove(Employee employee) => throw new NotSupportedException();
