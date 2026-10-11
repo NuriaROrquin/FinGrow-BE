@@ -19,12 +19,33 @@ public class CompanyTests
     public void A_department_is_added_to_the_company_aggregate()
     {
         var company = CreateCompany();
+        var managerId = Guid.CreateVersion7();
 
-        var department = company.AddDepartment("Ventas", "Ventas y atencion al cliente", "Maria Gonzalez", Now);
+        var department = company.AddDepartment("Ventas", "Ventas y atencion al cliente", managerId, Now);
 
         company.Departments.ShouldContain(department);
         department.CompanyId.ShouldBe(company.Id);
+        department.ManagerId.ShouldBe(managerId);
         department.IsActive.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void A_department_can_be_left_without_a_manager()
+    {
+        var company = CreateCompany();
+        var department = company.AddDepartment("Ventas", null, Guid.CreateVersion7(), Now);
+
+        company.UpdateDepartment(department.Id, "Ventas", null, null, Now.AddDays(1));
+
+        department.ManagerId.ShouldBeNull();
+    }
+
+    [Fact]
+    public void An_empty_manager_id_is_rejected()
+    {
+        var company = CreateCompany();
+
+        Should.Throw<DomainException>(() => company.AddDepartment("Ventas", null, Guid.Empty, Now));
     }
 
     [Fact]
@@ -41,12 +62,13 @@ public class CompanyTests
     {
         var company = CreateCompany();
         var department = company.AddDepartment("Ventas", null, null, Now);
+        var managerId = Guid.CreateVersion7();
 
-        company.UpdateDepartment(department.Id, "Ventas Online", "Canal digital", "Maria Gonzalez", Now.AddDays(1));
+        company.UpdateDepartment(department.Id, "Ventas Online", "Canal digital", managerId, Now.AddDays(1));
 
         department.Name.ShouldBe("Ventas Online");
         department.Description.ShouldBe("Canal digital");
-        department.ManagerName.ShouldBe("Maria Gonzalez");
+        department.ManagerId.ShouldBe(managerId);
         department.UpdatedAt.ShouldBe(Now.AddDays(1));
     }
 

@@ -85,14 +85,14 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
             createdAt);
     }
 
-    public Department AddDepartment(string name, string? description, string? managerName, DateTimeOffset createdAt)
+    public Department AddDepartment(string name, string? description, Guid? managerId, DateTimeOffset createdAt)
     {
         if (IsDepartmentNameTaken(name))
         {
             throw new DomainException($"Ya existe un departamento llamado '{name}'.");
         }
 
-        var department = Department.Create(Id, name, description, managerName, createdAt);
+        var department = Department.Create(Id, name, description, managerId, createdAt);
         _departments.Add(department);
         UpdatedAt = createdAt;
 
@@ -109,7 +109,7 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
         Guid departmentId,
         string name,
         string? description,
-        string? managerName,
+        Guid? managerId,
         DateTimeOffset updatedAt)
     {
         var department = GetDepartment(departmentId);
@@ -119,7 +119,7 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
             throw new DomainException($"Ya existe un departamento llamado '{name}'.");
         }
 
-        department.Update(name, description, managerName, updatedAt);
+        department.Update(name, description, managerId, updatedAt);
         UpdatedAt = updatedAt;
 
         return department;

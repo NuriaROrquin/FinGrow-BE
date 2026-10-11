@@ -8,7 +8,13 @@ public class ChangeDepartmentStatusCommandHandlerTests
     private readonly CompanyStaffScenario _scenario = new();
 
     private ChangeDepartmentStatusCommandHandler CreateHandler() =>
-        new(_scenario.CurrentUser, _scenario.Companies, _scenario.Employees, _scenario.UnitOfWork, _scenario.Clock);
+        new(
+            _scenario.CurrentUser,
+            _scenario.Companies,
+            _scenario.Employees,
+            _scenario.DepartmentResponses,
+            _scenario.UnitOfWork,
+            _scenario.Clock);
 
     [Fact]
     public async Task Deactivating_an_empty_department_keeps_it_in_the_company()
