@@ -7,9 +7,6 @@ internal static class ReceiptErrors
     public static readonly Error NotOwned = Error.Forbidden(
         "Receipt.NotOwned", "El comprobante no pertenece al usuario autenticado.");
 
-    public static readonly Error TransactionNotOwned = Error.Forbidden(
-        "Transaction.NotOwned", "El movimiento no pertenece al usuario autenticado.");
-
     public static readonly Error ContentMismatch = Error.Validation(
         "Receipt.ContentMismatch", "El contenido del archivo no corresponde al tipo declarado.");
 
@@ -21,7 +18,4 @@ internal static class ReceiptErrors
 
     public static Error FileMissing(Guid id) => Error.NotFound(
         "Receipt.FileMissing", $"El archivo del comprobante '{id}' no esta disponible.");
-
-    public static Error TransactionNotFound(Guid id) => Error.NotFound(
-        "Transaction.NotFound", $"No existe un movimiento con id '{id}'.");
 }
