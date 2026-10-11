@@ -55,6 +55,10 @@ public sealed class Transaction : AggregateRoot
         {
             Raise(new TransactionProposed(id, employeeId, source, createdAt));
         }
+        else if (status == TransactionStatus.Confirmed)
+        {
+            RaiseConfirmationEvent(createdAt);
+        }
     }
 
     public Guid EmployeeId { get; private set; }
@@ -193,6 +197,7 @@ public sealed class Transaction : AggregateRoot
 
         Status = TransactionStatus.Confirmed;
         UpdatedAt = confirmedAt;
+        RaiseConfirmationEvent(confirmedAt);
     }
 
     public void Discard(DateTimeOffset discardedAt)
@@ -289,6 +294,8 @@ public sealed class Transaction : AggregateRoot
             throw new DomainException($"El estado del movimiento '{status}' no existe.");
         }
 
+        var wasPending = Status == TransactionStatus.Pending;
+
         if (Status == TransactionStatus.Confirmed && status == TransactionStatus.Pending)
         {
             throw new DomainException("Una transaccion confirmada no puede volver a pendiente.");
@@ -338,6 +345,11 @@ public sealed class Transaction : AggregateRoot
         PaymentMethod = paymentMethod;
         Status = status;
         UpdatedAt = updatedAt;
+
+        if (wasPending && status == TransactionStatus.Confirmed)
+        {
+            RaiseConfirmationEvent(updatedAt);
+        }
     }
 
     public void Eliminate(DateTimeOffset eliminatedAt)
@@ -378,6 +390,18 @@ public sealed class Transaction : AggregateRoot
         employeeId == Guid.Empty
             ? throw new DomainException("Un movimiento siempre pertenece a un empleado.")
             : employeeId;
+
+    private void RaiseConfirmationEvent(DateTimeOffset confirmedAt)
+    {
+        Raise(new TransactionConfirmed(
+            Id,
+            EmployeeId,
+            ExpenseCategory,
+            Amount.Amount,
+            Amount.Currency,
+            OccurredOn,
+            confirmedAt));
+    }
 
     private static void EnsureValidAmount(Money amount)
     {
