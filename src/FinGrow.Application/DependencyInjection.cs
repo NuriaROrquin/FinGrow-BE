@@ -12,6 +12,7 @@ using Features.Notifications;
 using Features.Notifications.Alerts.GoalProgress;
 using Features.Notifications.Delivery;
 using Features.OutboundEmails;
+using Features.OutboundEmails.DeliverDueEmails;
 using Features.Session;
 using FluentValidation;
 using Jobs;
@@ -50,6 +51,7 @@ public static class DependencyInjection
         services.AddScoped<IScheduledJob, MercadoPagoSyncJob>();
         services.AddScoped<IScheduledJob, InvestmentQuotesJob>();
         services.AddScoped<IScheduledJob, GoalProgressAlertsJob>();
+        services.AddScoped<IScheduledJob, EmailDeliveryJob>();
 
         return services;
     }

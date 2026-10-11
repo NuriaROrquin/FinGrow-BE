@@ -12,6 +12,8 @@ public sealed class OutboundEmail : AggregateRoot
     public const int MaxErrorLength = 4000;
     public const int MaxProviderMessageIdLength = 100;
 
+    public static readonly TimeSpan FirstAttemptGrace = TimeSpan.FromMinutes(1);
+
     private static readonly TimeSpan[] RetryDelays =
     {
         TimeSpan.FromMinutes(5),
@@ -32,7 +34,7 @@ public sealed class OutboundEmail : AggregateRoot
         HtmlBody = htmlBody;
         TextBody = textBody;
         Status = OutboundEmailStatus.Pending;
-        NextAttemptAt = createdAt;
+        NextAttemptAt = createdAt + FirstAttemptGrace;
         CreatedAt = createdAt;
     }
 

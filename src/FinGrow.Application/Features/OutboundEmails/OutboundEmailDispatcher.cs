@@ -40,7 +40,7 @@ internal sealed partial class OutboundEmailDispatcher
             email.MarkFailed(exception.Message, _clock.UtcNow);
             LogDeliveryFailed(_logger, exception, email.Id, email.Attempts, email.Status);
         }
-        
+
         await _unitOfWork.SaveChangesAsync(CancellationToken.None);
     }
 
