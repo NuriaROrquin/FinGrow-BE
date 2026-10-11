@@ -26,6 +26,7 @@ internal sealed class DepartmentConfiguration : IEntityTypeConfiguration<Departm
         builder.Property(department => department.IsActive).IsRequired();
         builder.Property(department => department.CreatedAt).IsRequired();
         builder.Property(department => department.UpdatedAt).IsRequired();
+        builder.Property(department => department.DeactivatedAt);
 
         // Un departamento no sobrevive a su empresa: forma parte del agregado Company.
         builder.HasOne<Company>()

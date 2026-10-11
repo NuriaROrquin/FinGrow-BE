@@ -187,6 +187,9 @@ public class WhatsAppWebhookTests
         public Task<IReadOnlyList<Employee>> ListByCompanyAsync(Guid companyId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<IReadOnlyList<Employee>> ListByDepartmentAsync(Guid departmentId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public void Add(Employee employee) => throw new NotSupportedException();
 
         public void Remove(Employee employee) => throw new NotSupportedException();

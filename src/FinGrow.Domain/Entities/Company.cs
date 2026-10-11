@@ -131,6 +131,24 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
         UpdatedAt = removedAt;
     }
 
+    public Department DeactivateDepartment(Guid departmentId, DateTimeOffset deactivatedAt)
+    {
+        var department = GetDepartment(departmentId);
+        department.Deactivate(deactivatedAt);
+        UpdatedAt = deactivatedAt;
+
+        return department;
+    }
+
+    public Department ActivateDepartment(Guid departmentId, DateTimeOffset activatedAt)
+    {
+        var department = GetDepartment(departmentId);
+        department.Activate(activatedAt);
+        UpdatedAt = activatedAt;
+
+        return department;
+    }
+
     public void UpdateProfile(string name, Email email, Currency defaultCurrency, DateTimeOffset updatedAt)
     {
         ArgumentNullException.ThrowIfNull(email);

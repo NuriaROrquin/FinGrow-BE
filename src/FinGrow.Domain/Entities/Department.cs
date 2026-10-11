@@ -50,6 +50,8 @@ public sealed class Department : Entity
 
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    public DateTimeOffset? DeactivatedAt { get; private set; }
+
     internal static Department Create(
         Guid companyId,
         string name,
@@ -80,15 +82,30 @@ public sealed class Department : Entity
     /// </summary>
     public void Deactivate(DateTimeOffset updatedAt)
     {
+        if (!IsActive)
+        {
+            return;
+        }
+
         IsActive = false;
+        DeactivatedAt = updatedAt;
         UpdatedAt = updatedAt;
     }
 
     public void Activate(DateTimeOffset updatedAt)
     {
+        if (IsActive)
+        {
+            return;
+        }
+
         IsActive = true;
+        DeactivatedAt = null;
         UpdatedAt = updatedAt;
     }
+
+    public bool WasActiveDuring(DateTimeOffset periodStart, DateTimeOffset periodEndExclusive) =>
+        CreatedAt < periodEndExclusive && (IsActive || DeactivatedAt >= periodStart);
 
     private static string EnsureValidName(string name)
     {
