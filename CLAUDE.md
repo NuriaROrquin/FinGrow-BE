@@ -172,6 +172,17 @@ ante un recurso de otra empresa, para no confirmar que existe.
   Las respuestas de departamentos se arman en `DepartmentResponseBuilder`, que trae el nombre
   del responsable y la cantidad de empleados.
 
+## Contenido educativo e inversiones
+
+Artículos y cursos se vinculan a un tipo de activo con `RelatedInvestmentType`, y
+`/api/articles` y `/api/courses` filtran por él (`?investmentType=Cedear`, HU-35): así la
+pantalla de inversiones trae lo que corresponde a cada activo. `EducationCatalogTests` rompe
+el build si un `InvestmentType` nuevo queda sin contenido relacionado. Qué cuenta como
+contenido de inversiones lo decide el dominio (`IsInvestmentContent`: categoría `Investments` o
+un tipo de activo vinculado) y viaja en la respuesta. El front muestra la aclaración de que es
+material educativo y no asesoramiento financiero certificado: no la saques ni dupliques el
+criterio en otro lado.
+
 ## Archivos subidos
 
 Un archivo nunca se guarda en PostgreSQL: va a `IFileStorage` (`Infrastructure/Storage/S3FileStorage`,
