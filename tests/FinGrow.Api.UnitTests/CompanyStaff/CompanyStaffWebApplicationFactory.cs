@@ -92,9 +92,12 @@ internal sealed class CompanyStaffWebApplicationFactory : WebApplicationFactory<
             services.AddScoped<ITransactionReceiptRepository, NoReceiptsRepository>();
             services.AddScoped<INotificationRepository>(_ => new RecordingNotificationRepository(ClearedRecipients));
             services.AddScoped<IRefreshTokenRepository>(_ => new RecordingRefreshTokenRepository(RevokedUsers));
+            services.AddScoped<IPeriodActivityReadRepository>(_ => new InMemoryPeriodActivityReadRepository(Activity));
             services.AddScoped<IUnitOfWork, NoOpUnitOfWork>();
         });
     }
+
+    public List<EmployeePeriodActivity> Activity { get; } = new();
 
     public List<NotificationRecipient> ClearedRecipients { get; } = new();
 
@@ -217,6 +220,15 @@ internal sealed class CompanyStaffWebApplicationFactory : WebApplicationFactory<
         public void Add(Employee employee) => employees.Add(employee);
 
         public void Remove(Employee employee) => employees.Remove(employee);
+    }
+
+    private sealed class InMemoryPeriodActivityReadRepository(List<EmployeePeriodActivity> activity) : IPeriodActivityReadRepository
+    {
+        public Task<IReadOnlyList<EmployeePeriodActivity>> ListByCompanyAsync(
+            Guid companyId,
+            MetricsPeriod period,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<EmployeePeriodActivity>>(activity);
     }
 
     private sealed class NoOpUnitOfWork : IUnitOfWork
