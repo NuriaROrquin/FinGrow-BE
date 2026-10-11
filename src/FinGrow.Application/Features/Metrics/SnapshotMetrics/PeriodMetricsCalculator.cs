@@ -16,6 +16,8 @@ internal static class PeriodMetricsCalculator
             employeesWithBudget: employees.Count(employee => employee.HasBudget),
             employeesWithActiveGoal: employees.Count(employee => employee.HasActiveGoal),
             goalsAchieved: employees.Sum(employee => employee.GoalsAchieved),
-            employeesWithIntegration: employees.Count(employee => employee.HasIntegration));
+            employeesWithIntegration: employees.Count(employee => employee.HasIntegration),
+            employeesWithScore: 0,
+            financialHealthScoreSum: 0);
     }
 }

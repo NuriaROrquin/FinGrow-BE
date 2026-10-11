@@ -49,13 +49,15 @@ public class MetricsSnapshotJobTests
             employeesWithBudget: 1,
             employeesWithActiveGoal: 1,
             goalsAchieved: 1,
-            employeesWithIntegration: 1));
+            employeesWithIntegration: 1,
+            employeesWithScore: 0,
+            financialHealthScoreSum: 0));
         _snapshots.CompanySnapshots.Single(snapshot => snapshot.Period == July).Metrics.ShouldBe(PeriodMetrics.Empty);
 
         _snapshots.DepartmentSnapshots.Count.ShouldBe(4);
         var techAugust = _snapshots.DepartmentSnapshots.Single(snapshot => snapshot.DepartmentId == tech.Id && snapshot.Period == August);
         techAugust.CompanyId.ShouldBe(company.Id);
-        techAugust.Metrics.ShouldBe(PeriodMetrics.From(2, 1, 3, 1, 0, 0, 1));
+        techAugust.Metrics.ShouldBe(PeriodMetrics.From(2, 1, 3, 1, 0, 0, 1, 0, 0));
         var adminAugust = _snapshots.DepartmentSnapshots.Single(snapshot => snapshot.DepartmentId == admin.Id && snapshot.Period == August);
         adminAugust.Metrics.ShouldBe(PeriodMetrics.Empty);
         adminAugust.Metrics.ParticipationRate.ShouldBeNull();
@@ -90,7 +92,7 @@ public class MetricsSnapshotJobTests
         julyCompany.ComputedAt.ShouldBe(earlier);
 
         var augustCompany = _snapshots.CompanySnapshots.Single(snapshot => snapshot.Period == August);
-        augustCompany.Metrics.ShouldBe(PeriodMetrics.From(1, 1, 2, 0, 0, 0, 0));
+        augustCompany.Metrics.ShouldBe(PeriodMetrics.From(1, 1, 2, 0, 0, 0, 0, 0, 0));
         augustCompany.ComputedAt.ShouldBe(Now);
         _snapshots.DepartmentSnapshots.Single(snapshot => snapshot.Period == August).Metrics.ConfirmedTransactions.ShouldBe(2);
         result.Summary.ShouldBe("1 empresa(s) activa(s): 1 foto(s) de empresa y 1 de departamento para 1 periodo(s) (2026-08).");
