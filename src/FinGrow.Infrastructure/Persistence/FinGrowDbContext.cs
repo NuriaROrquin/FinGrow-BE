@@ -51,6 +51,8 @@ public sealed class FinGrowDbContext : DbContext, IUnitOfWork
 
     public DbSet<DepartmentMetricsSnapshot> DepartmentMetricsSnapshots => Set<DepartmentMetricsSnapshot>();
 
+    public DbSet<FinancialHealthScore> FinancialHealthScores => Set<FinancialHealthScore>();
+
     public DbSet<Course> Courses => Set<Course>();
 
     public DbSet<Lesson> Lessons => Set<Lesson>();

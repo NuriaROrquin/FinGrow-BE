@@ -21,7 +21,10 @@ internal static class PeriodMetricsConfigurationExtensions
             metrics.Property(value => value.EmployeesWithActiveGoal).HasColumnName("employees_with_active_goal").IsRequired();
             metrics.Property(value => value.GoalsAchieved).HasColumnName("goals_achieved").IsRequired();
             metrics.Property(value => value.EmployeesWithIntegration).HasColumnName("employees_with_integration").IsRequired();
+            metrics.Property(value => value.EmployeesWithScore).HasColumnName("employees_with_score").IsRequired();
+            metrics.Property(value => value.FinancialHealthScoreSum).HasColumnName("financial_health_score_sum").IsRequired();
             metrics.Ignore(value => value.ParticipationRate);
+            metrics.Ignore(value => value.AverageFinancialHealthScore);
         });
 
         builder.Navigation(navigation).IsRequired();

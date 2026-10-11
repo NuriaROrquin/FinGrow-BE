@@ -222,6 +222,28 @@ siguiente corre igual. Un mismo trabajo no corre dos veces a la vez (`RunningJob
   falten desde el alta de la empresa. Las fotos guardan conteos, no porcentajes: la tasa de
   participación se deriva (`PeriodMetrics.ParticipationRate`), fiel a "un total no se persiste".
 
+## Puntaje de salud financiera
+
+La fórmula está en `FinancialHealthFactors` (`Domain/ValueObjects/`) y explicada en el README;
+la aplica `FinancialHealthScorer` (`Application/Features/Metrics/FinancialHealth/`) dentro de
+`metrics-snapshot`. Lo que no se deduce leyendo:
+
+- **Sin actividad suficiente no hay puntaje, y eso no es un cero** (`HasEnoughActivity`: 10
+  movimientos confirmados y algún ingreso en el mes). Un cero es alguien con actividad al que le
+  va mal; la ausencia de fila es "no se puede medir". No completes con ceros.
+- **El puntaje sí se persiste**, a diferencia de los totales: es el resultado de una fórmula en
+  una fecha (`computed_at`), no la suma de partes editables. Factores y puntaje se escriben
+  juntos (`Compute`/`Refresh`), nunca uno sin el otro.
+- **El empleado nunca ve su puntaje y la empresa solo lo ve agregado.** Las fotos guardan cuántos
+  empleados tienen puntaje y la suma, y el promedio se deriva. No expongas
+  `financial_health_scores` por empleado en ningún endpoint.
+- **`ahorro_inversion` es ahorro, no gasto**, en el factor de ahorro y en el colchón.
+- **Un factor que falta no vale cero:** sin presupuesto del mes o sin metas con cuota, su peso se
+  reparte entre los demás.
+- **Sin MEP no se fotografía el mes** de una empresa con movimientos en dólares: la corrida queda
+  fallida y la siguiente genera la foto que falta. No conviertas con una cotización inventada ni
+  guardes una foto con parte de la plantilla sin puntuar.
+
 ## Eventos de dominio y alertas
 
 Un agregado levanta un evento con `Raise` y `DomainEventsInterceptor` (`Infrastructure/Persistence/`)

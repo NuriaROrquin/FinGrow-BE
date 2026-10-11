@@ -305,6 +305,56 @@ public class GoalTests
         goal.IsOverdue(Deadline.AddDays(1)).ShouldBeFalse();
     }
 
+    [Fact]
+    public void The_contributions_of_a_month_are_summed_by_their_date()
+    {
+        var goal = CreateGoal();
+        goal.AddContribution(Money.From(30000m, Currency.ARS), new DateOnly(2026, 4, 2), null, Now);
+        goal.AddContribution(Money.From(20000m, Currency.ARS), new DateOnly(2026, 4, 28), null, Now);
+        goal.AddContribution(Money.From(50000m, Currency.ARS), new DateOnly(2026, 5, 1), null, Now);
+
+        goal.ContributedIn(new DateOnly(2026, 4, 15)).ShouldBe(Money.From(50000m, Currency.ARS));
+        goal.ContributedIn(new DateOnly(2026, 6, 1)).ShouldBe(Money.Zero(Currency.ARS));
+    }
+
+    [Fact]
+    public void The_commitment_fulfilled_in_a_month_is_what_was_contributed_over_the_monthly_commitment()
+    {
+        var goal = CreateGoal();
+        goal.AddContribution(Money.From(25000m, Currency.ARS), new DateOnly(2026, 4, 10), null, Now);
+
+        goal.CommitmentFulfilledIn(new DateOnly(2026, 4, 1)).ShouldBe(0.25m);
+        goal.CommitmentFulfilledIn(new DateOnly(2026, 5, 1)).ShouldBe(0m);
+    }
+
+    [Fact]
+    public void Contributing_more_than_the_monthly_commitment_fulfils_it_but_not_beyond()
+    {
+        var goal = CreateGoal();
+        goal.AddContribution(Money.From(250000m, Currency.ARS), new DateOnly(2026, 4, 10), null, Now);
+
+        goal.CommitmentFulfilledIn(new DateOnly(2026, 4, 1)).ShouldBe(1m);
+    }
+
+    [Fact]
+    public void Reaching_the_target_fulfils_the_commitment_of_that_month_even_with_a_smaller_contribution()
+    {
+        var goal = CreateGoal();
+        goal.AddContribution(Money.From(950000m, Currency.ARS), new DateOnly(2026, 3, 20), null, Now);
+        goal.AddContribution(Money.From(50000m, Currency.ARS), new DateOnly(2026, 4, 5), null, Now);
+
+        goal.CommitmentFulfilledIn(new DateOnly(2026, 4, 1)).ShouldBe(1m);
+    }
+
+    [Fact]
+    public void A_month_without_commitment_has_nothing_to_fulfil()
+    {
+        var goal = CreateGoal();
+
+        goal.CommitmentFulfilledIn(new DateOnly(2026, 2, 1)).ShouldBeNull();
+        goal.CommitmentFulfilledIn(new DateOnly(2027, 1, 1)).ShouldBeNull();
+    }
+
     private static Goal CreateGoal() => Goal.Create(
         EmployeeId,
         "Fondo de emergencia",

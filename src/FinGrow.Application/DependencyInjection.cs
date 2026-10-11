@@ -7,6 +7,7 @@ using Features.Integrations.ChatTransactions;
 using Features.Integrations.Linking;
 using Features.Integrations.MercadoPago.Sync;
 using Features.Investments.QuoteInvestments;
+using Features.Metrics.FinancialHealth;
 using Features.Metrics.SnapshotMetrics;
 using Features.Notifications;
 using Features.Notifications.Alerts.GoalProgress;
@@ -37,6 +38,7 @@ public static class DependencyInjection
         services.AddScoped<TwoFactorAccountFinder>();
         services.AddScoped<DepartmentResponseBuilder>();
         services.AddScoped<DepartmentManagerEligibility>();
+        services.AddScoped<FinancialHealthScorer>();
 
         services.AddSingleton<IDomainEventDispatcher, DomainEventDispatcher>();
         services.AddScoped<Notifier>();
