@@ -1,6 +1,7 @@
 namespace FinGrow.Application.Features.Metrics.SnapshotMetrics;
 
 using System.Globalization;
+using FinGrow.Application.Features.Metrics.FinancialHealth;
 using FinGrow.Application.Interfaces;
 using FinGrow.Application.Jobs;
 using FinGrow.Domain.Common;
@@ -16,6 +17,7 @@ internal sealed partial class MetricsSnapshotJob : IScheduledJob
     private readonly ICompanyRepository _companies;
     private readonly IPeriodActivityReadRepository _activity;
     private readonly IMetricsSnapshotRepository _snapshots;
+    private readonly FinancialHealthScorer _healthScorer;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _clock;
     private readonly ILogger<MetricsSnapshotJob> _logger;
@@ -24,6 +26,7 @@ internal sealed partial class MetricsSnapshotJob : IScheduledJob
         ICompanyRepository companies,
         IPeriodActivityReadRepository activity,
         IMetricsSnapshotRepository snapshots,
+        FinancialHealthScorer healthScorer,
         IUnitOfWork unitOfWork,
         IDateTimeProvider clock,
         ILogger<MetricsSnapshotJob> logger)
@@ -31,6 +34,7 @@ internal sealed partial class MetricsSnapshotJob : IScheduledJob
         _companies = companies;
         _activity = activity;
         _snapshots = snapshots;
+        _healthScorer = healthScorer;
         _unitOfWork = unitOfWork;
         _clock = clock;
         _logger = logger;
@@ -39,8 +43,9 @@ internal sealed partial class MetricsSnapshotJob : IScheduledJob
     public string Name => JobName;
 
     public string Description =>
-        "Genera las fotos mensuales de metricas de cada empresa y de sus departamentos: "
-        + "siempre la del ultimo mes cerrado y ademas las de los meses anteriores que todavia no tengan foto.";
+        "Genera las fotos mensuales de metricas de cada empresa y de sus departamentos, con el puntaje de "
+        + "salud financiera de cada empleado: siempre la del ultimo mes cerrado y ademas las de los meses "
+        + "anteriores que todavia no tengan foto.";
 
     public string Schedule => "0 4 1 * *";
 
@@ -51,6 +56,7 @@ internal sealed partial class MetricsSnapshotJob : IScheduledJob
         var companies = await _companies.ListActiveAsync(cancellationToken);
         var companySnapshots = 0;
         var departmentSnapshots = 0;
+        var periodsWithoutExchangeRate = 0;
         var periods = new HashSet<MetricsPeriod>();
 
         foreach (var company in companies)
@@ -65,15 +71,23 @@ internal sealed partial class MetricsSnapshotJob : IScheduledJob
             foreach (var period in pending)
             {
                 var activity = await _activity.ListByCompanyAsync(company.Id, period, cancellationToken);
+                var scoring = await _healthScorer.ScoreAsync(company.Id, period, activity, now, cancellationToken);
 
-                await SnapshotCompanyAsync(company, period, activity, now, cancellationToken);
+                if (!scoring.IsComplete)
+                {
+                    LogPeriodWithoutExchangeRate(_logger, company.Name, period.ToString());
+                    periodsWithoutExchangeRate++;
+                    continue;
+                }
+
+                await SnapshotCompanyAsync(company, period, activity, scoring.Scores, now, cancellationToken);
                 companySnapshots++;
 
                 foreach (var department in company.Departments.Where(department => ExistedDuring(department, period)))
                 {
                     var ownActivity = activity.Where(employee => employee.DepartmentId == department.Id);
 
-                    await SnapshotDepartmentAsync(department, period, ownActivity, now, cancellationToken);
+                    await SnapshotDepartmentAsync(department, period, ownActivity, scoring.Scores, now, cancellationToken);
                     departmentSnapshots++;
                 }
 
@@ -84,7 +98,15 @@ internal sealed partial class MetricsSnapshotJob : IScheduledJob
             LogCompanyDone(_logger, company.Name, pending.Count);
         }
 
-        return JobResult.Success(Summarize(companies.Count, companySnapshots, departmentSnapshots, periods));
+        var summary = Summarize(companies.Count, companySnapshots, departmentSnapshots, periods);
+
+        return periodsWithoutExchangeRate == 0
+            ? JobResult.Success(summary)
+            : JobResult.Failure(
+                string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"No se pudo obtener la cotizacion del dolar MEP: {periodsWithoutExchangeRate} foto(s) de empresa quedaron pendientes para la proxima corrida."),
+                summary);
     }
 
     private static bool ExistedDuring(Department department, MetricsPeriod period) =>
@@ -94,10 +116,11 @@ internal sealed partial class MetricsSnapshotJob : IScheduledJob
         Company company,
         MetricsPeriod period,
         IEnumerable<EmployeePeriodActivity> activity,
+        IReadOnlyDictionary<Guid, int> scores,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        var metrics = PeriodMetricsCalculator.Aggregate(activity);
+        var metrics = PeriodMetricsCalculator.Aggregate(activity, scores);
         var existing = await _snapshots.FindCompanyAsync(company.Id, period.Start, cancellationToken);
 
         if (existing is null)
@@ -114,10 +137,11 @@ internal sealed partial class MetricsSnapshotJob : IScheduledJob
         Department department,
         MetricsPeriod period,
         IEnumerable<EmployeePeriodActivity> activity,
+        IReadOnlyDictionary<Guid, int> scores,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        var metrics = PeriodMetricsCalculator.Aggregate(activity);
+        var metrics = PeriodMetricsCalculator.Aggregate(activity, scores);
         var existing = await _snapshots.FindDepartmentAsync(department.Id, period.Start, cancellationToken);
 
         if (existing is null)
@@ -152,4 +176,7 @@ internal sealed partial class MetricsSnapshotJob : IScheduledJob
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Fotos de metricas de {Company}: {Periods} periodo(s) generados o actualizados.")]
     private static partial void LogCompanyDone(ILogger logger, string company, int periods);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "La foto de {Company} de {Period} queda pendiente: sin cotizacion MEP no se puede medir la salud financiera.")]
+    private static partial void LogPeriodWithoutExchangeRate(ILogger logger, string company, string period);
 }
