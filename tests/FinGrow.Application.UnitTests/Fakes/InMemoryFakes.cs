@@ -488,6 +488,46 @@ public sealed class FakePeriodActivityReadRepository : IPeriodActivityReadReposi
     }
 }
 
+public sealed class FakeFinancialHealthReadRepository : IFinancialHealthReadRepository
+{
+    public List<EmployeeCurrencyTotals> Totals { get; } = new();
+
+    public List<EmployeeBudgetLimit> Limits { get; } = new();
+
+    public Task<IReadOnlyList<EmployeeCurrencyTotals>> ListMovementTotalsAsync(
+        IReadOnlyCollection<Guid> employeeIds,
+        MetricsPeriod period,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<EmployeeCurrencyTotals>>(Totals
+            .Where(total => employeeIds.Contains(total.EmployeeId))
+            .ToList());
+
+    public Task<IReadOnlyList<EmployeeBudgetLimit>> ListBudgetLimitsAsync(
+        IReadOnlyCollection<Guid> employeeIds,
+        MetricsPeriod period,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<EmployeeBudgetLimit>>(Limits
+            .Where(limit => employeeIds.Contains(limit.EmployeeId))
+            .ToList());
+}
+
+public sealed class FakeFinancialHealthScoreRepository : IFinancialHealthScoreRepository
+{
+    public List<FinancialHealthScore> Scores { get; } = new();
+
+    public Task<IReadOnlyList<FinancialHealthScore>> ListByCompanyAsync(
+        Guid companyId,
+        DateOnly periodStart,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<FinancialHealthScore>>(Scores
+            .Where(score => score.PeriodStart == periodStart)
+            .ToList());
+
+    public void Add(FinancialHealthScore score) => Scores.Add(score);
+
+    public void Remove(FinancialHealthScore score) => Scores.Remove(score);
+}
+
 public sealed class FakeInvestmentRepository : IInvestmentRepository
 {
     public List<Investment> Investments { get; } = new();
@@ -525,8 +565,14 @@ public sealed class FakeExchangeRateProvider : IExchangeRateProvider
 
     public Exception? Failure { get; set; }
 
-    public Task<MepQuote> GetMepQuoteAsync(CancellationToken cancellationToken = default) =>
-        Failure is null ? Task.FromResult(Quote) : Task.FromException<MepQuote>(Failure);
+    public int Calls { get; private set; }
+
+    public Task<MepQuote> GetMepQuoteAsync(CancellationToken cancellationToken = default)
+    {
+        Calls++;
+
+        return Failure is null ? Task.FromResult(Quote) : Task.FromException<MepQuote>(Failure);
+    }
 }
 
 public sealed class FakeInvestmentReadRepository : IInvestmentReadRepository
