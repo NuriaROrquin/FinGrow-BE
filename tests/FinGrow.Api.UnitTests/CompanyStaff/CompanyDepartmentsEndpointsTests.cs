@@ -114,6 +114,66 @@ public class CompanyDepartmentsEndpointsTests
     }
 
     [Fact]
+    public async Task Deactivating_a_department_moves_its_employees_and_hides_it_from_assignments()
+    {
+        using var factory = new CompanyStaffWebApplicationFactory();
+        var marketing = factory.Company.AddDepartment("Marketing", null, null, CompanyStaffWebApplicationFactory.CreatedAt);
+        var sales = factory.Company.AddDepartment("Ventas", null, null, CompanyStaffWebApplicationFactory.CreatedAt);
+        var ana = factory.AddEmployee(marketing, "ana@acme.com");
+        var client = factory.CreateCompanyClient();
+
+        var response = await client.PutAsJsonAsync(
+            new Uri($"{DepartmentsPath}/{marketing.Id}/status", UriKind.Relative),
+            new { isActive = false, moveEmployeesTo = sales.Id });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        marketing.IsActive.ShouldBeFalse();
+        ana.DepartmentId.ShouldBe(sales.Id);
+        (await response.Content.ReadAsStringAsync()).ShouldContain("\"isActive\":false");
+
+        var assignment = await client.PostAsJsonAsync(
+            new Uri("/api/company/employees", UriKind.Relative),
+            new { fullName = "Bruno Díaz", email = "bruno@acme.com", departmentId = marketing.Id });
+        assignment.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Reactivating_a_department_makes_it_available_for_assignments_again()
+    {
+        using var factory = new CompanyStaffWebApplicationFactory();
+        var marketing = factory.Company.AddDepartment("Marketing", null, null, CompanyStaffWebApplicationFactory.CreatedAt);
+        marketing.Deactivate(CompanyStaffWebApplicationFactory.CreatedAt);
+        var client = factory.CreateCompanyClient();
+
+        var response = await client.PutAsJsonAsync(
+            new Uri($"{DepartmentsPath}/{marketing.Id}/status", UriKind.Relative),
+            new { isActive = true });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        marketing.IsActive.ShouldBeTrue();
+
+        var assignment = await client.PostAsJsonAsync(
+            new Uri("/api/company/employees", UriKind.Relative),
+            new { fullName = "Bruno Díaz", email = "bruno@acme.com", departmentId = marketing.Id });
+        assignment.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Changing_the_status_without_saying_which_responds_400()
+    {
+        using var factory = new CompanyStaffWebApplicationFactory();
+        var marketing = factory.Company.AddDepartment("Marketing", null, null, CompanyStaffWebApplicationFactory.CreatedAt);
+        var client = factory.CreateCompanyClient();
+
+        var response = await client.PutAsJsonAsync(
+            new Uri($"{DepartmentsPath}/{marketing.Id}/status", UriKind.Relative),
+            new { moveEmployeesTo = (Guid?)null });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        marketing.IsActive.ShouldBeTrue();
+    }
+
+    [Fact]
     public async Task An_employee_token_is_rejected_with_403()
     {
         using var factory = new CompanyStaffWebApplicationFactory();
