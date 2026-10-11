@@ -840,3 +840,31 @@ public sealed class FakeFileStorage : IFileStorage
         }
     }
 }
+
+public sealed class FakeOutboundEmailRepository : IOutboundEmailRepository
+{
+    public List<OutboundEmail> Emails { get; } = new();
+
+    public void Add(OutboundEmail email) => Emails.Add(email);
+
+    public Task<OutboundEmail?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Emails.FirstOrDefault(email => email.Id == id));
+}
+
+public sealed class FakeEmailSender : IEmailSender
+{
+    public List<EmailMessage> Sent { get; } = new();
+
+    public EmailDeliveryException? Failure { get; set; }
+
+    public Task<string> SendAsync(EmailMessage message, CancellationToken cancellationToken = default)
+    {
+        if (Failure is not null)
+        {
+            throw Failure;
+        }
+
+        Sent.Add(message);
+        return Task.FromResult($"re-{Sent.Count}");
+    }
+}
