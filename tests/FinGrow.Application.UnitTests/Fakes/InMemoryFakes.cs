@@ -742,6 +742,12 @@ public sealed class FakeNotificationRepository : INotificationRepository
     public Task<IReadOnlyList<Notification>> ListUnreadAsync(NotificationRecipient recipient, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Notification>>(Filtered(recipient, unreadOnly: true).ToList());
 
+    public Task RemoveAllForAsync(NotificationRecipient recipient, CancellationToken cancellationToken = default)
+    {
+        Notifications.RemoveAll(notification => notification.IsAddressedTo(recipient));
+        return Task.CompletedTask;
+    }
+
     private IEnumerable<Notification> Filtered(NotificationRecipient recipient, bool unreadOnly) =>
         Notifications.Where(notification => notification.IsAddressedTo(recipient) && (!unreadOnly || !notification.IsRead));
 }
@@ -774,6 +780,12 @@ public sealed class FakeTransactionReceiptRepository : ITransactionReceiptReposi
         Task.FromResult<IReadOnlyDictionary<Guid, Guid>>(Receipts
             .Where(receipt => receipt.TransactionId is { } id && transactionIds.Contains(id))
             .ToDictionary(receipt => receipt.TransactionId!.Value, receipt => receipt.Id));
+
+    public Task<IReadOnlyList<string>> ListStorageKeysByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<string>>(Receipts
+            .Where(receipt => receipt.EmployeeId == employeeId)
+            .Select(receipt => receipt.StorageKey)
+            .ToList());
 }
 
 public sealed class FakeFileStorage : IFileStorage

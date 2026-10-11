@@ -302,6 +302,9 @@ public class ReceiptsEndpointsTests
             Task.FromResult<IReadOnlyDictionary<Guid, Guid>>(receipts
                 .Where(receipt => receipt.TransactionId is { } id && transactionIds.Contains(id))
                 .ToDictionary(receipt => receipt.TransactionId!.Value, receipt => receipt.Id));
+
+        public Task<IReadOnlyList<string>> ListStorageKeysByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class InMemoryTransactionRepository(List<Transaction> transactions) : ITransactionRepository
