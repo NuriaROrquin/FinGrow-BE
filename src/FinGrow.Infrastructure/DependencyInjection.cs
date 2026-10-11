@@ -318,8 +318,7 @@ public static class DependencyInjection
                     AuthenticationRegion = options.Region,
                     ForcePathStyle = options.ForcePathStyle,
                     Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds),
-                    // Los checksums que el SDK agrega por defecto desde la v4 no los entienden
-                    // ni R2 ni S3Mock: se mandan solo cuando la operacion los exige.
+                    // R2 y S3Mock no aceptan los checksums que el SDK v4 agrega por defecto.
                     RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED,
                     ResponseChecksumValidation = ResponseChecksumValidation.WHEN_REQUIRED,
                 });

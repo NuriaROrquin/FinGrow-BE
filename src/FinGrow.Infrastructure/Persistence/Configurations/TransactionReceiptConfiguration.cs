@@ -34,8 +34,6 @@ internal sealed class TransactionReceiptConfiguration : IEntityTypeConfiguration
             .HasForeignKey(receipt => receipt.EmployeeId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Si el movimiento desaparece, el comprobante queda suelto en lugar de perderse: es la
-        // misma situación que cuando el OCR falla y todavía nadie lo asoció a nada.
         builder.HasOne<Transaction>()
             .WithMany()
             .HasForeignKey(receipt => receipt.TransactionId)

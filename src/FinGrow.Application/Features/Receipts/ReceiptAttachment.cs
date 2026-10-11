@@ -27,7 +27,6 @@ internal static class ReceiptAttachment
     public static Guid? ReceiptOf(this IReadOnlyDictionary<Guid, Guid> receiptIds, Guid transactionId) =>
         receiptIds.TryGetValue(transactionId, out var receiptId) ? receiptId : null;
 
-    // Un movimiento tiene un solo comprobante: el que tenía queda suelto.
     public static async Task AttachAsync(
         ITransactionReceiptRepository receipts,
         TransactionReceipt receipt,
