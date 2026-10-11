@@ -26,6 +26,8 @@ public sealed class Employee : AggregateRoot, ITwoFactorAccount
 
     private const string PhoneNumberSeparators = " +-()";
 
+    private readonly List<EmployeeDepartmentAssignment> _departmentAssignments = new();
+
     private Employee()
     {
     }
@@ -57,6 +59,11 @@ public sealed class Employee : AggregateRoot, ITwoFactorAccount
         IsActive = true;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
+
+        if (departmentId is { } assignedDepartmentId)
+        {
+            _departmentAssignments.Add(EmployeeDepartmentAssignment.Start(id, assignedDepartmentId, createdAt));
+        }
     }
 
     public Guid CompanyId { get; private set; }
@@ -110,6 +117,8 @@ public sealed class Employee : AggregateRoot, ITwoFactorAccount
     public Company Company { get; private set; } = null!;
 
     public Department? Department { get; private set; }
+
+    public IReadOnlyCollection<EmployeeDepartmentAssignment> DepartmentAssignments => _departmentAssignments.AsReadOnly();
 
     public static Employee Create(
         Guid companyId,
@@ -198,10 +207,22 @@ public sealed class Employee : AggregateRoot, ITwoFactorAccount
         UpdatedAt = updatedAt;
     }
 
-    public void AssignToDepartment(Guid? departmentId, DateTimeOffset updatedAt)
+    public void AssignToDepartment(Guid? departmentId, DateTimeOffset assignedAt)
     {
+        if (departmentId == DepartmentId)
+        {
+            return;
+        }
+
+        _departmentAssignments.SingleOrDefault(assignment => assignment.IsCurrent)?.End(assignedAt);
+
+        if (departmentId is { } newDepartmentId)
+        {
+            _departmentAssignments.Add(EmployeeDepartmentAssignment.Start(Id, newDepartmentId, assignedAt));
+        }
+
         DepartmentId = departmentId;
-        UpdatedAt = updatedAt;
+        UpdatedAt = assignedAt;
     }
 
     public void ChangePassword(string passwordHash, DateTimeOffset updatedAt)
