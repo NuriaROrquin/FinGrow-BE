@@ -141,7 +141,8 @@ para que un OCR fallido no pierda la imagen, y la clave la arma el dominio a par
 y del id del comprobante. Lo que sume otro tipo de archivo (los audios de HU-14) reutiliza
 `IFileStorage`. Un almacenamiento que no responde llega como `FileStorageUnavailableException`
 y el caso de uso lo traduce a `Unavailable` (503). Los handlers la atrapan; no dejes que
-escape como 500.
+escape como 500. Un movimiento tiene un solo comprobante, y lo que deja de usar uno lo suelta
+con `Detach()`, no lo borra: el borrado real es del trabajo de limpieza (SCRUM-132).
 
 ## Trabajos programados
 
