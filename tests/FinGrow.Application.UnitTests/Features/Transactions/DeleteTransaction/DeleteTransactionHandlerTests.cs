@@ -21,7 +21,7 @@ public class DeleteTransactionHandlerTests
         var transaction = NewExpense(user.UserId!.Value);
         transactions.Transactions.Add(transaction);
 
-        var handler = new DeleteTransactionHandler(transactions, unitOfWork, user, clock);
+        var handler = new DeleteTransactionHandler(transactions, new FakeTransactionReceiptRepository(), unitOfWork, user, clock);
 
         var result = await handler.Handle(new DeleteTransactionCommand(transaction.Id), CancellationToken.None);
 
@@ -42,6 +42,7 @@ public class DeleteTransactionHandlerTests
 
         var handler = new DeleteTransactionHandler(
             transactions,
+            new FakeTransactionReceiptRepository(),
             unitOfWork,
             user,
             new FakeDateTimeProvider(Now));
@@ -55,10 +56,32 @@ public class DeleteTransactionHandlerTests
     }
 
     [Fact]
+    public async Task Deleting_a_transaction_leaves_its_receipt_loose()
+    {
+        var transactions = new FakeTransactionRepository();
+        var receipts = new FakeTransactionReceiptRepository();
+        var user = new FakeCurrentUser { UserId = Guid.CreateVersion7() };
+        var transaction = NewExpense(user.UserId!.Value);
+        transactions.Transactions.Add(transaction);
+        var receipt = TransactionReceipt.Upload(user.UserId!.Value, "image/png", 10, null, Now);
+        receipt.AttachTo(transaction);
+        receipts.Receipts.Add(receipt);
+
+        var handler = new DeleteTransactionHandler(
+            transactions, receipts, new FakeUnitOfWork(), user, new FakeDateTimeProvider(Now));
+
+        var result = await handler.Handle(new DeleteTransactionCommand(transaction.Id), CancellationToken.None);
+
+        result.IsSuccess.ShouldBeTrue();
+        receipt.TransactionId.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task Returns_forbidden_when_the_user_is_not_authenticated()
     {
         var handler = new DeleteTransactionHandler(
             new FakeTransactionRepository(),
+            new FakeTransactionReceiptRepository(),
             new FakeUnitOfWork(),
             new FakeCurrentUser(),
             new FakeDateTimeProvider(Now));

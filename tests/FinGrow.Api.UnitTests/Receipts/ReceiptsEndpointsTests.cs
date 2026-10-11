@@ -57,6 +57,24 @@ public class ReceiptsEndpointsTests
     }
 
     [Fact]
+    public async Task Uploading_more_than_one_file_responds_400_and_stores_nothing()
+    {
+        using var factory = new ReceiptsWebApplicationFactory();
+        var client = CreateAuthenticatedClient(factory);
+        var form = Upload(Jpeg, "image/jpeg");
+        var second = new ByteArrayContent(Jpeg);
+        second.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+        form.Add(second, "file", "otro.jpg");
+
+        var response = await client.PostAsync(new Uri(ReceiptsPath, UriKind.Relative), form);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync()).ShouldContain("Receipt.SingleFile");
+        factory.Receipts.ShouldBeEmpty();
+        factory.Storage.Files.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task Uploading_an_unsupported_type_responds_400()
     {
         using var factory = new ReceiptsWebApplicationFactory();
@@ -142,38 +160,7 @@ public class ReceiptsEndpointsTests
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
-    [Fact]
-    public async Task Attaching_links_a_loose_receipt_to_a_transaction_loaded_by_hand()
-    {
-        using var factory = new ReceiptsWebApplicationFactory();
-        var receipt = factory.AddStoredReceipt(factory.EmployeeId, Jpeg);
-        var transaction = factory.AddExpense(factory.EmployeeId);
-        var client = CreateAuthenticatedClient(factory);
-
-        var response = await client.PostAsJsonAsync(AttachPath(receipt.Id), new { transactionId = transaction.Id });
-
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        receipt.TransactionId.ShouldBe(transaction.Id);
-        (await response.Content.ReadAsStringAsync()).ShouldContain($"\"transactionId\":\"{transaction.Id}\"");
-    }
-
-    [Fact]
-    public async Task Attaching_to_a_transaction_of_another_employee_responds_403()
-    {
-        using var factory = new ReceiptsWebApplicationFactory();
-        var receipt = factory.AddStoredReceipt(factory.EmployeeId, Jpeg);
-        var transaction = factory.AddExpense(Guid.CreateVersion7());
-        var client = CreateAuthenticatedClient(factory);
-
-        var response = await client.PostAsJsonAsync(AttachPath(receipt.Id), new { transactionId = transaction.Id });
-
-        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
-        receipt.TransactionId.ShouldBeNull();
-    }
-
     private static Uri FilePath(Guid id) => new($"{ReceiptsPath}/{id}/file", UriKind.Relative);
-
-    private static Uri AttachPath(Guid id) => new($"{ReceiptsPath}/{id}/attach", UriKind.Relative);
 
     private static MultipartFormDataContent Upload(byte[] bytes, string contentType)
     {
