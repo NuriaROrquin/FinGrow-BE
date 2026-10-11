@@ -87,7 +87,7 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
 
     public Department AddDepartment(string name, string? description, string? managerName, DateTimeOffset createdAt)
     {
-        if (_departments.Any(department => department.HasName(name)))
+        if (IsDepartmentNameTaken(name))
         {
             throw new DomainException($"Ya existe un departamento llamado '{name}'.");
         }
@@ -97,6 +97,38 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
         UpdatedAt = createdAt;
 
         return department;
+    }
+
+    public Department? FindDepartment(Guid departmentId) =>
+        _departments.SingleOrDefault(department => department.Id == departmentId);
+
+    public bool IsDepartmentNameTaken(string name, Guid? excludingDepartmentId = null) =>
+        _departments.Any(department => department.Id != excludingDepartmentId && department.HasName(name));
+
+    public Department UpdateDepartment(
+        Guid departmentId,
+        string name,
+        string? description,
+        string? managerName,
+        DateTimeOffset updatedAt)
+    {
+        var department = GetDepartment(departmentId);
+
+        if (IsDepartmentNameTaken(name, departmentId))
+        {
+            throw new DomainException($"Ya existe un departamento llamado '{name}'.");
+        }
+
+        department.Update(name, description, managerName, updatedAt);
+        UpdatedAt = updatedAt;
+
+        return department;
+    }
+
+    public void RemoveDepartment(Guid departmentId, DateTimeOffset removedAt)
+    {
+        _departments.Remove(GetDepartment(departmentId));
+        UpdatedAt = removedAt;
     }
 
     public void UpdateProfile(string name, Email email, Currency defaultCurrency, DateTimeOffset updatedAt)
@@ -165,6 +197,10 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
         TwoFactorEnabledAt = null;
         UpdatedAt = updatedAt;
     }
+
+    private Department GetDepartment(Guid departmentId) =>
+        FindDepartment(departmentId)
+        ?? throw new DomainException("El departamento no pertenece a esta empresa.");
 
     private static string EnsureValidName(string name)
     {

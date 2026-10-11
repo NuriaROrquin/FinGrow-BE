@@ -37,6 +37,63 @@ public class CompanyTests
     }
 
     [Fact]
+    public void A_department_can_be_renamed_and_described_again()
+    {
+        var company = CreateCompany();
+        var department = company.AddDepartment("Ventas", null, null, Now);
+
+        company.UpdateDepartment(department.Id, "Ventas Online", "Canal digital", "Maria Gonzalez", Now.AddDays(1));
+
+        department.Name.ShouldBe("Ventas Online");
+        department.Description.ShouldBe("Canal digital");
+        department.ManagerName.ShouldBe("Maria Gonzalez");
+        department.UpdatedAt.ShouldBe(Now.AddDays(1));
+    }
+
+    [Fact]
+    public void A_department_keeps_its_own_name_when_only_the_description_changes()
+    {
+        var company = CreateCompany();
+        var department = company.AddDepartment("Ventas", null, null, Now);
+
+        company.UpdateDepartment(department.Id, "VENTAS", "Otra descripcion", null, Now.AddDays(1));
+
+        department.Name.ShouldBe("VENTAS");
+    }
+
+    [Fact]
+    public void A_department_cannot_be_renamed_to_the_name_of_another_one()
+    {
+        var company = CreateCompany();
+        company.AddDepartment("Ventas", null, null, Now);
+        var marketing = company.AddDepartment("Marketing", null, null, Now);
+
+        Should.Throw<DomainException>(() => company.UpdateDepartment(marketing.Id, " ventas", null, null, Now));
+    }
+
+    [Fact]
+    public void A_removed_department_leaves_the_company()
+    {
+        var company = CreateCompany();
+        var department = company.AddDepartment("Ventas", null, null, Now);
+
+        company.RemoveDepartment(department.Id, Now.AddDays(1));
+
+        company.Departments.ShouldBeEmpty();
+        company.FindDepartment(department.Id).ShouldBeNull();
+    }
+
+    [Fact]
+    public void A_department_of_another_company_cannot_be_updated_or_removed()
+    {
+        var company = CreateCompany();
+        var foreign = CreateCompany().AddDepartment("Ventas", null, null, Now);
+
+        Should.Throw<DomainException>(() => company.UpdateDepartment(foreign.Id, "Ventas", null, null, Now));
+        Should.Throw<DomainException>(() => company.RemoveDepartment(foreign.Id, Now));
+    }
+
+    [Fact]
     public void A_department_is_deactivated_instead_of_deleted()
     {
         var company = CreateCompany();
