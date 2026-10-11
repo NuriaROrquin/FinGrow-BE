@@ -140,8 +140,8 @@ administran la plantilla de la empresa del token. Hasta que exista el filtro glo
 ante un recurso de otra empresa, para no confirmar que existe.
 
 - **El alta de un empleado devuelve una contraseña temporal una sola vez**
-  (`CreatedEmployeeResponse`); en la base queda solo el hash. Mandarla por mail es T-17: cuando
-  exista, se engancha en `CreateEmployeeCommandHandler`.
+  (`CreatedEmployeeResponse`); en la base queda solo el hash. Además se le manda por correo
+  (`WelcomeEmail`), encolado en el mismo `SaveChanges` que el empleado.
 - **El email de un empleado es único en toda la plataforma**, no por empresa: es su credencial
   de login.
 - **Eliminar un empleado es definitivo.** La cascada se lleva sus movimientos, metas,
@@ -221,6 +221,21 @@ siguiente corre igual. Un mismo trabajo no corre dos veces a la vez (`RunningJob
   cerrado (por si se confirmaron movimientos tarde) y genera las de los meses anteriores que
   falten desde el alta de la empresa. Las fotos guardan conteos, no porcentajes: la tasa de
   participación se deriva (`PeriodMetrics.ParticipationRate`), fiel a "un total no se persiste".
+
+## Correos
+
+Un correo nunca se manda directo desde un handler: se encola con `OutboundEmail.Queue` en
+`outbound_emails` dentro del mismo `SaveChanges` que el cambio que lo origina, así una falla de
+Resend no deshace ese cambio. El evento `OutboundEmailQueued` dispara el primer intento apenas se
+guarda, y `OutboundEmailDispatcher` (`Application/Features/OutboundEmails/`) registra el resultado:
+`Sent`, `Failed` con el próximo intento, o `Abandoned` después de `OutboundEmail.MaxAttempts`.
+
+- **El cuerpo va cifrado y se borra cuando el correo deja de esperar envío**: puede llevar
+  credenciales. Un `CHECK` impide que un correo enviado o abandonado conserve el cuerpo.
+- **En `Development` todo correo va a `Email:RedirectAllTo`**, no a su destinatario: lo resuelve
+  `ResendEmailSender`, no quien encola.
+- **El cliente de Resend no reintenta**: repetir el `POST` cuando Resend ya lo recibió duplica el
+  correo. Los reintentos son de `outbound_emails`.
 
 ## Eventos de dominio y alertas
 
