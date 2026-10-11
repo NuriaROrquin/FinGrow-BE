@@ -45,7 +45,7 @@ public class UpdateInvestmentHandlerTests
     }
 
     [Fact]
-    public async Task Another_employees_investment_is_reported_as_not_found()
+    public async Task Another_employees_investment_is_reported_as_forbidden()
     {
         var investment = StoredInvestment(Guid.CreateVersion7());
         var command = new UpdateInvestmentCommand(
@@ -60,7 +60,7 @@ public class UpdateInvestmentHandlerTests
         var result = await _handler.Handle(command, CancellationToken.None);
 
         result.IsFailure.ShouldBeTrue();
-        result.Error.Type.ShouldBe(ErrorType.NotFound);
+        result.Error.Type.ShouldBe(ErrorType.Forbidden);
         investment.AssetName.ShouldBe("AL30");
         _unitOfWork.SaveCount.ShouldBe(0);
     }

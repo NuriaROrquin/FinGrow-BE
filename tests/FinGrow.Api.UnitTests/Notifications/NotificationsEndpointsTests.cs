@@ -76,7 +76,7 @@ public class NotificationsEndpointsTests
     }
 
     [Fact]
-    public async Task Reading_a_notification_marks_it_and_someone_else_one_responds_404()
+    public async Task Reading_a_notification_marks_it_and_someone_else_one_responds_403()
     {
         using var factory = new NotificationsWebApplicationFactory();
         var own = factory.Store(NotificationRecipient.Employee(factory.UserId));
@@ -84,12 +84,12 @@ public class NotificationsEndpointsTests
         var client = CreateClient(factory, Rol.Empleado);
 
         var read = await client.PostAsync(new Uri($"{NotificationsPath}/{own.Id}/read", UriKind.Relative), content: null);
-        var notFound = await client.PostAsync(new Uri($"{NotificationsPath}/{foreign.Id}/read", UriKind.Relative), content: null);
+        var forbidden = await client.PostAsync(new Uri($"{NotificationsPath}/{foreign.Id}/read", UriKind.Relative), content: null);
 
         read.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await read.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("isRead").GetBoolean().ShouldBeTrue();
         own.IsRead.ShouldBeTrue();
-        notFound.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        forbidden.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
         foreign.IsRead.ShouldBeFalse();
     }
 

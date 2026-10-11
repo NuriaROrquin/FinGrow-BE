@@ -70,14 +70,14 @@ public class AddGoalContributionHandlerTests
     }
 
     [Fact]
-    public async Task A_goal_of_another_employee_is_reported_as_not_found()
+    public async Task A_goal_of_another_employee_is_reported_as_forbidden()
     {
         var foreignGoal = Goal.Create(Guid.CreateVersion7(), "Auto", Money.From(1000m, Currency.ARS), Today.AddMonths(6), Now);
         _goals.Add(foreignGoal);
 
         var result = await _handler.Handle(Command(foreignGoal.Id), CancellationToken.None);
 
-        result.Error.Type.ShouldBe(ErrorType.NotFound);
+        result.Error.Type.ShouldBe(ErrorType.Forbidden);
         foreignGoal.Contributions.ShouldBeEmpty();
         _unitOfWork.SaveCount.ShouldBe(0);
     }
