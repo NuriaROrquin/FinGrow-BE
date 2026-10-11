@@ -33,6 +33,9 @@ public sealed class FakeEmployeeRepository : IEmployeeRepository
             .OrderBy(employee => employee.FullName, StringComparer.Ordinal)
             .ToList());
 
+    public Task<IReadOnlyList<Employee>> ListByDepartmentAsync(Guid departmentId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Employee>>(Employees.Where(employee => employee.DepartmentId == departmentId).ToList());
+
     public void Add(Employee employee) => Employees.Add(employee);
 
     public void Remove(Employee employee) => Employees.Remove(employee);

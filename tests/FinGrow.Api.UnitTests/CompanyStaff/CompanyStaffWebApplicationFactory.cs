@@ -208,6 +208,9 @@ internal sealed class CompanyStaffWebApplicationFactory : WebApplicationFactory<
                 .OrderBy(employee => employee.FullName, StringComparer.Ordinal)
                 .ToList());
 
+        public Task<IReadOnlyList<Employee>> ListByDepartmentAsync(Guid departmentId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Employee>>(employees.Where(employee => employee.DepartmentId == departmentId).ToList());
+
         public void Add(Employee employee) => employees.Add(employee);
 
         public void Remove(Employee employee) => employees.Remove(employee);

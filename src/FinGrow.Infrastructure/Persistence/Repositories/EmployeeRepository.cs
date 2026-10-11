@@ -35,6 +35,13 @@ internal sealed class EmployeeRepository : IEmployeeRepository
             .OrderBy(employee => employee.FullName)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<Employee>> ListByDepartmentAsync(
+        Guid departmentId,
+        CancellationToken cancellationToken = default) =>
+        await _dbContext.Employees
+            .Where(employee => employee.DepartmentId == departmentId)
+            .ToListAsync(cancellationToken);
+
     public void Add(Employee employee) => _dbContext.Employees.Add(employee);
 
     public void Remove(Employee employee) => _dbContext.Employees.Remove(employee);

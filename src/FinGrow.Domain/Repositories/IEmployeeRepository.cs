@@ -13,6 +13,8 @@ public interface IEmployeeRepository
 
     Task<IReadOnlyList<Employee>> ListByCompanyAsync(Guid companyId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<Employee>> ListByDepartmentAsync(Guid departmentId, CancellationToken cancellationToken = default);
+
     void Add(Employee employee);
 
     void Remove(Employee employee);
