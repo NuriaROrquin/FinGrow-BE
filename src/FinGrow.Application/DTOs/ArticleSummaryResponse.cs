@@ -11,6 +11,7 @@ public sealed record ArticleSummaryResponse(
     EducationCategory Category,
     int ReadingTimeMinutes,
     InvestmentType? RelatedInvestmentType,
+    bool IsInvestmentContent,
     DateTimeOffset PublishedAt)
 {
     public static ArticleSummaryResponse FromEntity(Article article) => new(
@@ -21,5 +22,6 @@ public sealed record ArticleSummaryResponse(
         article.Category,
         article.ReadingTimeMinutes,
         article.RelatedInvestmentType,
+        article.IsInvestmentContent,
         article.PublishedAt!.Value);
 }

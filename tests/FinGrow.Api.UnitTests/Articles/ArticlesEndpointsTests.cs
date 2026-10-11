@@ -53,7 +53,24 @@ public class ArticlesEndpointsTests
         item.GetProperty("slug").GetString().ShouldBe("fondo-de-emergencia");
         item.GetProperty("category").GetString().ShouldBe("Savings");
         item.GetProperty("readingTimeMinutes").GetInt32().ShouldBe(4);
+        item.GetProperty("isInvestmentContent").GetBoolean().ShouldBeFalse();
         item.TryGetProperty("content", out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task An_article_about_an_investment_type_is_marked_as_investment_content()
+    {
+        using var factory = new ArticlesWebApplicationFactory();
+        factory.Articles.Articles.Add(PublishedArticle("cedears-para-principiantes", InvestmentType.Cedear));
+        var client = AuthenticatedClient(factory, Rol.Empleado);
+
+        var list = await client.GetFromJsonAsync<JsonElement>(new Uri("/api/articles", UriKind.Relative));
+        var detail = await client.GetFromJsonAsync<JsonElement>(
+            new Uri("/api/articles/cedears-para-principiantes", UriKind.Relative));
+
+        list[0].GetProperty("relatedInvestmentType").GetString().ShouldBe("Cedear");
+        list[0].GetProperty("isInvestmentContent").GetBoolean().ShouldBeTrue();
+        detail.GetProperty("isInvestmentContent").GetBoolean().ShouldBeTrue();
     }
 
     [Fact]
@@ -122,7 +139,7 @@ public class ArticlesEndpointsTests
         factory.Articles.WasQueried.ShouldBeFalse();
     }
 
-    private static Article PublishedArticle(string slug)
+    private static Article PublishedArticle(string slug, InvestmentType? relatedInvestmentType = null)
     {
         var article = Article.Create(
             slug,
@@ -131,7 +148,7 @@ public class ArticlesEndpointsTests
             "## Por qué\n\nCubre **tres meses** de gastos.",
             EducationCategory.Savings,
             readingTimeMinutes: 4,
-            relatedInvestmentType: null,
+            relatedInvestmentType,
             Now);
         article.Publish(Now);
 

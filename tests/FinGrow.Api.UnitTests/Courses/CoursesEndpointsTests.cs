@@ -58,6 +58,7 @@ public class CoursesEndpointsTests
         item.GetProperty("level").GetString().ShouldBe("Beginner");
         item.GetProperty("category").GetString().ShouldBe("Basics");
         item.GetProperty("relatedInvestmentType").GetString().ShouldBe("Etf");
+        item.GetProperty("isInvestmentContent").GetBoolean().ShouldBeTrue();
         item.GetProperty("durationMinutes").GetInt32().ShouldBe(25);
         item.GetProperty("lessonCount").GetInt32().ShouldBe(2);
         item.GetProperty("completedLessons").GetInt32().ShouldBe(1);
