@@ -26,12 +26,15 @@ public class ArticlesEndpointsTests
         using var factory = new ArticlesWebApplicationFactory();
         var client = AuthenticatedClient(factory, Rol.Empleado);
 
-        var response = await client.GetAsync(new Uri("/api/articles?category=Savings&maxReadingTime=5", UriKind.Relative));
+        var response = await client.GetAsync(new Uri(
+            "/api/articles?category=Savings&maxReadingTime=5&investmentType=Cedear",
+            UriKind.Relative));
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         factory.Articles.WasQueried.ShouldBeTrue();
         factory.Articles.RequestedCategory.ShouldBe(EducationCategory.Savings);
         factory.Articles.RequestedMaxReadingTimeMinutes.ShouldBe(5);
+        factory.Articles.RequestedInvestmentType.ShouldBe(InvestmentType.Cedear);
     }
 
     [Fact]
@@ -84,6 +87,7 @@ public class ArticlesEndpointsTests
     [Theory]
     [InlineData("maxReadingTime=0")]
     [InlineData("category=Astrologia")]
+    [InlineData("investmentType=Oro")]
     public async Task An_invalid_filter_is_rejected_with_400_without_querying_the_database(string query)
     {
         using var factory = new ArticlesWebApplicationFactory();
@@ -156,14 +160,18 @@ public class ArticlesEndpointsTests
 
         public int? RequestedMaxReadingTimeMinutes { get; private set; }
 
+        public InvestmentType? RequestedInvestmentType { get; private set; }
+
         public Task<IReadOnlyList<Article>> ListPublishedAsync(
             EducationCategory? category,
             int? maxReadingTimeMinutes,
+            InvestmentType? relatedInvestmentType,
             CancellationToken cancellationToken = default)
         {
             WasQueried = true;
             RequestedCategory = category;
             RequestedMaxReadingTimeMinutes = maxReadingTimeMinutes;
+            RequestedInvestmentType = relatedInvestmentType;
 
             return Task.FromResult<IReadOnlyList<Article>>(Articles.ToList());
         }

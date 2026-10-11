@@ -28,13 +28,14 @@ public class CoursesEndpointsTests
         var client = AuthenticatedClient(factory, Rol.Empleado);
 
         var response = await client.GetAsync(new Uri(
-            "/api/courses?level=Intermediate&maxDuration=45&status=NotStarted",
+            "/api/courses?level=Intermediate&maxDuration=45&status=NotStarted&investmentType=Crypto",
             UriKind.Relative));
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         factory.Courses.WasQueried.ShouldBeTrue();
         factory.Courses.RequestedLevel.ShouldBe(CourseLevel.Intermediate);
         factory.Courses.RequestedMaxDurationMinutes.ShouldBe(45);
+        factory.Courses.RequestedInvestmentType.ShouldBe(InvestmentType.Crypto);
         factory.Courses.RequestedEmployeeId.ShouldBe(EmployeeId);
     }
 
@@ -69,6 +70,7 @@ public class CoursesEndpointsTests
     [InlineData("maxDuration=-5")]
     [InlineData("level=Experto")]
     [InlineData("status=Terminado")]
+    [InlineData("investmentType=Oro")]
     public async Task An_invalid_filter_is_rejected_with_400_without_querying_the_database(string query)
     {
         using var factory = new CoursesWebApplicationFactory();
@@ -299,16 +301,20 @@ public class CoursesEndpointsTests
 
         public int? RequestedMaxDurationMinutes { get; private set; }
 
+        public InvestmentType? RequestedInvestmentType { get; private set; }
+
         public Guid? RequestedEmployeeId { get; private set; }
 
         public Task<IReadOnlyList<Course>> ListPublishedAsync(
             CourseLevel? level,
             int? maxDurationMinutes,
+            InvestmentType? relatedInvestmentType,
             CancellationToken cancellationToken = default)
         {
             WasQueried = true;
             RequestedLevel = level;
             RequestedMaxDurationMinutes = maxDurationMinutes;
+            RequestedInvestmentType = relatedInvestmentType;
 
             return Task.FromResult<IReadOnlyList<Course>>(Courses.ToList());
         }
