@@ -13,6 +13,7 @@ internal sealed class CreateEmployeeCommandHandler : IRequestHandler<CreateEmplo
     private readonly ICurrentUser _currentUser;
     private readonly ICompanyRepository _companies;
     private readonly IEmployeeRepository _employees;
+    private readonly IOutboundEmailRepository _outboundEmails;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _clock;
@@ -21,6 +22,7 @@ internal sealed class CreateEmployeeCommandHandler : IRequestHandler<CreateEmplo
         ICurrentUser currentUser,
         ICompanyRepository companies,
         IEmployeeRepository employees,
+        IOutboundEmailRepository outboundEmails,
         IPasswordHasher passwordHasher,
         IUnitOfWork unitOfWork,
         IDateTimeProvider clock)
@@ -28,6 +30,7 @@ internal sealed class CreateEmployeeCommandHandler : IRequestHandler<CreateEmplo
         _currentUser = currentUser;
         _companies = companies;
         _employees = employees;
+        _outboundEmails = outboundEmails;
         _passwordHasher = passwordHasher;
         _unitOfWork = unitOfWork;
         _clock = clock;
@@ -69,6 +72,7 @@ internal sealed class CreateEmployeeCommandHandler : IRequestHandler<CreateEmplo
             now);
 
         _employees.Add(employee);
+        _outboundEmails.Add(WelcomeEmail.Queue(employee, company, temporaryPassword, now));
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new CreatedEmployeeResponse(

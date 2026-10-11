@@ -113,6 +113,7 @@ public static class DependencyInjection
         services.AddScoped<IArticleRepository, ArticleRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<INotificationChannelSettingRepository, NotificationChannelSettingRepository>();
+        services.AddScoped<IOutboundEmailRepository, OutboundEmailRepository>();
 
         services.AddScoped<DatabaseSeeder>();
         services.AddScoped<EducationCatalogSeeder>();

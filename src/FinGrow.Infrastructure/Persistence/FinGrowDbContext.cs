@@ -65,6 +65,8 @@ public sealed class FinGrowDbContext : DbContext, IUnitOfWork
 
     public DbSet<NotificationChannelSetting> NotificationChannelSettings => Set<NotificationChannelSetting>();
 
+    public DbSet<OutboundEmail> OutboundEmails => Set<OutboundEmail>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());

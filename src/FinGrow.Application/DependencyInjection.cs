@@ -11,6 +11,7 @@ using Features.Metrics.SnapshotMetrics;
 using Features.Notifications;
 using Features.Notifications.Alerts.GoalProgress;
 using Features.Notifications.Delivery;
+using Features.OutboundEmails;
 using Features.Session;
 using FluentValidation;
 using Jobs;
@@ -41,6 +42,7 @@ public static class DependencyInjection
         services.AddSingleton<IDomainEventDispatcher, DomainEventDispatcher>();
         services.AddScoped<Notifier>();
         services.AddScoped<INotificationSender, TelegramNotificationSender>();
+        services.AddScoped<OutboundEmailDispatcher>();
 
         services.AddSingleton<RunningJobs>();
         services.AddScoped<JobRunner>();
