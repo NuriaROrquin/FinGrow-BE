@@ -849,6 +849,14 @@ public sealed class FakeOutboundEmailRepository : IOutboundEmailRepository
 
     public Task<OutboundEmail?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Emails.FirstOrDefault(email => email.Id == id));
+
+    public Task<IReadOnlyList<Guid>> ListDueIdsAsync(DateTimeOffset now, int take, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>(Emails
+            .Where(email => email.IsAwaitingDelivery && email.NextAttemptAt <= now)
+            .OrderBy(email => email.NextAttemptAt)
+            .Select(email => email.Id)
+            .Take(take)
+            .ToList());
 }
 
 public sealed class FakeEmailSender : IEmailSender

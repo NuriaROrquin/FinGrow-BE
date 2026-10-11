@@ -11,7 +11,7 @@ public class OutboundEmailTests
     private static readonly DateTimeOffset QueuedAt = new(2026, 10, 11, 10, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public void A_queued_email_is_pending_and_due_right_away()
+    public void A_queued_email_is_pending_and_left_to_its_first_attempt_before_the_job_can_take_it()
     {
         var email = Queue();
 
@@ -20,7 +20,7 @@ public class OutboundEmailTests
         email.Recipient.Value.ShouldBe("ana@acme.com");
         email.Subject.ShouldBe("Tu acceso a FinGrow");
         email.Attempts.ShouldBe(0);
-        email.NextAttemptAt.ShouldBe(QueuedAt);
+        email.NextAttemptAt.ShouldBe(QueuedAt + OutboundEmail.FirstAttemptGrace);
         email.CreatedAt.ShouldBe(QueuedAt);
     }
 

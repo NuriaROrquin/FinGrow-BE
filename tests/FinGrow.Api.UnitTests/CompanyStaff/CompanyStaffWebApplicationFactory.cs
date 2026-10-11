@@ -110,6 +110,9 @@ internal sealed class CompanyStaffWebApplicationFactory : WebApplicationFactory<
 
         public Task<OutboundEmail?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
             Task.FromResult(emails.FirstOrDefault(email => email.Id == id));
+
+        public Task<IReadOnlyList<Guid>> ListDueIdsAsync(DateTimeOffset now, int take, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Guid>>(Array.Empty<Guid>());
     }
 
     private sealed class RecordingRefreshTokenRepository(List<Guid> revokedUsers) : IRefreshTokenRepository
