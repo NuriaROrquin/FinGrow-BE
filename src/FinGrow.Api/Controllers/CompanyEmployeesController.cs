@@ -1,7 +1,10 @@
 namespace FinGrow.Api.Controllers;
 
 using FinGrow.Api.Extensions;
+using FinGrow.Api.Contracts;
 using FinGrow.Application.Common;
+using FinGrow.Application.Features.Employees.ChangeEmployeeAccess;
+using FinGrow.Application.Features.Employees.ChangeEmployeeDepartment;
 using FinGrow.Application.Features.Employees.CreateEmployee;
 using FinGrow.Application.Features.Employees.DeleteEmployee;
 using FinGrow.Application.Features.Employees.ListEmployees;
@@ -29,6 +32,22 @@ public sealed class CompanyEmployeesController(ISender sender) : ControllerBase
         UpdateEmployeeCommand command,
         CancellationToken cancellationToken) =>
         (await sender.Send(command with { EmployeeId = employeeId }, cancellationToken)).ToActionResult();
+
+    [HttpPut("{employeeId:guid}/department")]
+    public async Task<IActionResult> ChangeDepartment(
+        Guid employeeId,
+        ChangeEmployeeDepartmentRequest request,
+        CancellationToken cancellationToken) =>
+        (await sender.Send(new ChangeEmployeeDepartmentCommand(employeeId, request.DepartmentId), cancellationToken))
+        .ToActionResult();
+
+    [HttpPut("{employeeId:guid}/access")]
+    public async Task<IActionResult> ChangeAccess(
+        Guid employeeId,
+        ChangeEmployeeAccessRequest request,
+        CancellationToken cancellationToken) =>
+        (await sender.Send(new ChangeEmployeeAccessCommand(employeeId, request.IsActive!.Value), cancellationToken))
+        .ToActionResult();
 
     [HttpDelete("{employeeId:guid}")]
     public async Task<IActionResult> Delete(Guid employeeId, CancellationToken cancellationToken) =>
