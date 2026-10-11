@@ -131,6 +131,41 @@ public class CoursesEndpointsTests
     }
 
     [Fact]
+    public async Task The_learning_progress_summarizes_the_courses_of_the_employee()
+    {
+        using var factory = new CoursesWebApplicationFactory();
+        var course = PublishedCourse();
+        factory.Courses.Courses.Add(course);
+        factory.Courses.CompletedLessonIds.Add(course.Lessons.First().Id);
+        var client = AuthenticatedClient(factory, Rol.Empleado);
+
+        var response = await client.GetAsync(new Uri("/api/courses/progress", UriKind.Relative));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        factory.Courses.RequestedEmployeeId.ShouldBe(EmployeeId);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("courseCount").GetInt32().ShouldBe(1);
+        body.GetProperty("completedCourses").GetInt32().ShouldBe(0);
+        body.GetProperty("inProgressCourses").GetInt32().ShouldBe(1);
+        body.GetProperty("notStartedCourses").GetInt32().ShouldBe(0);
+        body.GetProperty("lessonCount").GetInt32().ShouldBe(2);
+        body.GetProperty("completedLessons").GetInt32().ShouldBe(1);
+        body.GetProperty("progressPercentage").GetInt32().ShouldBe(50);
+    }
+
+    [Fact]
+    public async Task A_company_session_cannot_read_the_learning_progress()
+    {
+        using var factory = new CoursesWebApplicationFactory();
+        var client = AuthenticatedClient(factory, Rol.Empresa);
+
+        var response = await client.GetAsync(new Uri("/api/courses/progress", UriKind.Relative));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        factory.Courses.WasQueried.ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task A_course_that_does_not_exist_is_404()
     {
         using var factory = new CoursesWebApplicationFactory();
