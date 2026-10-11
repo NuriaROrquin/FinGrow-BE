@@ -10,4 +10,10 @@ public interface IEmployeeRepository
     Task<Employee?> GetByEmailAsync(Email email, CancellationToken cancellationToken);
 
     Task<IReadOnlyDictionary<Guid, int>> CountByDepartmentAsync(Guid companyId, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Employee>> ListByCompanyAsync(Guid companyId, CancellationToken cancellationToken = default);
+
+    void Add(Employee employee);
+
+    void Remove(Employee employee);
 }

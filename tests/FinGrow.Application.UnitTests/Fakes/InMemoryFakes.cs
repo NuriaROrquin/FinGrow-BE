@@ -26,6 +26,16 @@ public sealed class FakeEmployeeRepository : IEmployeeRepository
             .Where(employee => employee.CompanyId == companyId && employee.DepartmentId is not null)
             .GroupBy(employee => employee.DepartmentId!.Value)
             .ToDictionary(group => group.Key, group => group.Count()));
+
+    public Task<IReadOnlyList<Employee>> ListByCompanyAsync(Guid companyId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Employee>>(Employees
+            .Where(employee => employee.CompanyId == companyId)
+            .OrderBy(employee => employee.FullName, StringComparer.Ordinal)
+            .ToList());
+
+    public void Add(Employee employee) => Employees.Add(employee);
+
+    public void Remove(Employee employee) => Employees.Remove(employee);
 }
 
 public sealed class FakeCompanyRepository : ICompanyRepository
