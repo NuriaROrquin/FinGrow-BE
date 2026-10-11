@@ -6,12 +6,19 @@ using FinGrow.Domain.Entities;
 using FinGrow.Infrastructure.Persistence.Protection;
 using Microsoft.EntityFrameworkCore;
 
-public sealed class FinGrowDbContext : DbContext, IUnitOfWork
+public sealed partial class FinGrowDbContext : DbContext, IUnitOfWork
 {
     private readonly ISecretProtector _protector;
+    private readonly ICurrentUser _currentUser;
 
-    public FinGrowDbContext(DbContextOptions<FinGrowDbContext> options, ISecretProtector protector) : base(options) =>
+    public FinGrowDbContext(
+        DbContextOptions<FinGrowDbContext> options,
+        ISecretProtector protector,
+        ICurrentUser currentUser) : base(options)
+    {
         _protector = protector;
+        _currentUser = currentUser;
+    }
 
     public DbSet<Company> Companies => Set<Company>();
 
@@ -68,6 +75,7 @@ public sealed class FinGrowDbContext : DbContext, IUnitOfWork
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
+        ApplyTenantFilters(modelBuilder);
 
         var encrypted = new EncryptedStringConverter(_protector);
 

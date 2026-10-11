@@ -132,11 +132,29 @@ confirma o descarta. Telegram lo muestra con botones (`TelegramTransactionCallba
 `callback_data`, limitado a 64 bytes) y `AnswerTelegramCallback` procesa el toque. Para sumar
 WhatsApp alcanza con una capa propia del canal que use esas dos piezas.
 
+## Aislamiento de datos (T-10)
+
+**Entre empresas, lo garantiza la base de datos de EF**: `FinGrowDbContext.Tenancy.cs` registra un
+filtro global con nombre (`Tenant`) en cada entidad, acotado al `ICurrentUser.CompanyId`. Lo que
+cuelga de un empleado (movimientos, metas, etc.) lo hereda preguntando si el dueño es visible.
+Una entidad nueva tiene que aplicar el filtro o figurar en `GlobalEntityTypes`
+(`TenantIsolationRules` rompe el build si no).
+
+- **Sin sesión no hay empresa**: webhooks, trabajos, login y seeders corren sin filtro. Con sesión
+  siempre aplica: un token sin `company_id` no ve ninguna fila.
+- **Lo que cruza empresas a propósito** usa `IgnoreQueryFilters(new[] { FinGrowDbContext.TenantFilter })`
+  y lo justifica con un comentario (el email único de `GetByEmailAsync`, el promedio de votos de un curso).
+- **Un recurso de otra empresa responde `NotFound`**: el filtro hace que ni se vea.
+
+**Entre empleados de la misma empresa el filtro no alcanza**: cada caso de uso compara el dueño con
+`ICurrentUser.UserId`. `Ownership.Require` (`Application/Common/`) resuelve el par: inexistente →
+`NotFound`, de otro empleado → `Forbidden` (403). Usalo en los handlers que cargan un recurso por id.
+
 ## Panel de la empresa
 
 `api/company/departments` y `api/company/employees` (`[Authorize(Roles = Rol.Empresa)]`)
-administran la plantilla de la empresa del token. Hasta que exista el filtro global de T-10,
-**cada handler filtra por `ICurrentUser.CompanyId`** y responde `NotFound` (no `Forbidden`)
+administran la plantilla de la empresa del token. El filtro global de T-10 ya acota las consultas a
+esa empresa, pero **cada handler sigue filtrando por `ICurrentUser.CompanyId`** como segunda barrera y responde `NotFound` (no `Forbidden`)
 ante un recurso de otra empresa, para no confirmar que existe.
 
 - **El alta de un empleado devuelve una contraseña temporal una sola vez**
