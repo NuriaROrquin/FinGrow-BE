@@ -17,9 +17,10 @@ public sealed record TransactionResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     double? AiConfidence,
-    ConfidenceLevel? AiConfidenceLevel)
+    ConfidenceLevel? AiConfidenceLevel,
+    Guid? ReceiptId)
 {
-    public static TransactionResponse FromEntity(Transaction transaction) => new(
+    public static TransactionResponse FromEntity(Transaction transaction, Guid? receiptId) => new(
         transaction.Id,
         transaction.Type,
         transaction.Amount.Amount,
@@ -33,5 +34,6 @@ public sealed record TransactionResponse(
         transaction.CreatedAt,
         transaction.UpdatedAt,
         transaction.AiConfidence,
-        transaction.AiConfidenceLevel);
+        transaction.AiConfidenceLevel,
+        receiptId);
 }

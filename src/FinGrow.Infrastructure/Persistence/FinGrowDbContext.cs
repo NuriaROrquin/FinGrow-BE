@@ -21,6 +21,8 @@ public sealed class FinGrowDbContext : DbContext, IUnitOfWork
 
     public DbSet<Transaction> Transactions => Set<Transaction>();
 
+    public DbSet<TransactionReceipt> TransactionReceipts => Set<TransactionReceipt>();
+
     public DbSet<Budget> Budgets => Set<Budget>();
 
     public DbSet<BudgetCategoryLimit> BudgetCategoryLimits => Set<BudgetCategoryLimit>();

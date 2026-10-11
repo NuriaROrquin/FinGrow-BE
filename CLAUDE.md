@@ -132,6 +132,18 @@ confirma o descarta. Telegram lo muestra con botones (`TelegramTransactionCallba
 `callback_data`, limitado a 64 bytes) y `AnswerTelegramCallback` procesa el toque. Para sumar
 WhatsApp alcanza con una capa propia del canal que use esas dos piezas.
 
+## Archivos subidos
+
+Un archivo nunca se guarda en PostgreSQL: va a `IFileStorage` (`Infrastructure/Storage/S3FileStorage`,
+protocolo S3: Cloudflare R2 desplegado, S3Mock en compose) y la base guarda solo la clave. Los
+comprobantes son `TransactionReceipt` (`Application/Features/Receipts`): nacen sin movimiento
+para que un OCR fallido no pierda la imagen, y la clave la arma el dominio a partir del empleado
+y del id del comprobante. Lo que sume otro tipo de archivo (los audios de HU-14) reutiliza
+`IFileStorage`. Un almacenamiento que no responde llega como `FileStorageUnavailableException`
+y el caso de uso lo traduce a `Unavailable` (503). Los handlers la atrapan; no dejes que
+escape como 500. Un movimiento tiene un solo comprobante, y lo que deja de usar uno lo suelta
+con `Detach()`, no lo borra: el borrado real es del trabajo de limpieza (SCRUM-132).
+
 ## Trabajos programados
 
 No hay scheduler dentro del proceso. Los trabajos implementan `IScheduledJob`

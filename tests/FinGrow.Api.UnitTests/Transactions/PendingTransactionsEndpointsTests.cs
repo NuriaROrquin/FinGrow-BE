@@ -268,6 +268,7 @@ public class PendingTransactionsEndpointsTests
             builder.ConfigureTestServices(services =>
             {
                 services.AddScoped<ITransactionRepository>(_ => new InMemoryTransactionRepository(Transactions));
+                services.AddScoped<ITransactionReceiptRepository, EmptyReceiptRepository>();
                 services.AddScoped<IUnitOfWork, NoOpUnitOfWork>();
             });
         }
@@ -313,6 +314,24 @@ public class PendingTransactionsEndpointsTests
                     && externalReferences.Contains(transaction.ExternalReference))
                 .Select(transaction => transaction.ExternalReference!)
                 .ToHashSet(StringComparer.Ordinal));
+    }
+
+    private sealed class EmptyReceiptRepository : ITransactionReceiptRepository
+    {
+        public void Add(TransactionReceipt receipt)
+        {
+        }
+
+        public Task<TransactionReceipt?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+            Task.FromResult<TransactionReceipt?>(null);
+
+        public Task<TransactionReceipt?> GetByTransactionIdAsync(Guid transactionId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<TransactionReceipt?>(null);
+
+        public Task<IReadOnlyDictionary<Guid, Guid>> GetIdsByTransactionAsync(
+            IReadOnlyCollection<Guid> transactionIds,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyDictionary<Guid, Guid>>(new Dictionary<Guid, Guid>());
     }
 
     private sealed class NoOpUnitOfWork : IUnitOfWork

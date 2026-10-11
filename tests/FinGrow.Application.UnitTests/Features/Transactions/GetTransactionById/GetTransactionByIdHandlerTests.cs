@@ -25,7 +25,7 @@ public class GetTransactionByIdHandlerTests
             DateTimeOffset.UtcNow);
         transactions.Transactions.Add(transaction);
 
-        var handler = new GetTransactionByIdHandler(transactions);
+        var handler = new GetTransactionByIdHandler(transactions, new FakeTransactionReceiptRepository());
         var result = await handler.Handle(new GetTransactionByIdCommand(transaction.Id), CancellationToken.None);
 
         result.IsSuccess.ShouldBeTrue();
@@ -35,7 +35,7 @@ public class GetTransactionByIdHandlerTests
     [Fact]
     public async Task Returns_not_found_for_a_missing_transaction()
     {
-        var handler = new GetTransactionByIdHandler(new FakeTransactionRepository());
+        var handler = new GetTransactionByIdHandler(new FakeTransactionRepository(), new FakeTransactionReceiptRepository());
 
         var result = await handler.Handle(new GetTransactionByIdCommand(Guid.CreateVersion7()), CancellationToken.None);
 

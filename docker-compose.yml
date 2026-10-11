@@ -16,6 +16,20 @@ services:
       timeout: 5s
       retries: 5
 
+  # S3 de mentira para desarrollo: acepta cualquier credencial y crea el bucket al arrancar.
+  # Los archivos se guardan en el volumen, asi que sobreviven a un `docker compose down`.
+  s3:
+    image: adobe/s3mock:5.2.2
+    container_name: fingrow-s3
+    environment:
+      COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: fingrow-receipts
+      COM_ADOBE_TESTING_S3MOCK_STORE_ROOT: /s3mockroot
+      COM_ADOBE_TESTING_S3MOCK_STORE_RETAIN_FILES_ON_EXIT: "true"
+    ports:
+      - "9090:9090"
+    volumes:
+      - fingrow-s3-data:/s3mockroot
+
   api:
     build:
       context: .
@@ -38,6 +52,11 @@ services:
       MercadoPago__FrontendReturnUrl: "${MERCADOPAGO_FRONTEND_RETURN_URL:-http://localhost:3000/dashboard/settings}"
       TokenEncryption__Key: "${TOKEN_ENCRYPTION_KEY:-}"
       Jobs__ApiKey: "${JOBS_API_KEY:-dev-only-jobs-key-change-in-production}"
+      Storage__ServiceUrl: "${STORAGE_SERVICE_URL:-http://s3:9090}"
+      Storage__BucketName: "${STORAGE_BUCKET_NAME:-fingrow-receipts}"
+      Storage__AccessKey: "${STORAGE_ACCESS_KEY:-fingrow}"
+      Storage__SecretKey: "${STORAGE_SECRET_KEY:-fingrow-dev}"
+      Storage__Region: "${STORAGE_REGION:-us-east-1}"
       Cors__AllowedOrigins__0: "http://localhost:3000"
       Jwt__SecretKey: "dev-only-secret-key-change-in-production-32chars"
     ports:
@@ -46,6 +65,8 @@ services:
       db:
         condition: service_healthy
       ai:
+        condition: service_started
+      s3:
         condition: service_started
 
   ai:
@@ -61,3 +82,4 @@ services:
 
 volumes:
   fingrow-db-data:
+  fingrow-s3-data:
