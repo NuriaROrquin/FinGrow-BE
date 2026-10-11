@@ -211,6 +211,9 @@ internal sealed class CompanyStaffWebApplicationFactory : WebApplicationFactory<
         public Task<IReadOnlyList<Employee>> ListByDepartmentAsync(Guid departmentId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<Employee>>(employees.Where(employee => employee.DepartmentId == departmentId).ToList());
 
+        public Task<IReadOnlyList<Employee>> ListByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Employee>>(employees.Where(employee => ids.Contains(employee.Id)).ToList());
+
         public void Add(Employee employee) => employees.Add(employee);
 
         public void Remove(Employee employee) => employees.Remove(employee);

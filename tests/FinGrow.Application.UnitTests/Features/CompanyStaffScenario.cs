@@ -1,6 +1,7 @@
 namespace FinGrow.Application.UnitTests.Features;
 
 using FinGrow.Application.Common;
+using FinGrow.Application.Features.Departments;
 using FinGrow.Application.UnitTests.Fakes;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
@@ -42,18 +43,22 @@ internal sealed class CompanyStaffScenario
 
     public FakeDateTimeProvider Clock { get; } = new(Now);
 
+    public DepartmentResponseBuilder DepartmentResponses => new(Employees);
+
+    public DepartmentManagerEligibility ManagerEligibility => new(Employees);
+
     public static Company CreateCompany(string name, string email) =>
         Company.Create(name, TaxId.From("20123456786"), Email.From(email), "hash", Currency.ARS, CreatedAt);
 
     public Department AddDepartment(string name) => Company.AddDepartment(name, null, null, CreatedAt);
 
-    public Employee AddEmployee(Department? department, Company? company = null, string? email = null)
+    public Employee AddEmployee(Department? department, Company? company = null, string? email = null, string fullName = "Ana Gomez")
     {
         var owner = company ?? Company;
         var employee = Employee.Create(
             owner.Id,
             department?.Id,
-            "Ana Gomez",
+            fullName,
             Email.From(email ?? $"ana.{Guid.NewGuid():N}@acme.com"),
             null,
             "hash",

@@ -17,6 +17,7 @@ using Jobs;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using Features.Account.TwoFactor;
+using Features.Departments;
 
 public static class DependencyInjection
 {
@@ -34,6 +35,8 @@ public static class DependencyInjection
         services.AddScoped<MercadoPagoSynchronizer>();
         services.AddScoped<SessionIssuer>();
         services.AddScoped<TwoFactorAccountFinder>();
+        services.AddScoped<DepartmentResponseBuilder>();
+        services.AddScoped<DepartmentManagerEligibility>();
 
         services.AddSingleton<IDomainEventDispatcher, DomainEventDispatcher>();
         services.AddScoped<Notifier>();

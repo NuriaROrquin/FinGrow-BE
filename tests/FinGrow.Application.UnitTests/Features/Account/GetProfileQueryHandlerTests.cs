@@ -52,7 +52,7 @@ public class GetProfileQueryHandlerTests
     public async Task Returns_the_employee_data_with_company_and_department_names()
     {
         var company = AddCompany();
-        var department = company.AddDepartment("Finanzas", description: null, managerName: null, Now);
+        var department = company.AddDepartment("Finanzas", description: null, managerId: null, Now);
         var employee = AddLoggedInEmployee(company, department.Id, "+54 11 1234-5678");
         employee.UpdateProfile("Ana Gómez", "+54 11 1234-5678", "30123456", new DateOnly(1990, 5, 20), "Av. Corrientes 1234", Now);
 
@@ -73,7 +73,7 @@ public class GetProfileQueryHandlerTests
     public async Task Department_is_empty_when_the_employee_has_none_assigned()
     {
         var company = AddCompany();
-        company.AddDepartment("Finanzas", description: null, managerName: null, Now);
+        company.AddDepartment("Finanzas", description: null, managerId: null, Now);
         AddLoggedInEmployee(company, departmentId: null, phoneNumber: null);
 
         var result = await CreateHandler().Handle(new GetProfileQuery(), CancellationToken.None);

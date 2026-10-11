@@ -13,6 +13,7 @@ internal sealed class ChangeDepartmentStatusCommandHandler
     private readonly ICurrentUser _currentUser;
     private readonly ICompanyRepository _companies;
     private readonly IEmployeeRepository _employees;
+    private readonly DepartmentResponseBuilder _responses;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _clock;
 
@@ -20,12 +21,14 @@ internal sealed class ChangeDepartmentStatusCommandHandler
         ICurrentUser currentUser,
         ICompanyRepository companies,
         IEmployeeRepository employees,
+        DepartmentResponseBuilder responses,
         IUnitOfWork unitOfWork,
         IDateTimeProvider clock)
     {
         _currentUser = currentUser;
         _companies = companies;
         _employees = employees;
+        _responses = responses;
         _unitOfWork = unitOfWork;
         _clock = clock;
     }
@@ -47,7 +50,7 @@ internal sealed class ChangeDepartmentStatusCommandHandler
 
         if (department.IsActive == request.IsActive)
         {
-            return Result.Success(await ToResponseAsync(department, companyId, cancellationToken));
+            return Result.Success(await _responses.BuildAsync(companyId, department, cancellationToken));
         }
 
         var now = _clock.UtcNow;
@@ -75,19 +78,9 @@ internal sealed class ChangeDepartmentStatusCommandHandler
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(await ToResponseAsync(department, companyId, cancellationToken));
+        return Result.Success(await _responses.BuildAsync(companyId, department, cancellationToken));
     }
 
     private static bool IsValidMoveTarget(Company company, Department department, Guid targetId) =>
         targetId != department.Id && company.FindDepartment(targetId) is { IsActive: true };
-
-    private async Task<DepartmentResponse> ToResponseAsync(
-        Department department,
-        Guid companyId,
-        CancellationToken cancellationToken)
-    {
-        var employees = await _employees.CountByDepartmentAsync(companyId, cancellationToken);
-
-        return DepartmentResponse.FromEntity(department, employees.GetValueOrDefault(department.Id));
-    }
 }

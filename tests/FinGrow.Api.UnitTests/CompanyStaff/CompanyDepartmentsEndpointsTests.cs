@@ -3,6 +3,9 @@ namespace FinGrow.Api.UnitTests.CompanyStaff;
 using System.Net;
 using System.Net.Http.Json;
 using FinGrow.Application.Common;
+using FinGrow.Domain.Entities;
+using FinGrow.Domain.Enums;
+using FinGrow.Domain.ValueObjects;
 
 public class CompanyDepartmentsEndpointsTests
 {
@@ -12,18 +15,21 @@ public class CompanyDepartmentsEndpointsTests
     public async Task Creating_a_department_persists_it_in_the_company_of_the_token()
     {
         using var factory = new CompanyStaffWebApplicationFactory();
+        var manager = factory.AddEmployee(department: null, "maria.gonzalez@acme.com");
         var client = factory.CreateCompanyClient();
 
         var response = await client.PostAsJsonAsync(
             new Uri(DepartmentsPath, UriKind.Relative),
-            new { name = "Ventas", description = "Ventas y atención al cliente", managerName = "María González" });
+            new { name = "Ventas", description = "Ventas y atención al cliente", managerId = manager.Id });
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var department = factory.Company.Departments.ShouldHaveSingleItem();
         department.Name.ShouldBe("Ventas");
+        department.ManagerId.ShouldBe(manager.Id);
         var body = await response.Content.ReadAsStringAsync();
         body.ShouldContain($"\"id\":\"{department.Id}\"");
         body.ShouldContain("\"employeeCount\":0");
+        body.ShouldContain($"\"manager\":{{\"id\":\"{manager.Id}\",\"fullName\":\"Ana Gomez\",\"isActive\":true}}");
     }
 
     [Fact]
@@ -77,11 +83,38 @@ public class CompanyDepartmentsEndpointsTests
 
         var response = await client.PutAsJsonAsync(
             new Uri($"{DepartmentsPath}/{sales.Id}", UriKind.Relative),
-            new { name = "Ventas Online", description = "Canal digital", managerName = (string?)null });
+            new { name = "Ventas Online", description = "Canal digital", managerId = (Guid?)null });
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         sales.Name.ShouldBe("Ventas Online");
         sales.Description.ShouldBe("Canal digital");
+    }
+
+    [Fact]
+    public async Task An_employee_of_another_company_cannot_be_assigned_as_manager()
+    {
+        using var factory = new CompanyStaffWebApplicationFactory();
+        var sales = factory.Company.AddDepartment("Ventas", null, null, CompanyStaffWebApplicationFactory.CreatedAt);
+        var outsider = Employee.Create(
+            Guid.CreateVersion7(),
+            null,
+            "Persona Ajena",
+            Email.From("ajena@otra.com"),
+            null,
+            "hash",
+            Currency.ARS,
+            DateOnly.FromDateTime(CompanyStaffWebApplicationFactory.CreatedAt.Date),
+            CompanyStaffWebApplicationFactory.CreatedAt);
+        factory.Employees.Add(outsider);
+        var client = factory.CreateCompanyClient();
+
+        var response = await client.PutAsJsonAsync(
+            new Uri($"{DepartmentsPath}/{sales.Id}", UriKind.Relative),
+            new { name = "Ventas", description = (string?)null, managerId = outsider.Id });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync()).ShouldContain("Department.ManagerNotAvailable");
+        sales.ManagerId.ShouldBeNull();
     }
 
     [Fact]

@@ -15,6 +15,8 @@ public interface IEmployeeRepository
 
     Task<IReadOnlyList<Employee>> ListByDepartmentAsync(Guid departmentId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<Employee>> ListByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default);
+
     void Add(Employee employee);
 
     void Remove(Employee employee);

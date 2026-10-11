@@ -10,7 +10,7 @@ public class ListDepartmentsQueryHandlerTests
     private readonly CompanyStaffScenario _scenario = new();
 
     private ListDepartmentsQueryHandler CreateHandler() =>
-        new(_scenario.CurrentUser, _scenario.Companies, _scenario.Employees);
+        new(_scenario.CurrentUser, _scenario.Companies, _scenario.DepartmentResponses);
 
     [Fact]
     public async Task Lists_the_departments_of_the_company_sorted_by_name_with_their_headcount()
@@ -28,6 +28,23 @@ public class ListDepartmentsQueryHandlerTests
         result.Value[1].Name.ShouldBe("Ventas");
         result.Value.Single(department => department.Id == sales.Id).EmployeeCount.ShouldBe(2);
         result.Value.Single(department => department.Id == it.Id).EmployeeCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Shows_the_name_of_each_manager()
+    {
+        var sales = _scenario.AddDepartment("Ventas");
+        var manager = _scenario.AddEmployee(sales, fullName: "María González");
+        _scenario.Company.UpdateDepartment(sales.Id, "Ventas", null, manager.Id, CompanyStaffScenario.Now);
+        _scenario.AddDepartment("IT");
+
+        var result = await CreateHandler().Handle(new ListDepartmentsQuery(), CancellationToken.None);
+
+        var managed = result.Value.Single(department => department.Id == sales.Id).Manager.ShouldNotBeNull();
+        managed.Id.ShouldBe(manager.Id);
+        managed.FullName.ShouldBe("María González");
+        managed.IsActive.ShouldBeTrue();
+        result.Value.Single(department => department.Name == "IT").Manager.ShouldBeNull();
     }
 
     [Fact]

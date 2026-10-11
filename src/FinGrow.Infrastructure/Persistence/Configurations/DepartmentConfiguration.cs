@@ -20,8 +20,6 @@ internal sealed class DepartmentConfiguration : IEntityTypeConfiguration<Departm
         builder.Property(department => department.Description)
             .HasMaxLength(Department.MaxDescriptionLength);
 
-        builder.Property(department => department.ManagerName)
-            .HasMaxLength(Department.MaxManagerNameLength);
 
         builder.Property(department => department.IsActive).IsRequired();
         builder.Property(department => department.CreatedAt).IsRequired();
@@ -33,6 +31,11 @@ internal sealed class DepartmentConfiguration : IEntityTypeConfiguration<Departm
             .WithMany(company => company.Departments)
             .HasForeignKey(department => department.CompanyId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne<Employee>()
+            .WithMany()
+            .HasForeignKey(department => department.ManagerId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasIndex(department => new { department.CompanyId, department.Name }).IsUnique();
     }

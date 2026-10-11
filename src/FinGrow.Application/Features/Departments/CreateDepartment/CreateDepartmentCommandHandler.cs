@@ -10,17 +10,23 @@ internal sealed class CreateDepartmentCommandHandler : IRequestHandler<CreateDep
 {
     private readonly ICurrentUser _currentUser;
     private readonly ICompanyRepository _companies;
+    private readonly DepartmentManagerEligibility _managers;
+    private readonly DepartmentResponseBuilder _responses;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _clock;
 
     public CreateDepartmentCommandHandler(
         ICurrentUser currentUser,
         ICompanyRepository companies,
+        DepartmentManagerEligibility managers,
+        DepartmentResponseBuilder responses,
         IUnitOfWork unitOfWork,
         IDateTimeProvider clock)
     {
         _currentUser = currentUser;
         _companies = companies;
+        _managers = managers;
+        _responses = responses;
         _unitOfWork = unitOfWork;
         _clock = clock;
     }
@@ -38,9 +44,15 @@ internal sealed class CreateDepartmentCommandHandler : IRequestHandler<CreateDep
             return Result.Failure<DepartmentResponse>(DepartmentErrors.NameTaken(request.Name));
         }
 
-        var department = company.AddDepartment(request.Name, request.Description, request.ManagerName, _clock.UtcNow);
+        if (request.ManagerId is { } managerId
+            && !await _managers.IsEligibleAsync(managerId, companyId, cancellationToken))
+        {
+            return Result.Failure<DepartmentResponse>(DepartmentErrors.ManagerNotAvailable);
+        }
+
+        var department = company.AddDepartment(request.Name, request.Description, request.ManagerId, _clock.UtcNow);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(DepartmentResponse.FromEntity(department, employeeCount: 0));
+        return Result.Success(await _responses.BuildAsync(companyId, department, cancellationToken));
     }
 }

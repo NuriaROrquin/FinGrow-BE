@@ -42,6 +42,14 @@ internal sealed class EmployeeRepository : IEmployeeRepository
             .Where(employee => employee.DepartmentId == departmentId)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<Employee>> ListByIdsAsync(
+        IReadOnlyCollection<Guid> ids,
+        CancellationToken cancellationToken = default) =>
+        await _dbContext.Employees
+            .AsNoTracking()
+            .Where(employee => ids.Contains(employee.Id))
+            .ToListAsync(cancellationToken);
+
     public void Add(Employee employee) => _dbContext.Employees.Add(employee);
 
     public void Remove(Employee employee) => _dbContext.Employees.Remove(employee);

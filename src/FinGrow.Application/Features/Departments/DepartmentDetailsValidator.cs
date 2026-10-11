@@ -9,7 +9,7 @@ internal interface IDepartmentDetails
 
     string? Description { get; }
 
-    string? ManagerName { get; }
+    Guid? ManagerId { get; }
 }
 
 internal sealed class DepartmentDetailsValidator : AbstractValidator<IDepartmentDetails>
@@ -28,9 +28,8 @@ internal sealed class DepartmentDetailsValidator : AbstractValidator<IDepartment
             .When(details => details.Description is not null)
             .WithMessage($"La descripción no puede superar los {Department.MaxDescriptionLength} caracteres.");
 
-        RuleFor(details => details.ManagerName)
-            .Must(managerName => managerName!.Trim().Length <= Department.MaxManagerNameLength)
-            .When(details => details.ManagerName is not null)
-            .WithMessage($"El nombre del responsable no puede superar los {Department.MaxManagerNameLength} caracteres.");
+        RuleFor(details => details.ManagerId)
+            .NotEqual(Guid.Empty)
+            .WithMessage("El responsable tiene que ser un empleado de tu empresa.");
     }
 }

@@ -11,13 +11,16 @@ internal sealed class ListDepartmentsQueryHandler
 {
     private readonly ICurrentUser _currentUser;
     private readonly ICompanyRepository _companies;
-    private readonly IEmployeeRepository _employees;
+    private readonly DepartmentResponseBuilder _responses;
 
-    public ListDepartmentsQueryHandler(ICurrentUser currentUser, ICompanyRepository companies, IEmployeeRepository employees)
+    public ListDepartmentsQueryHandler(
+        ICurrentUser currentUser,
+        ICompanyRepository companies,
+        DepartmentResponseBuilder responses)
     {
         _currentUser = currentUser;
         _companies = companies;
-        _employees = employees;
+        _responses = responses;
     }
 
     public async Task<Result<IReadOnlyList<DepartmentResponse>>> Handle(
@@ -30,11 +33,10 @@ internal sealed class ListDepartmentsQueryHandler
             return Result.Failure<IReadOnlyList<DepartmentResponse>>(DepartmentErrors.NoAutenticado);
         }
 
-        var employees = await _employees.CountByDepartmentAsync(companyId, cancellationToken);
-
-        return Result.Success<IReadOnlyList<DepartmentResponse>>(company.Departments
+        var departments = company.Departments
             .OrderBy(department => department.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(department => DepartmentResponse.FromEntity(department, employees.GetValueOrDefault(department.Id)))
-            .ToList());
+            .ToList();
+
+        return Result.Success(await _responses.BuildAsync(companyId, departments, cancellationToken));
     }
 }
