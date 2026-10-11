@@ -112,6 +112,10 @@ variables de entorno usando `__` como separador de sección.
 | `CoinGecko:CacheMinutes` | `CoinGecko__CacheMinutes` | Minutos que se reutilizan los precios bajados (default 10) |
 | `CoinGecko:TopCoins` | `CoinGecko__TopCoins` | Cuántas criptomonedas, de mayor a menor capitalización, se cotizan (default y máximo 250) |
 | `Cors:AllowedOrigins` | `Cors__AllowedOrigins__0` | Orígenes habilitados para el frontend |
+| `Email:ResendApiKey` | `Email__ResendApiKey` | API key de [Resend](https://resend.com/api-keys), el proveedor de los correos transaccionales (por ejemplo, las credenciales del alta de un empleado) |
+| `Email:From` | `Email__From` | Remitente de los correos. Tiene que ser una dirección del dominio verificado en Resend (default `FinGrow <no-reply@fingrow.com.ar>`) |
+| `Email:RedirectAllTo` | `Email__RedirectAllTo` | Si tiene valor, todos los correos van a esa dirección en lugar de a su destinatario, que queda en el asunto (`[Para ana@empresa.com] ...`). En `Development` es `delivered@resend.dev`, una casilla de prueba de Resend que acepta el correo sin entregarlo a nadie: para verlo en tu bandeja, pisala con tu dirección. En producción va vacía |
+| `Email:TimeoutSeconds` | `Email__TimeoutSeconds` | Timeout de cada envío a Resend (default 30) |
 | `Storage:ServiceUrl` | `Storage__ServiceUrl` | URL del almacenamiento compatible con S3 donde viven los comprobantes. En Cloudflare R2 es `https://<account-id>.r2.cloudflarestorage.com`; en desarrollo, el S3Mock de compose (`http://localhost:9090`). Ver [Comprobantes](#comprobantes-cloudflare-r2) |
 | `Storage:BucketName` | `Storage__BucketName` | Bucket de los comprobantes. Uno por entorno, siempre privado |
 | `Storage:AccessKey` | `Storage__AccessKey` | Access Key ID del token de API de R2 |
@@ -132,9 +136,10 @@ dotnet user-secrets set "Telegram:BotToken" "<token del bot>" --project src/FinG
 dotnet user-secrets set "Telegram:WebhookSecret" "<secreto inventado para el webhook>" --project src/FinGrow.Api
 dotnet user-secrets set "TokenEncryption:Key" "$(openssl rand -base64 32)" --project src/FinGrow.Api
 dotnet user-secrets set "Jobs:ApiKey" "$(openssl rand -base64 24)" --project src/FinGrow.Api
+dotnet user-secrets set "Email:ResendApiKey" "<API key de Resend>" --project src/FinGrow.Api
 ```
 
-Si `Jwt:SecretKey`, `AiService:ApiKey` o las credenciales de Twilio o Telegram faltan, la API no arranca y
+Si `Jwt:SecretKey`, `AiService:ApiKey`, las credenciales de Twilio o Telegram, o la API key de Resend faltan, la API no arranca y
 el log dice cuál es. Con `dotnet run` contra una FinGrow-AI levantada con `uvicorn` y `API_KEY`
 vacía, `AiService:ApiKey` puede ser cualquier texto porque la IA no lo valida. Con Docker y en
 producción los dos servicios tienen que compartir el mismo valor.
