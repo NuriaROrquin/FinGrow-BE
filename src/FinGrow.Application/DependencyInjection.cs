@@ -52,6 +52,7 @@ public static class DependencyInjection
 
         services.AddSingleton<IDomainEventDispatcher, DomainEventDispatcher>();
         services.AddScoped<Notifier>();
+        services.AddScoped<INotificationSender, EmailNotificationSender>();
         services.AddScoped<INotificationSender, TelegramNotificationSender>();
         services.AddScoped<OutboundEmailDispatcher>();
 

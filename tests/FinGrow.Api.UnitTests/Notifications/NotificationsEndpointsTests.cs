@@ -120,9 +120,10 @@ public class NotificationsEndpointsTests
             new { isEnabled = false });
 
         var names = channels.EnumerateArray().Select(channel => channel.GetProperty("channel").GetString()).ToList();
-        names.Count.ShouldBe(2);
+        names.Count.ShouldBe(3);
         names.ShouldContain("InApp");
         names.ShouldContain("Telegram");
+        names.ShouldContain("Email");
         change.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await change.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("isEnabled").GetBoolean().ShouldBeFalse();
         var stored = factory.ChannelSettings.ShouldHaveSingleItem();

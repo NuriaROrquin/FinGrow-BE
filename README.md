@@ -468,9 +468,10 @@ pasos, siempre en este orden:
 2. **Persistencia.** La notificación queda en la tabla `notifications`, que es la bandeja de la
    app y el historial de todo lo que se avisó. Por eso la bandeja no se puede apagar.
 3. **Entrega.** Se empuja al instante a las pestañas abiertas del destinatario (SignalR, ver más
-   abajo) y se manda además por cada canal externo que el empleado no haya desactivado. Hoy el
-   único externo es Telegram, y solo si el empleado tiene el chat vinculado. Si un canal falla,
-   se loguea y la notificación queda igual en la bandeja.
+   abajo) y se manda además por cada canal externo que el empleado no haya desactivado. Telegram
+   requiere tener el chat vinculado; las alertas `BudgetWarning` y `BudgetExceeded` también se
+   encolan como email en `outbound_emails` para que las entregue el job de correos con reintentos.
+   Si un canal falla, se loguea y la notificación queda igual en la bandeja.
 
 El destinatario puede ser un empleado o la empresa (`recipient_type`), así que la misma bandeja
 sirve para las alertas de bienestar del panel de empresa. Los canales externos son solo para
