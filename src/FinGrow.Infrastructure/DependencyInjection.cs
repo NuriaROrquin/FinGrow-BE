@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using Amazon.Runtime;
 using Amazon.S3;
+using FinGrow.Application.Features.Receipts.Cleanup;
 using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Repositories;
 using FinGrow.Infrastructure.Ai;
@@ -327,6 +328,12 @@ public static class DependencyInjection
         });
 
         services.AddSingleton<IFileStorage, S3FileStorage>();
+
+        services.AddOptions<ReceiptsCleanupOptions>()
+            .Bind(configuration.GetSection(ReceiptsCleanupOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddSingleton(provider => provider.GetRequiredService<IOptions<ReceiptsCleanupOptions>>().Value);
 
         return services;
     }
