@@ -281,6 +281,14 @@ public class TelegramWebhookTests
             AnsweredCallbacks.Add(callbackQueryId);
             return Task.CompletedTask;
         }
+
+        public List<string> DownloadedFiles { get; } = new();
+
+        public Task<ReadOnlyMemory<byte>> DownloadFileAsync(string fileId, CancellationToken cancellationToken = default)
+        {
+            DownloadedFiles.Add(fileId);
+            return Task.FromResult<ReadOnlyMemory<byte>>(new byte[] { 1, 2, 3 });
+        }
     }
 
     private sealed class SupermarketAiService : IAiService
