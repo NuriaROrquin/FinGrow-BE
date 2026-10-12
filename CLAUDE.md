@@ -211,7 +211,12 @@ y del id del comprobante. Lo que sume otro tipo de archivo (los audios de HU-14)
 `IFileStorage`. Un almacenamiento que no responde llega como `FileStorageUnavailableException`
 y el caso de uso lo traduce a `Unavailable` (503). Los handlers la atrapan; no dejes que
 escape como 500. Un movimiento tiene un solo comprobante, y lo que deja de usar uno lo suelta
-con `Detach()`, no lo borra: el borrado real es del trabajo de limpieza (SCRUM-132).
+con `Detach()`, no lo borra: el borrado real es exclusivo de `receipts-cleanup`
+(`Application/Features/Receipts/Cleanup/`), que borra los sueltos pasado el período de gracia
+(`ReceiptsCleanup:GraceDays`, medido desde `UploadedAt`). Primero borra el archivo y después la
+fila, y guarda todas las filas juntas al final: si se corta a mitad de camino, quedan filas cuyo
+archivo ya no existe, y la corrida siguiente las limpia porque borrar un archivo inexistente no
+falla. Al revés quedaría un archivo sin fila que nadie volvería a encontrar.
 
 ## Trabajos programados
 
