@@ -129,8 +129,13 @@ sabe de qué canal viene el texto: `ChatTransactionProposer` le pide a FinGrow-A
 interprete y crea el movimiento como `Pending` (con `external_reference` = canal + id del
 mensaje, para que un reintento del webhook no lo duplique), y `ChatTransactionReviewer` lo
 confirma o descarta. Telegram lo muestra con botones (`TelegramTransactionCallback` arma y lee el
-`callback_data`, limitado a 64 bytes) y `AnswerTelegramCallback` procesa el toque. Para sumar
-WhatsApp alcanza con una capa propia del canal que use esas dos piezas.
+`callback_data`, limitado a 64 bytes) y `AnswerTelegramCallback` procesa el toque. WhatsApp
+(HU-14) no tiene botones en TwiML: `WhatsAppProposalReviewer` aplica un SÍ, un NO o el número
+del medio de pago (`WhatsAppReviewReply`) a la última propuesta de WhatsApp pendiente de las
+últimas 24 horas, y cualquier otro texto es un movimiento nuevo. Las notas de voz las baja y
+transcribe `WhatsAppVoiceNoteTranscriber`. Todo el procesamiento de un mensaje de WhatsApp corre
+con un tope de 12 segundos (`ProcessingBudget`) porque la respuesta va en el cuerpo del webhook
+y Twilio corta a los 15: no lo subas ni lo saques sin mirar ese límite.
 
 ## Aislamiento de datos (T-10)
 
@@ -207,8 +212,8 @@ Un archivo nunca se guarda en PostgreSQL: va a `IFileStorage` (`Infrastructure/S
 protocolo S3: Cloudflare R2 desplegado, S3Mock en compose) y la base guarda solo la clave. Los
 comprobantes son `TransactionReceipt` (`Application/Features/Receipts`): nacen sin movimiento
 para que un OCR fallido no pierda la imagen, y la clave la arma el dominio a partir del empleado
-y del id del comprobante. Lo que sume otro tipo de archivo (los audios de HU-14) reutiliza
-`IFileStorage`. Un almacenamiento que no responde llega como `FileStorageUnavailableException`
+y del id del comprobante. Lo que sume otro tipo de archivo reutiliza `IFileStorage`. Los audios
+de WhatsApp (HU-14) no se guardan, por decisión de producto: se transcriben y se descartan. Un almacenamiento que no responde llega como `FileStorageUnavailableException`
 y el caso de uso lo traduce a `Unavailable` (503). Los handlers la atrapan; no dejes que
 escape como 500. Un movimiento tiene un solo comprobante, y lo que deja de usar uno lo suelta
 con `Detach()`, no lo borra: el borrado real es exclusivo de `receipts-cleanup`
