@@ -31,7 +31,10 @@ internal sealed class EmployeeIntegrationRepository : IEmployeeIntegrationReposi
         IntegrationProvider provider,
         CancellationToken cancellationToken = default) =>
         await _dbContext.EmployeeIntegrations
-            .Where(integration => integration.Provider == provider && integration.Grant != null)
+            .Where(integration =>
+                integration.Provider == provider
+                && integration.Grant != null
+                && integration.Status == IntegrationStatus.Active)
             .OrderBy(integration => integration.LastSyncedAt)
             .ToListAsync(cancellationToken);
 

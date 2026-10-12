@@ -13,6 +13,7 @@ public class CreateEmployeeCommandHandlerTests
             _scenario.CurrentUser,
             _scenario.Companies,
             _scenario.Employees,
+            _scenario.OutboundEmails,
             _scenario.PasswordHasher,
             _scenario.UnitOfWork,
             _scenario.Clock);
@@ -141,4 +142,50 @@ public class CreateEmployeeCommandHandlerTests
     [Fact]
     public void Validator_accepts_an_employee_without_phone_or_department() =>
         IsValid(new CreateEmployeeCommand("Ana Gómez", "ana@acme.com", "  ", null)).ShouldBeTrue();
+
+    [Fact]
+    public async Task The_welcome_email_with_the_temporary_password_is_queued_together_with_the_employee()
+    {
+        var result = await CreateHandler().Handle(
+            new CreateEmployeeCommand("Juan Pérez", "juan.perez@acme.com", null, null),
+            CancellationToken.None);
+
+        var email = _scenario.OutboundEmails.Emails.ShouldHaveSingleItem();
+        email.Recipient.Value.ShouldBe("juan.perez@acme.com");
+        email.Subject.ShouldBe(WelcomeEmail.Subject);
+        email.Status.ShouldBe(OutboundEmailStatus.Pending);
+        email.TextBody.ShouldNotBeNull();
+        email.TextBody.ShouldContain("Juan Pérez");
+        email.TextBody.ShouldContain("Acme S.A.");
+        email.TextBody.ShouldContain("juan.perez@acme.com");
+        email.TextBody.ShouldContain(result.Value.TemporaryPassword);
+        email.HtmlBody.ShouldNotBeNull();
+        email.HtmlBody.ShouldContain(result.Value.TemporaryPassword);
+        _scenario.UnitOfWork.SaveCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task The_html_of_the_welcome_email_escapes_the_employee_name()
+    {
+        await CreateHandler().Handle(
+            new CreateEmployeeCommand("Ana <b>Gómez</b>", "ana@acme.com", null, null),
+            CancellationToken.None);
+
+        var email = _scenario.OutboundEmails.Emails.ShouldHaveSingleItem();
+        email.HtmlBody.ShouldNotBeNull();
+        email.HtmlBody.ShouldContain("Ana &lt;b&gt;");
+        email.HtmlBody.ShouldNotContain("<b>Gómez</b>");
+    }
+
+    [Fact]
+    public async Task A_rejected_registration_queues_no_email()
+    {
+        _scenario.AddEmployee(department: null, email: "ana@acme.com");
+
+        await CreateHandler().Handle(
+            new CreateEmployeeCommand("Ana Gómez", "ana@acme.com", null, null),
+            CancellationToken.None);
+
+        _scenario.OutboundEmails.Emails.ShouldBeEmpty();
+    }
 }

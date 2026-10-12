@@ -129,19 +129,52 @@ sabe de qué canal viene el texto: `ChatTransactionProposer` le pide a FinGrow-A
 interprete y crea el movimiento como `Pending` (con `external_reference` = canal + id del
 mensaje, para que un reintento del webhook no lo duplique), y `ChatTransactionReviewer` lo
 confirma o descarta. Telegram lo muestra con botones (`TelegramTransactionCallback` arma y lee el
-`callback_data`, limitado a 64 bytes) y `AnswerTelegramCallback` procesa el toque. Para sumar
-WhatsApp alcanza con una capa propia del canal que use esas dos piezas.
+`callback_data`, limitado a 64 bytes) y `AnswerTelegramCallback` procesa el toque. WhatsApp
+(HU-14) no tiene botones en TwiML: `WhatsAppProposalReviewer` aplica un SÍ, un NO o el número
+del medio de pago (`WhatsAppReviewReply`) a la última propuesta de WhatsApp pendiente de las
+últimas 24 horas, y cualquier otro texto es un movimiento nuevo. Las notas de voz de los dos
+canales (HU-14 y HU-71) las transcribe `ChatVoiceNoteTranscriber`; cada canal le pasa cómo
+bajar el audio (Twilio o `getFile` del Bot API). Todo el procesamiento de un mensaje de WhatsApp
+corre con un tope de 12 segundos (`ProcessingBudget`) porque la respuesta va en el cuerpo del webhook
+y Twilio corta a los 15: no lo subas ni lo saques sin mirar ese límite.
+
+**IOL (T-34) es la única integración que recibe una contraseña.** `POST /api/integrations/iol/link`
+la canjea por tokens en el momento y la descarta. `LinkIolCommand` redefine `PrintMembers` para
+que un log del comando no la imprima, e `IolAuthClient` no pone cuerpos de pedido ni de respuesta
+en sus excepciones. No le agregues la política de reintentos de Polly: repetir un refresh que IOL
+ya procesó puede invalidar el refresh token nuevo. Quien llame a IOL pide el bearer a
+`IolAccessTokenProvider`, que lo renueva y, si IOL rechaza el refresh token, deja la integración
+en `IntegrationStatus.Error` con `ErrorReason`. `ListAuthorizedAsync` excluye las integraciones
+en error, así que un trabajo de sincronización no las vuelve a intentar.
+
+## Aislamiento de datos (T-10)
+
+**Entre empresas, lo garantiza la base de datos de EF**: `FinGrowDbContext.Tenancy.cs` registra un
+filtro global con nombre (`Tenant`) en cada entidad, acotado al `ICurrentUser.CompanyId`. Lo que
+cuelga de un empleado (movimientos, metas, etc.) lo hereda preguntando si el dueño es visible.
+Una entidad nueva tiene que aplicar el filtro o figurar en `GlobalEntityTypes`
+(`TenantIsolationRules` rompe el build si no).
+
+- **Sin sesión no hay empresa**: webhooks, trabajos, login y seeders corren sin filtro. Con sesión
+  siempre aplica: un token sin `company_id` no ve ninguna fila.
+- **Lo que cruza empresas a propósito** usa `IgnoreQueryFilters(new[] { FinGrowDbContext.TenantFilter })`
+  y lo justifica con un comentario (el email único de `GetByEmailAsync`, el promedio de votos de un curso).
+- **Un recurso de otra empresa responde `NotFound`**: el filtro hace que ni se vea.
+
+**Entre empleados de la misma empresa el filtro no alcanza**: cada caso de uso compara el dueño con
+`ICurrentUser.UserId`. `Ownership.Require` (`Application/Common/`) resuelve el par: inexistente →
+`NotFound`, de otro empleado → `Forbidden` (403). Usalo en los handlers que cargan un recurso por id.
 
 ## Panel de la empresa
 
 `api/company/departments` y `api/company/employees` (`[Authorize(Roles = Rol.Empresa)]`)
-administran la plantilla de la empresa del token. Hasta que exista el filtro global de T-10,
-**cada handler filtra por `ICurrentUser.CompanyId`** y responde `NotFound` (no `Forbidden`)
+administran la plantilla de la empresa del token. El filtro global de T-10 ya acota las consultas a
+esa empresa, pero **cada handler sigue filtrando por `ICurrentUser.CompanyId`** como segunda barrera y responde `NotFound` (no `Forbidden`)
 ante un recurso de otra empresa, para no confirmar que existe.
 
 - **El alta de un empleado devuelve una contraseña temporal una sola vez**
-  (`CreatedEmployeeResponse`); en la base queda solo el hash. Mandarla por mail es T-17: cuando
-  exista, se engancha en `CreateEmployeeCommandHandler`.
+  (`CreatedEmployeeResponse`); en la base queda solo el hash. Además se le manda por correo
+  (`WelcomeEmail`), encolado en el mismo `SaveChanges` que el empleado.
 - **El email de un empleado es único en toda la plataforma**, no por empresa: es su credencial
   de login.
 - **Eliminar un empleado es definitivo.** La cascada se lleva sus movimientos, metas,
@@ -189,11 +222,18 @@ Un archivo nunca se guarda en PostgreSQL: va a `IFileStorage` (`Infrastructure/S
 protocolo S3: Cloudflare R2 desplegado, S3Mock en compose) y la base guarda solo la clave. Los
 comprobantes son `TransactionReceipt` (`Application/Features/Receipts`): nacen sin movimiento
 para que un OCR fallido no pierda la imagen, y la clave la arma el dominio a partir del empleado
-y del id del comprobante. Lo que sume otro tipo de archivo (los audios de HU-14) reutiliza
-`IFileStorage`. Un almacenamiento que no responde llega como `FileStorageUnavailableException`
+y del id del comprobante. Lo que sume otro tipo de archivo reutiliza `IFileStorage`. Las notas
+de voz de WhatsApp y Telegram (HU-14 y HU-71) no se guardan, por decisión de producto: se
+transcriben y se descartan. Un almacenamiento que no responde llega como
+`FileStorageUnavailableException`
 y el caso de uso lo traduce a `Unavailable` (503). Los handlers la atrapan; no dejes que
 escape como 500. Un movimiento tiene un solo comprobante, y lo que deja de usar uno lo suelta
-con `Detach()`, no lo borra: el borrado real es del trabajo de limpieza (SCRUM-132).
+con `Detach()`, no lo borra: el borrado real es exclusivo de `receipts-cleanup`
+(`Application/Features/Receipts/Cleanup/`), que borra los sueltos pasado el período de gracia
+(`ReceiptsCleanup:GraceDays`, medido desde `UploadedAt`). Primero borra el archivo y después la
+fila, y guarda todas las filas juntas al final: si se corta a mitad de camino, quedan filas cuyo
+archivo ya no existe, y la corrida siguiente las limpia porque borrar un archivo inexistente no
+falla. Al revés quedaría un archivo sin fila que nadie volvería a encontrar.
 
 ## Trabajos programados
 
@@ -221,6 +261,79 @@ siguiente corre igual. Un mismo trabajo no corre dos veces a la vez (`RunningJob
   cerrado (por si se confirmaron movimientos tarde) y genera las de los meses anteriores que
   falten desde el alta de la empresa. Las fotos guardan conteos, no porcentajes: la tasa de
   participación se deriva (`PeriodMetrics.ParticipationRate`), fiel a "un total no se persiste".
+
+## Panel empresarial y anonimización
+
+La empresa nunca ve datos de una persona identificable. La anonimización se garantiza en
+Application, antes de serializar la respuesta, y no escondiendo columnas en el frontend.
+
+- **Las métricas empresariales siempre son agregadas.** Los endpoints
+  `GET /api/company/metrics` y `GET /api/company/departments/{departmentId}/metrics` leen
+  `CompanyMetricsSnapshot` o `DepartmentMetricsSnapshot`; no consultan ni proyectan empleados,
+  movimientos, metas o inversiones individuales.
+- **El umbral mínimo es configurable por alcance y por defecto es de tres empleados activos.**
+  `MetricsAnonymizationPolicy` (`Application/Features/Metrics/`) lee
+  `Metrics:CompanyMinimumEmployees` para métricas de empresa y
+  `Metrics:DepartmentMinimumEmployees` para métricas de departamento. Se configuran por
+  variables de entorno como `Metrics__CompanyMinimumEmployees` y
+  `Metrics__DepartmentMinimumEmployees`. En Docker Compose se pasan desde
+  `METRICS_COMPANY_MINIMUM_EMPLOYEES` y `METRICS_DEPARTMENT_MINIMUM_EMPLOYEES`, ambos con
+  valor predeterminado 3. Cada handler rechaza la métrica si el período tiene menos empleados
+  que su umbral. No devuelvas el dato parcialmente ni completes el resultado con ceros para
+  ocultarlo.
+- **Las respuestas usan DTOs exclusivos del panel.** `CompanyMetricsResponse` y
+  `DepartmentMetricsResponse` solo pueden contener períodos, conteos, tasas y promedios
+  agregados. No agregues `EmployeeId`, `UserId`, nombres, emails, `TransactionId`, `GoalId`,
+  `InvestmentId` ni colecciones de entidades personales.
+- **El mapeo al DTO es explícito.** No serialices snapshots, entidades ni `PeriodMetrics`
+  directamente desde un controller o handler. Si se agrega un campo al modelo, debe evaluarse
+  expresamente si puede formar parte del contrato anonimizado.
+- **El alcance de empresa se verifica siempre.** El handler usa el `CompanyId` de
+  `ICurrentUser`; el acceso a un departamento de otra empresa se trata como inexistente y no
+  confirma que el recurso existe.
+- **Toda modificación del contrato debe tener una prueba.** Los tests deben comprobar el umbral
+  de tres empleados, el aislamiento entre empresas y que la respuesta serializada no expone
+  identificadores, montos, saldos ni movimientos individuales. Un test arquitectónico debe
+  fallar si los DTOs incorporan propiedades identificables.
+
+## Puntaje de salud financiera
+
+La fórmula está en `FinancialHealthFactors` (`Domain/ValueObjects/`) y explicada en el README;
+la aplica `FinancialHealthScorer` (`Application/Features/Metrics/FinancialHealth/`) dentro de
+`metrics-snapshot`. Lo que no se deduce leyendo:
+
+- **Sin actividad suficiente no hay puntaje, y eso no es un cero** (`HasEnoughActivity`: 10
+  movimientos confirmados y algún ingreso en el mes). Un cero es alguien con actividad al que le
+  va mal; la ausencia de fila es "no se puede medir". No completes con ceros.
+- **El puntaje sí se persiste**, a diferencia de los totales: es el resultado de una fórmula en
+  una fecha (`computed_at`), no la suma de partes editables. Factores y puntaje se escriben
+  juntos (`Compute`/`Refresh`), nunca uno sin el otro.
+- **El empleado nunca ve su puntaje y la empresa solo lo ve agregado.** Las fotos guardan cuántos
+  empleados tienen puntaje y la suma, y el promedio se deriva. No expongas
+  `financial_health_scores` por empleado en ningún endpoint.
+- **`ahorro_inversion` es ahorro, no gasto**, en el factor de ahorro y en el colchón.
+- **Un factor que falta no vale cero:** sin presupuesto del mes o sin metas con cuota, su peso se
+  reparte entre los demás.
+- **Sin MEP no se fotografía el mes** de una empresa con movimientos en dólares: la corrida queda
+  fallida y la siguiente genera la foto que falta. No conviertas con una cotización inventada ni
+  guardes una foto con parte de la plantilla sin puntuar.
+
+## Correos
+
+Un correo nunca se manda directo desde un handler: se encola con `OutboundEmail.Queue` en
+`outbound_emails` dentro del mismo `SaveChanges` que el cambio que lo origina, así una falla de
+Resend no deshace ese cambio. El evento `OutboundEmailQueued` dispara el primer intento apenas se
+guarda, y `OutboundEmailDispatcher` (`Application/Features/OutboundEmails/`) registra el resultado:
+`Sent`, `Failed` con el próximo intento, o `Abandoned` después de `OutboundEmail.MaxAttempts`.
+Los reintentos los hace el trabajo `email-delivery`. Un correo recién encolado le pertenece a su
+primer intento durante `OutboundEmail.FirstAttemptGrace`: así el trabajo no lo manda a la vez.
+
+- **El cuerpo va cifrado y se borra cuando el correo deja de esperar envío**: puede llevar
+  credenciales. Un `CHECK` impide que un correo enviado o abandonado conserve el cuerpo.
+- **En `Development` todo correo va a `Email:RedirectAllTo`**, no a su destinatario: lo resuelve
+  `ResendEmailSender`, no quien encola.
+- **El cliente de Resend no reintenta**: repetir el `POST` cuando Resend ya lo recibió duplica el
+  correo. Los reintentos son de `outbound_emails`.
 
 ## Eventos de dominio y alertas
 

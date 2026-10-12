@@ -126,6 +126,14 @@ public sealed class Budget : AggregateRoot
         var limit = LimitFor(category)
             ?? throw new DomainException("El presupuesto no tiene un tope para esa categoria.");
 
+        return HealthOf(limit, spent);
+    }
+
+    public static BudgetHealth HealthOf(Money limit, Money spent)
+    {
+        ArgumentNullException.ThrowIfNull(limit);
+        ArgumentNullException.ThrowIfNull(spent);
+
         if (spent.IsAtLeast(limit))
         {
             return BudgetHealth.Exceeded;

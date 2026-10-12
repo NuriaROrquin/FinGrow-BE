@@ -26,6 +26,10 @@ internal sealed partial class GmailSynchronizer
     internal static readonly Error AccessLost = Error.Conflict(
         "Integrations.Gmail.AccessLost", "FinGrow perdio el acceso a tu Gmail: volve a autorizarlo.");
 
+    // Lo ve el empleado en la card de Gmail.
+    internal const string AccessLostReason =
+        "Google rechazo el acceso a tu Gmail: quitaste el permiso o vencio. Volve a autorizarlo.";
+
     internal static readonly Error AiUnavailable = Error.Unavailable(
         "Integrations.Gmail.AiUnavailable", "No se pudieron interpretar los mails: FinGrow-AI no respondio.");
 
@@ -65,7 +69,7 @@ internal sealed partial class GmailSynchronizer
             return Result.Failure<GmailSyncSummary>(NotLinked);
         }
 
-        if (integration.Status == IntegrationStatus.Failed)
+        if (integration.Status == IntegrationStatus.Error)
         {
             return Result.Failure<GmailSyncSummary>(AccessLost);
         }
@@ -342,7 +346,7 @@ internal sealed partial class GmailSynchronizer
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        integration.MarkFailed(now);
+        integration.MarkFailed(AccessLostReason, now);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         LogAccessLost(_logger, integration.EmployeeId);

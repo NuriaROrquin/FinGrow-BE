@@ -18,6 +18,14 @@ internal sealed class GoalRepository(FinGrowDbContext dbContext) : IGoalReposito
             .OrderByDescending(goal => goal.CreatedAt)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<Goal>> ListByEmployeesAsync(
+        IReadOnlyCollection<Guid> employeeIds,
+        CancellationToken cancellationToken = default) =>
+        await dbContext.Goals
+            .AsNoTracking()
+            .Where(goal => employeeIds.Contains(goal.EmployeeId))
+            .ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<Guid>> ListEmployeesWithActiveGoalsAsync(CancellationToken cancellationToken = default) =>
         await dbContext.Goals
             .Where(goal => goal.Status == GoalStatus.Active)

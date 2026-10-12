@@ -14,13 +14,19 @@ internal sealed class UpdateInvestmentHandler(
 {
     public async Task<Result<InvestmentResponse>> Handle(UpdateInvestmentCommand request, CancellationToken cancellationToken)
     {
-        var investment = await investmentRepository.GetByIdAsync(request.Id, cancellationToken);
+        var owned = Ownership.Require(
+            await investmentRepository.GetByIdAsync(request.Id, cancellationToken),
+            investment => investment.EmployeeId,
+            request.EmployeeId,
+            InvestmentErrors.NotFound(request.Id),
+            InvestmentErrors.NotOwned());
 
-        if (investment is null || investment.EmployeeId != request.EmployeeId)
+        if (owned.IsFailure)
         {
-            return Result.Failure<InvestmentResponse>(
-                Error.NotFound("Investment.NotFound", $"No existe una inversion con id '{request.Id}'."));
+            return Result.Failure<InvestmentResponse>(owned.Error);
         }
+
+        var investment = owned.Value;
 
         investment.Correct(
             request.AssetName,

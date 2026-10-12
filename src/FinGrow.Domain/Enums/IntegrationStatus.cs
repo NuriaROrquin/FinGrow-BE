@@ -2,6 +2,6 @@ namespace FinGrow.Domain.Enums;
 
 public enum IntegrationStatus
 {
-    Active = 1,
-    Failed = 2
+    Active = 0,
+    Error = 1
 }

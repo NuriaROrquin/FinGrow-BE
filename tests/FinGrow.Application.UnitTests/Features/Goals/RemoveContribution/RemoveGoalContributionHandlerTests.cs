@@ -74,7 +74,7 @@ public class RemoveGoalContributionHandlerTests
     }
 
     [Fact]
-    public async Task A_goal_of_another_employee_is_reported_as_not_found()
+    public async Task A_goal_of_another_employee_is_reported_as_forbidden()
     {
         var goal = StoreGoal(employeeId: Guid.CreateVersion7());
         var contribution = goal.AddContribution(Money.From(100m, Currency.ARS), Today, null, Now);
@@ -83,7 +83,7 @@ public class RemoveGoalContributionHandlerTests
             new RemoveGoalContributionCommand(_employeeId, goal.Id, contribution.Id),
             CancellationToken.None);
 
-        result.Error.Type.ShouldBe(ErrorType.NotFound);
+        result.Error.Type.ShouldBe(ErrorType.Forbidden);
         goal.Contributions.ShouldHaveSingleItem();
     }
 

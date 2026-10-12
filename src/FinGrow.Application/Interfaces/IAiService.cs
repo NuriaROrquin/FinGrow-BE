@@ -55,6 +55,19 @@ public sealed record ParsedBillEmail(BillParsingOutcome Outcome, ParsedBill? Bil
     public static ParsedBillEmail Of(BillParsingOutcome outcome, string? model = null) => new(outcome, null, model);
 }
 
+public enum AudioTranscriptionOutcome
+{
+    Transcribed,
+    NotUnderstood,
+    UnsupportedFormat,
+    TooLarge
+}
+
+public sealed record AudioTranscription(AudioTranscriptionOutcome Outcome, string? Text, string? Model)
+{
+    public static AudioTranscription Of(AudioTranscriptionOutcome outcome) => new(outcome, null, null);
+}
+
 public interface IAiService
 {
     Task<bool> IsHealthyAsync(CancellationToken cancellationToken = default);
@@ -71,5 +84,10 @@ public interface IAiService
     Task<ParsedBillEmail> ParseBillEmailAsync(
         BillEmail email,
         Currency defaultCurrency,
+        CancellationToken cancellationToken = default);
+
+    Task<AudioTranscription> TranscribeAudioAsync(
+        ReadOnlyMemory<byte> audio,
+        string contentType,
         CancellationToken cancellationToken = default);
 }

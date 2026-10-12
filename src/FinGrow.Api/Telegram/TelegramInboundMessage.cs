@@ -7,13 +7,23 @@ using MediatR;
 
 internal static class TelegramInboundMessage
 {
+    private const string VoiceNoteContentType = "audio/ogg";
+
     public static IRequest<Result>? ToCommand(TelegramUpdate update) =>
         ToMessageCommand(update) ?? (IRequest<Result>?)ToCallbackCommand(update);
 
     private static ReceiveTelegramMessageCommand? ToMessageCommand(TelegramUpdate update) =>
-        update.Message is { Text: { } text, Chat: { IsPrivate: true } chat } message
-            ? new ReceiveTelegramMessageCommand(chat.Id, text, message.MessageId)
-            : null;
+        update.Message switch
+        {
+            { Chat.IsPrivate: true, Voice: { } voice } message => new ReceiveTelegramMessageCommand(
+                message.Chat.Id,
+                message.Text ?? string.Empty,
+                message.MessageId,
+                new TelegramVoiceNote(voice.FileId, voice.MimeType ?? VoiceNoteContentType)),
+            { Chat.IsPrivate: true, Text: { } text } message => new ReceiveTelegramMessageCommand(
+                message.Chat.Id, text, message.MessageId),
+            _ => null
+        };
 
     private static AnswerTelegramCallbackCommand? ToCallbackCommand(TelegramUpdate update)
     {

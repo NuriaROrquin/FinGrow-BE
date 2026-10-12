@@ -48,7 +48,7 @@ public class GmailSyncJobTests
         var ana = Linked("ana@gmail.com", "token-ana");
         var bruno = Linked("bruno@gmail.com", "token-bruno");
         var failed = Linked("carla@gmail.com", "token-carla");
-        failed.MarkFailed(Now.AddDays(-1));
+        failed.MarkFailed("Sin acceso", Now.AddDays(-1));
 
         var result = await Job().ExecuteAsync(CancellationToken.None);
 

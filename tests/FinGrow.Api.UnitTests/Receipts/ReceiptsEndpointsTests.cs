@@ -230,6 +230,7 @@ public class ReceiptsEndpointsTests
                     ["Twilio:AuthToken"] = "unit-test-twilio-auth-token",
                     ["Telegram:BotToken"] = "unit-test-telegram-bot-token",
                     ["Telegram:WebhookSecret"] = "unit-test-telegram-secret",
+                    ["Email:ResendApiKey"] = "re_unit_test_key",
                     ["MercadoPago:ClientId"] = "unit-test-mp-client-id",
                     ["MercadoPago:ClientSecret"] = "unit-test-mp-client-secret",
                     ["MercadoPago:RedirectUri"] = "https://api.test/api/integrations/mercadopago/oauth/callback",
@@ -290,6 +291,8 @@ public class ReceiptsEndpointsTests
     {
         public void Add(TransactionReceipt receipt) => receipts.Add(receipt);
 
+        public void Remove(TransactionReceipt receipt) => receipts.Remove(receipt);
+
         public Task<TransactionReceipt?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
             Task.FromResult(receipts.FirstOrDefault(receipt => receipt.Id == id));
 
@@ -304,6 +307,9 @@ public class ReceiptsEndpointsTests
                 .ToDictionary(receipt => receipt.TransactionId!.Value, receipt => receipt.Id));
 
         public Task<IReadOnlyList<string>> ListStorageKeysByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<TransactionReceipt>> ListDetachedUploadedBeforeAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
     }
 

@@ -10,14 +10,20 @@ internal static class ChatTransactionText
     public const string MissingAmountReply =
         "No encontré el monto. ¿Me lo mandás de nuevo con el importe? Por ejemplo: Gasté $500 en el súper.";
 
+    public const string TooLongReply =
+        "Es demasiado largo para mí. Mandame un movimiento por mensaje, corto. Por ejemplo: Gasté $500 en el súper.";
+
     public const string MultipleTransactionsReply =
         "Mandame un movimiento por mensaje así no se mezclan. Por ejemplo: Gasté $500 en el súper.";
 
     public const string HelpReply =
-        "Para registrar un movimiento escribime qué fue y cuánto. Por ejemplo:\n" +
+        "Para registrar un movimiento escribime o mandame un audio contando qué fue y cuánto. Por ejemplo:\n" +
         "• Gasté $500 en el súper\n" +
         "• Pagué $1500 el almuerzo con débito\n" +
         "• Cobré $10000 por un freelance";
+
+    public const string AudioNotUnderstoodReply =
+        "No pude entender el audio. ¿Me lo mandás de nuevo o me lo escribís? Por ejemplo: Gasté $500 en el súper.";
 
     public const string AiUnavailableReply =
         "No pude procesar tu mensaje en este momento. Probá de nuevo en unos minutos.";
@@ -57,10 +63,20 @@ internal static class ChatTransactionText
     {
         ArgumentNullException.ThrowIfNull(transaction);
 
-        var isIncome = transaction.Type == TransactionType.Income;
+        var question = asksPaymentMethod
+            ? PaymentMethodQuestion(transaction.Type) + " Elegí uno para confirmarlo."
+            : "¿Lo registro?";
+
+        return Summary(transaction, asksPaymentMethod) + "\n\n" + question;
+    }
+
+    public static string Summary(Transaction transaction, bool asksPaymentMethod)
+    {
+        ArgumentNullException.ThrowIfNull(transaction);
+
         var lines = new List<string>
         {
-            (isIncome ? "💰 Ingreso: " : "💸 Gasto: ") + FormatAmount(transaction.Amount),
+            (transaction.Type == TransactionType.Income ? "💰 Ingreso: " : "💸 Gasto: ") + FormatAmount(transaction.Amount),
             "🏷️ Categoría: " + CategoryLabel(transaction),
             "📝 " + transaction.Description
         };
@@ -70,13 +86,13 @@ internal static class ChatTransactionText
             lines.Add("💳 " + PaymentMethodLabel(transaction.PaymentMethod));
         }
 
-        lines.Add(string.Empty);
-        lines.Add(asksPaymentMethod
-            ? isIncome ? "¿Cómo lo cobraste? Elegí uno para confirmarlo." : "¿Cómo lo pagaste? Elegí uno para confirmarlo."
-            : "¿Lo registro?");
-
         return string.Join('\n', lines);
     }
+
+    public static string Heard(string transcript) => "🎙️ Entendí: «" + transcript + "»";
+
+    public static string PaymentMethodQuestion(TransactionType type) =>
+        type == TransactionType.Income ? "¿Cómo lo cobraste?" : "¿Cómo lo pagaste?";
 
     public static string Confirmed(Transaction transaction)
     {

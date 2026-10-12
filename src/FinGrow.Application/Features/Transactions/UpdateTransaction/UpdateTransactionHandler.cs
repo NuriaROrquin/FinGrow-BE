@@ -27,13 +27,19 @@ internal sealed class UpdateTransactionHandler(
                 Error.Forbidden("Transactions.Unauthenticated", "Hay que iniciar sesion para editar un movimiento."));
         }
 
-        var transaction = await transactionRepository.GetByIdAsync(request.Id, cancellationToken);
+        var owned = Ownership.Require(
+            await transactionRepository.GetByIdAsync(request.Id, cancellationToken),
+            transaction => transaction.EmployeeId,
+            employeeId,
+            TransactionReviewErrors.NotFound(request.Id),
+            TransactionReviewErrors.NotOwned);
 
-        if (transaction is null || transaction.EmployeeId != employeeId)
+        if (owned.IsFailure)
         {
-            return Result.Failure<TransactionResponse>(
-                Error.NotFound("Transaction.NotFound", $"No existe un movimiento con id '{request.Id}'."));
+            return Result.Failure<TransactionResponse>(owned.Error);
         }
+
+        var transaction = owned.Value;
 
         TransactionReceipt? newReceipt = null;
 

@@ -13,6 +13,7 @@ internal static class NotificationChannelConnections
         channel switch
         {
             NotificationChannel.InApp => true,
+            NotificationChannel.Email => true,
             NotificationChannel.Telegram => await integrations.FindByEmployeeAsync(
                 employeeId, IntegrationProvider.Telegram, cancellationToken) is not null,
             _ => false,

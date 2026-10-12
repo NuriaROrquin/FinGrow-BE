@@ -17,12 +17,19 @@ internal sealed class AddGoalContributionHandler(
         AddGoalContributionCommand request,
         CancellationToken cancellationToken)
     {
-        var goal = await goalRepository.GetByIdAsync(request.GoalId, cancellationToken);
+        var owned = Ownership.Require(
+            await goalRepository.GetByIdAsync(request.GoalId, cancellationToken),
+            goal => goal.EmployeeId,
+            request.EmployeeId,
+            GoalErrors.NotFound(request.GoalId),
+            GoalErrors.NotOwned());
 
-        if (goal is null || goal.EmployeeId != request.EmployeeId)
+        if (owned.IsFailure)
         {
-            return Result.Failure<GoalContributionAddedResponse>(GoalErrors.NotFound(request.GoalId));
+            return Result.Failure<GoalContributionAddedResponse>(owned.Error);
         }
+
+        var goal = owned.Value;
 
         if (goal.Status != GoalStatus.Active)
         {

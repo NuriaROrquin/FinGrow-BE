@@ -32,14 +32,14 @@ public class DeleteInvestmentHandlerTests
     }
 
     [Fact]
-    public async Task Another_employees_investment_is_reported_as_not_found_and_kept()
+    public async Task Another_employees_investment_is_reported_as_forbidden_and_kept()
     {
         var investment = StoredInvestment(Guid.CreateVersion7());
 
         var result = await _handler.Handle(new DeleteInvestmentCommand(investment.Id, EmployeeId), CancellationToken.None);
 
         result.IsFailure.ShouldBeTrue();
-        result.Error.Type.ShouldBe(ErrorType.NotFound);
+        result.Error.Type.ShouldBe(ErrorType.Forbidden);
         _investments.Investments.ShouldHaveSingleItem();
         _unitOfWork.SaveCount.ShouldBe(0);
     }

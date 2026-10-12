@@ -662,6 +662,11 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("employee_id");
 
+                    b.Property<string>("ErrorReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("error_reason");
+
                     b.Property<string>("ExternalAccountId")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -703,7 +708,50 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_employee_integrations_provider_external_account_id");
 
-                    b.ToTable("employee_integrations", (string)null);
+                    b.ToTable("employee_integrations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_employee_integrations_error_has_reason", "(status = 'Error') = (error_reason IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("FinGrow.Domain.Entities.FinancialHealthScore", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("ComputedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("computed_at");
+
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("employee_id");
+
+                    b.Property<DateOnly>("PeriodStart")
+                        .HasColumnType("date")
+                        .HasColumnName("period_start");
+
+                    b.Property<int>("Score")
+                        .HasColumnType("integer")
+                        .HasColumnName("score");
+
+                    b.HasKey("Id")
+                        .HasName("pk_financial_health_scores");
+
+                    b.HasIndex("EmployeeId", "PeriodStart")
+                        .IsUnique()
+                        .HasDatabaseName("ix_financial_health_scores_employee_id_period_start");
+
+                    b.ToTable("financial_health_scores", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_financial_health_scores_factors_range", "savings_factor between 0 and 100 and cushion_factor between 0 and 100 and (budget_factor is null or budget_factor between 0 and 100) and (goals_factor is null or goals_factor between 0 and 100)");
+
+                            t.HasCheckConstraint("ck_financial_health_scores_period_starts_on_day_one", "extract(day from period_start) = 1");
+
+                            t.HasCheckConstraint("ck_financial_health_scores_score_range", "score between 0 and 100");
+                        });
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.Goal", b =>
@@ -1161,6 +1209,83 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("FinGrow.Domain.Entities.OutboundEmail", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("HtmlBody")
+                        .HasColumnType("text")
+                        .HasColumnName("html_body")
+                        .HasAnnotation("FinGrow:Encrypted", true);
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTimeOffset?>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at");
+
+                    b.Property<string>("ProviderMessageId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("provider_message_id");
+
+                    b.Property<string>("Recipient")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("recipient");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("subject");
+
+                    b.Property<string>("TextBody")
+                        .HasColumnType("text")
+                        .HasColumnName("text_body")
+                        .HasAnnotation("FinGrow:Encrypted", true);
+
+                    b.HasKey("Id")
+                        .HasName("pk_outbound_emails");
+
+                    b.HasIndex("Status", "NextAttemptAt")
+                        .HasDatabaseName("ix_outbound_emails_status_next_attempt_at");
+
+                    b.ToTable("outbound_emails", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_outbound_emails_attempts_not_negative", "attempts >= 0");
+
+                            t.HasCheckConstraint("ck_outbound_emails_body_only_while_awaiting", "status IN ('Pending', 'Failed') OR (html_body IS NULL AND text_body IS NULL)");
+
+                            t.HasCheckConstraint("ck_outbound_emails_sent_has_provider_id", "status <> 'Sent' OR (sent_at IS NOT NULL AND provider_message_id IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("FinGrow.Domain.Entities.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1521,6 +1646,14 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                                 .HasColumnType("integer")
                                 .HasColumnName("employees_with_integration");
 
+                            b1.Property<int>("EmployeesWithScore")
+                                .HasColumnType("integer")
+                                .HasColumnName("employees_with_score");
+
+                            b1.Property<int>("FinancialHealthScoreSum")
+                                .HasColumnType("integer")
+                                .HasColumnName("financial_health_score_sum");
+
                             b1.Property<int>("GoalsAchieved")
                                 .HasColumnType("integer")
                                 .HasColumnName("goals_achieved");
@@ -1617,6 +1750,14 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                             b1.Property<int>("EmployeesWithIntegration")
                                 .HasColumnType("integer")
                                 .HasColumnName("employees_with_integration");
+
+                            b1.Property<int>("EmployeesWithScore")
+                                .HasColumnType("integer")
+                                .HasColumnName("employees_with_score");
+
+                            b1.Property<int>("FinancialHealthScoreSum")
+                                .HasColumnType("integer")
+                                .HasColumnName("financial_health_score_sum");
 
                             b1.Property<int>("GoalsAchieved")
                                 .HasColumnType("integer")
@@ -1718,6 +1859,55 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         });
 
                     b.Navigation("Grant");
+                });
+
+            modelBuilder.Entity("FinGrow.Domain.Entities.FinancialHealthScore", b =>
+                {
+                    b.HasOne("FinGrow.Domain.Entities.Employee", null)
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_financial_health_scores_employees_employee_id");
+
+                    b.OwnsOne("FinGrow.Domain.ValueObjects.FinancialHealthFactors", "Factors", b1 =>
+                        {
+                            b1.Property<Guid>("FinancialHealthScoreId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<decimal?>("Budget")
+                                .HasPrecision(5, 2)
+                                .HasColumnType("numeric(5,2)")
+                                .HasColumnName("budget_factor");
+
+                            b1.Property<decimal>("Cushion")
+                                .HasPrecision(5, 2)
+                                .HasColumnType("numeric(5,2)")
+                                .HasColumnName("cushion_factor");
+
+                            b1.Property<decimal?>("Goals")
+                                .HasPrecision(5, 2)
+                                .HasColumnType("numeric(5,2)")
+                                .HasColumnName("goals_factor");
+
+                            b1.Property<decimal>("Savings")
+                                .HasPrecision(5, 2)
+                                .HasColumnType("numeric(5,2)")
+                                .HasColumnName("savings_factor");
+
+                            b1.HasKey("FinancialHealthScoreId")
+                                .HasName("pk_financial_health_scores");
+
+                            b1.ToTable("financial_health_scores");
+
+                            b1.WithOwner()
+                                .HasForeignKey("FinancialHealthScoreId")
+                                .HasConstraintName("fk_financial_health_scores_financial_health_scores_id");
+                        });
+
+                    b.Navigation("Factors")
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.Goal", b =>

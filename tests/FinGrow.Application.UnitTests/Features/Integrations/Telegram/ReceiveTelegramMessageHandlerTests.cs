@@ -16,6 +16,7 @@ public class ReceiveTelegramMessageHandlerTests
 {
     private const long ChatId = 123456789;
     private const string Code = "ABCD2345";
+    private const string VoiceNoteFileId = "AwACAgEAAxkBAAIB";
     private static readonly DateTimeOffset Now = new(2026, 3, 15, 10, 0, 0, TimeSpan.Zero);
 
     private readonly FakeEmployeeRepository _employees = new();
@@ -246,6 +247,19 @@ public class ReceiveTelegramMessageHandlerTests
     }
 
     [Fact]
+    public async Task A_message_longer_than_the_AI_accepts_is_answered_without_calling_the_AI()
+    {
+        LinkChat();
+
+        var result = await Handle(new string('a', ChatTransactionProposer.MaxTextLength + 1));
+
+        result.IsSuccess.ShouldBeTrue();
+        _bot.Sent.ShouldHaveSingleItem().Text.ShouldBe(ChatTransactionText.TooLongReply);
+        _ai.ParsedMessages.ShouldBeEmpty();
+        _transactions.Transactions.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task When_the_AI_is_down_the_employee_is_told_to_try_again_and_nothing_is_registered()
     {
         LinkChat();
@@ -309,16 +323,120 @@ public class ReceiveTelegramMessageHandlerTests
         _bot.Sent.ShouldBeEmpty();
     }
 
-    private Task<Result> Handle(string text, long chatId = ChatId)
+    [Fact]
+    public async Task A_voice_note_is_transcribed_and_proposed_with_the_same_buttons_as_a_written_message()
+    {
+        LinkChat();
+        _ai.TranscriptionResult = Transcribed("Gasté 2500 pesos en el súper con débito");
+        _ai.ParseResult = Parsed(Expense(PaymentMethod.DebitCard));
+
+        var result = await HandleVoiceNote();
+
+        result.IsSuccess.ShouldBeTrue();
+        _bot.DownloadedFiles.ShouldBe(new[] { VoiceNoteFileId });
+        _ai.TranscribedAudios.ShouldHaveSingleItem().ContentType.ShouldBe("audio/ogg");
+        _ai.ParsedMessages.ShouldHaveSingleItem().Text.ShouldBe("Gasté 2500 pesos en el súper con débito");
+        var transaction = _transactions.Transactions.ShouldHaveSingleItem();
+        transaction.Status.ShouldBe(TransactionStatus.Pending);
+        transaction.Source.ShouldBe(TransactionSource.Telegram);
+        transaction.ExternalReference.ShouldBe("telegram:123456789:42");
+        var (_, text, buttonRows) = _bot.SentWithButtons.ShouldHaveSingleItem();
+        text.ShouldBe(
+            "🎙️ Entendí: «Gasté 2500 pesos en el súper con débito»\n\n" +
+            ChatTransactionText.Proposal(transaction, asksPaymentMethod: false));
+        buttonRows.SelectMany(row => row).Select(button => button.Text)
+            .ShouldBe(new[] { ChatTransactionText.ConfirmLabel, ChatTransactionText.DiscardLabel });
+    }
+
+    [Fact]
+    public async Task A_voice_note_without_an_amount_shows_what_was_heard_and_asks_again()
+    {
+        LinkChat();
+        _ai.TranscriptionResult = Transcribed("Gasté en el súper");
+        _ai.ParseResult = ParsedMessage.Of(MessageParsingOutcome.MissingAmount);
+
+        await HandleVoiceNote();
+
+        _bot.Sent.ShouldHaveSingleItem().Text.ShouldBe(
+            "🎙️ Entendí: «Gasté en el súper»\n\n" + ChatTransactionText.MissingAmountReply);
+        _transactions.Transactions.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(AudioTranscriptionOutcome.NotUnderstood)]
+    [InlineData(AudioTranscriptionOutcome.UnsupportedFormat)]
+    [InlineData(AudioTranscriptionOutcome.TooLarge)]
+    public async Task A_voice_note_that_cannot_be_transcribed_asks_to_repeat_it_or_write_it(AudioTranscriptionOutcome outcome)
+    {
+        LinkChat();
+        _ai.TranscriptionResult = AudioTranscription.Of(outcome);
+
+        await HandleVoiceNote();
+
+        _bot.Sent.ShouldHaveSingleItem().Text.ShouldBe(ChatTransactionText.AudioNotUnderstoodReply);
+        _ai.ParsedMessages.ShouldBeEmpty();
+        _transactions.Transactions.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task When_telegram_does_not_hand_over_the_voice_note_the_employee_is_told_to_try_again()
+    {
+        LinkChat();
+        _bot.FilesUnavailable = true;
+
+        var result = await HandleVoiceNote();
+
+        result.IsSuccess.ShouldBeTrue();
+        _bot.Sent.ShouldHaveSingleItem().Text.ShouldBe(ChatTransactionText.AiUnavailableReply);
+        _ai.TranscribedAudios.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task When_the_transcription_service_is_down_the_employee_is_told_to_try_again()
+    {
+        LinkChat();
+        _ai.Unreachable = true;
+
+        var result = await HandleVoiceNote();
+
+        result.IsSuccess.ShouldBeTrue();
+        _bot.Sent.ShouldHaveSingleItem().Text.ShouldBe(ChatTransactionText.AiUnavailableReply);
+        _transactions.Transactions.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_voice_note_telegram_delivers_twice_is_proposed_once()
+    {
+        LinkChat();
+        _ai.ParseResult = Parsed(Expense(PaymentMethod.Cash));
+        await HandleVoiceNote();
+
+        await HandleVoiceNote();
+
+        _transactions.Transactions.ShouldHaveSingleItem();
+        _bot.SentWithButtons.ShouldHaveSingleItem();
+    }
+
+    private Task<Result> HandleVoiceNote() =>
+        Send(new ReceiveTelegramMessageCommand(ChatId, string.Empty, 42, new TelegramVoiceNote(VoiceNoteFileId, "audio/ogg")));
+
+    private static AudioTranscription Transcribed(string text) =>
+        new(AudioTranscriptionOutcome.Transcribed, text, "fake-transcribe");
+
+    private Task<Result> Handle(string text, long chatId = ChatId) =>
+        Send(new ReceiveTelegramMessageCommand(chatId, text, 42));
+
+    private Task<Result> Send(ReceiveTelegramMessageCommand command)
     {
         var linker = new LinkCodeRedeemer(
             _integrations, _linkCodes, _employees, _unitOfWork, _clock, NullLogger<LinkCodeRedeemer>.Instance);
+        var voiceNotes = new ChatVoiceNoteTranscriber(_ai, NullLogger<ChatVoiceNoteTranscriber>.Instance);
         var proposer = new ChatTransactionProposer(
             _ai, _transactions, _unitOfWork, _clock, NullLogger<ChatTransactionProposer>.Instance);
         var handler = new ReceiveTelegramMessageHandler(
-            _integrations, linker, proposer, _bot, NullLogger<ReceiveTelegramMessageHandler>.Instance);
+            _integrations, linker, voiceNotes, proposer, _bot, NullLogger<ReceiveTelegramMessageHandler>.Instance);
 
-        return handler.Handle(new ReceiveTelegramMessageCommand(chatId, text, 42), CancellationToken.None);
+        return handler.Handle(command, CancellationToken.None);
     }
 
     private void LinkChat() =>

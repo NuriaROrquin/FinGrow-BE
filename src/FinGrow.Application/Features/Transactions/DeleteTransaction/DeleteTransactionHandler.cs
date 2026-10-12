@@ -21,13 +21,19 @@ internal sealed class DeleteTransactionHandler(
                 Error.Forbidden("Transactions.Unauthenticated", "Hay que iniciar sesion para eliminar un movimiento."));
         }
 
-        var transaction = await transactionRepository.GetByIdAsync(request.Id, cancellationToken);
+        var owned = Ownership.Require(
+            await transactionRepository.GetByIdAsync(request.Id, cancellationToken),
+            transaction => transaction.EmployeeId,
+            employeeId,
+            TransactionReviewErrors.NotFound(request.Id),
+            TransactionReviewErrors.NotOwned);
 
-        if (transaction is null || transaction.EmployeeId != employeeId)
+        if (owned.IsFailure)
         {
-            return Result.Failure(
-                Error.NotFound("Transaction.NotFound", $"No existe un movimiento con id '{request.Id}'."));
+            return Result.Failure(owned.Error);
         }
+
+        var transaction = owned.Value;
 
         transaction.Eliminate(dateTimeProvider.UtcNow);
         (await receiptRepository.GetByTransactionIdAsync(transaction.Id, cancellationToken))?.Detach();

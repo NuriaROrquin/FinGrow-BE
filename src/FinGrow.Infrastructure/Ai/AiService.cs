@@ -1,6 +1,7 @@
 namespace FinGrow.Infrastructure.Ai;
 
 using System.Collections.Frozen;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -41,6 +42,14 @@ internal sealed class AiService : IAiService
             ["debit_card"] = PaymentMethod.DebitCard,
             ["bank_transfer"] = PaymentMethod.BankTransfer,
             ["digital_wallet"] = PaymentMethod.DigitalWallet
+        }.ToFrozenDictionary(StringComparer.Ordinal);
+
+    private static readonly FrozenDictionary<string, AudioTranscriptionOutcome> TranscriptionErrors =
+        new Dictionary<string, AudioTranscriptionOutcome>(StringComparer.Ordinal)
+        {
+            ["audio_not_understood"] = AudioTranscriptionOutcome.NotUnderstood,
+            ["unsupported_audio"] = AudioTranscriptionOutcome.UnsupportedFormat,
+            ["audio_too_large"] = AudioTranscriptionOutcome.TooLarge
         }.ToFrozenDictionary(StringComparer.Ordinal);
 
     private readonly HttpClient _httpClient;
@@ -176,6 +185,65 @@ internal sealed class AiService : IAiService
         return new ParsedBill(bill.Issuer.Trim(), bill.Amount, currency, bill.DueDate, category, bill.Confidence);
     }
 
+    public async Task<AudioTranscription> TranscribeAudioAsync(
+        ReadOnlyMemory<byte> audio,
+        string contentType,
+        CancellationToken cancellationToken = default)
+    {
+        var file = new ReadOnlyMemoryContent(audio);
+        file.Headers.ContentType = MediaTypeHeaderValue.TryParse(contentType, out var mediaType)
+            ? mediaType
+            : new MediaTypeHeaderValue("application/octet-stream");
+
+        using var form = new MultipartFormDataContent();
+        form.Add(file, "file", "audio");
+
+        using var response = await _httpClient.PostAsync("/api/v1/transcription/audio", form, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var code = await ReadErrorCodeAsync(response, cancellationToken);
+
+            if (code is not null && TranscriptionErrors.TryGetValue(code, out var failure))
+            {
+                return AudioTranscription.Of(failure);
+            }
+
+            response.EnsureSuccessStatusCode();
+        }
+
+        TranscriptionResponse? payload;
+
+        try
+        {
+            payload = await response.Content.ReadFromJsonAsync<TranscriptionResponse>(cancellationToken);
+        }
+        catch (JsonException exception)
+        {
+            throw new HttpRequestException("FinGrow-AI devolvio un JSON invalido al transcribir el audio.", exception);
+        }
+
+        if (payload is null || string.IsNullOrWhiteSpace(payload.Text))
+        {
+            throw new HttpRequestException("FinGrow-AI devolvio una transcripcion vacia.");
+        }
+
+        return new AudioTranscription(AudioTranscriptionOutcome.Transcribed, payload.Text.Trim(), payload.Model);
+    }
+
+    private static async Task<string?> ReadErrorCodeAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var error = await response.Content.ReadFromJsonAsync<ErrorResponse>(cancellationToken);
+            return error?.Code;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
     private static ParsedTransaction ToParsedTransaction(ParsedTransactionPayload? transaction)
     {
         if (transaction is null
@@ -220,6 +288,12 @@ internal sealed class AiService : IAiService
             paymentMethod,
             transaction.Confidence);
     }
+
+    private sealed record TranscriptionResponse(
+        [property: JsonPropertyName("text")] string? Text,
+        [property: JsonPropertyName("model")] string? Model);
+
+    private sealed record ErrorResponse([property: JsonPropertyName("code")] string? Code);
 
     private sealed record ParseMessageRequest(
         [property: JsonPropertyName("text")] string Text,

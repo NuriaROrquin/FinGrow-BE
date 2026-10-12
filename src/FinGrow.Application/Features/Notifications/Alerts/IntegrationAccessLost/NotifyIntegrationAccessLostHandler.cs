@@ -33,6 +33,7 @@ internal sealed class NotifyIntegrationAccessLostHandler(Notifier notifier)
         provider switch
         {
             IntegrationProvider.MercadoPago => "Mercado Pago",
+            IntegrationProvider.Iol => "InvertirOnline",
             _ => provider.ToString(),
         };
 }

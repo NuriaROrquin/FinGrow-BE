@@ -37,6 +37,9 @@ internal sealed class DisabledTelegramBotClient : ITelegramBotClient
 
     public Task AnswerCallbackAsync(string callbackQueryId, string? text = null, CancellationToken cancellationToken = default) =>
         throw new InvalidOperationException(Disabled);
+
+    public Task<ReadOnlyMemory<byte>> DownloadFileAsync(string fileId, CancellationToken cancellationToken = default) =>
+        throw new InvalidOperationException(Disabled);
 }
 
 internal sealed class DisabledMercadoPagoOAuthClient : IMercadoPagoOAuthClient

@@ -54,7 +54,7 @@ public class CompleteGmailLinkHandlerTests
     {
         var existing = EmployeeIntegration.Create(_employee.Id, IntegrationProvider.Gmail, "juan.perez@gmail.com", Now.AddDays(-30));
         existing.Authorize(OAuthGrant.From("old-access", "old-refresh", Now), Now.AddDays(-30));
-        existing.MarkFailed(Now.AddDays(-1));
+        existing.MarkFailed("Sin acceso", Now.AddDays(-1));
         _integrations.Integrations.Add(existing);
 
         var result = await Handle(Code, _state);

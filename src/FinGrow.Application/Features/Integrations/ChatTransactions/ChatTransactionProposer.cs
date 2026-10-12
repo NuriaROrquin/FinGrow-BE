@@ -12,6 +12,7 @@ internal enum ProposalOutcome
 {
     Proposed,
     AlreadyProposed,
+    TooLong,
     MissingAmount,
     MultipleTransactions,
     NotATransaction,
@@ -28,6 +29,8 @@ internal sealed partial class ChatTransactionProposer
     public const Currency DefaultCurrency = Currency.ARS;
 
     public const PaymentMethod DefaultPaymentMethod = PaymentMethod.Cash;
+
+    public const int MaxTextLength = 1000;
 
     private readonly IAiService _ai;
     private readonly ITransactionRepository _transactions;
@@ -62,6 +65,11 @@ internal sealed partial class ChatTransactionProposer
         if (known.Count > 0)
         {
             return Proposal.Of(ProposalOutcome.AlreadyProposed);
+        }
+
+        if (text.Length > MaxTextLength)
+        {
+            return Proposal.Of(ProposalOutcome.TooLong);
         }
 
         var parsed = await ParseAsync(employeeId, text, cancellationToken);

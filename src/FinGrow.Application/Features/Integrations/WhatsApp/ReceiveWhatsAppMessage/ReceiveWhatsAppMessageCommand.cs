@@ -11,4 +11,7 @@ public sealed record ReceiveWhatsAppMessageCommand(
 
 public sealed record WhatsAppInboundMedia(Uri Url, string ContentType);
 
-public sealed record WhatsAppReply(string Text);
+public sealed record WhatsAppReply(string? Text)
+{
+    public static WhatsAppReply Silent { get; } = new((string?)null);
+}

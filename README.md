@@ -98,6 +98,9 @@ variables de entorno usando `__` como separador de sección.
 | `Gmail:RedirectUri` | `Gmail__RedirectUri` | URL de `GET /api/integrations/gmail/oauth/callback`, idéntica a una de las cargadas en el cliente OAuth. Google acepta `localhost`: en desarrollo ya viene configurada para el puerto 5210 |
 | `Gmail:FrontendReturnUrl` | `Gmail__FrontendReturnUrl` | Página del frontend a la que vuelve el navegador al terminar la vinculación; recibe `?gmail=linked` o `?gmail=error&reason=...` (default `http://localhost:3000/dashboard/settings`) |
 | `Gmail:TimeoutSeconds` | `Gmail__TimeoutSeconds` | Timeout de las llamadas a Google (default 30) |
+| `Iol:ApiBaseUrl` | `Iol__ApiBaseUrl` | URL base de la API de InvertirOnline (default `https://api.invertironline.com/`). Todo lo que se hace por la API impacta en la cuenta real |
+| `Iol:SyncIntervalMinutes` | `Iol__SyncIntervalMinutes` | Cada cuántos minutos se sincroniza el portafolio de IOL (lo usa T-35; default 30) |
+| `Iol:TimeoutSeconds` | `Iol__TimeoutSeconds` | Timeout de las llamadas a la API de IOL (default 30) |
 | `TokenEncryption:Key` | `TokenEncryption__Key` | Clave AES-256 en base64 (`openssl rand -base64 32`) con la que se cifran en la base los tokens OAuth de las integraciones. Cambiarla deja ilegibles los tokens ya guardados |
 | `Jobs:ApiKey` | `Jobs__ApiKey` | Clave (mínimo 16 caracteres, `openssl rand -base64 24`) que tiene que traer la cabecera `X-Jobs-Key` para disparar o consultar los trabajos programados en `/api/jobs`. Es la que usa el cron de Dokploy; ver [Trabajos programados](#trabajos-programados-dokploy) |
 | `DolarApi:BaseUrl` | `DolarApi__BaseUrl` | URL base de [DolarApi](https://dolarapi.com), de donde sale la cotización del dólar MEP que usa la pantalla de Inversiones (default `https://dolarapi.com/`). Es pública y no pide credenciales |
@@ -117,6 +120,10 @@ variables de entorno usando `__` como separador de sección.
 | `CoinGecko:CacheMinutes` | `CoinGecko__CacheMinutes` | Minutos que se reutilizan los precios bajados (default 10) |
 | `CoinGecko:TopCoins` | `CoinGecko__TopCoins` | Cuántas criptomonedas, de mayor a menor capitalización, se cotizan (default y máximo 250) |
 | `Cors:AllowedOrigins` | `Cors__AllowedOrigins__0` | Orígenes habilitados para el frontend |
+| `Email:ResendApiKey` | `Email__ResendApiKey` | API key de [Resend](https://resend.com/api-keys), el proveedor de los correos transaccionales (por ejemplo, las credenciales del alta de un empleado) |
+| `Email:From` | `Email__From` | Remitente de los correos. Tiene que ser una dirección del dominio verificado en Resend (default `FinGrow <no-reply@fingrow.com.ar>`) |
+| `Email:RedirectAllTo` | `Email__RedirectAllTo` | Si tiene valor, todos los correos van a esa dirección en lugar de a su destinatario, que queda en el asunto (`[Para ana@empresa.com] ...`). En `Development` es `delivered@resend.dev`, una casilla de prueba de Resend que acepta el correo sin entregarlo a nadie: para verlo en tu bandeja, pisala con tu dirección. En producción va vacía |
+| `Email:TimeoutSeconds` | `Email__TimeoutSeconds` | Timeout de cada envío a Resend (default 30) |
 | `Storage:ServiceUrl` | `Storage__ServiceUrl` | URL del almacenamiento compatible con S3 donde viven los comprobantes. En Cloudflare R2 es `https://<account-id>.r2.cloudflarestorage.com`; en desarrollo, el S3Mock de compose (`http://localhost:9090`). Ver [Comprobantes](#comprobantes-cloudflare-r2) |
 | `Storage:BucketName` | `Storage__BucketName` | Bucket de los comprobantes. Uno por entorno, siempre privado |
 | `Storage:AccessKey` | `Storage__AccessKey` | Access Key ID del token de API de R2 |
@@ -124,6 +131,7 @@ variables de entorno usando `__` como separador de sección.
 | `Storage:Region` | `Storage__Region` | Región del bucket. En R2 es `auto` (default) |
 | `Storage:ForcePathStyle` | `Storage__ForcePathStyle` | Arma las URLs como `<host>/<bucket>` en lugar de `<bucket>.<host>` (default `true`, que es lo que necesitan R2 y S3Mock) |
 | `Storage:TimeoutSeconds` | `Storage__TimeoutSeconds` | Timeout de cada operación contra el almacenamiento (default 30) |
+| `ReceiptsCleanup:GraceDays` | `ReceiptsCleanup__GraceDays` | Días que espera `receipts-cleanup` antes de borrar un comprobante suelto, contados desde que se subió (default 7, entre 1 y 365) |
 
 Los secretos no se commitean. En desarrollo local:
 
@@ -139,9 +147,10 @@ dotnet user-secrets set "Gmail:ClientId" "<Client ID del cliente OAuth de Google
 dotnet user-secrets set "Gmail:ClientSecret" "<Client Secret de ese cliente>" --project src/FinGrow.Api
 dotnet user-secrets set "TokenEncryption:Key" "$(openssl rand -base64 32)" --project src/FinGrow.Api
 dotnet user-secrets set "Jobs:ApiKey" "$(openssl rand -base64 24)" --project src/FinGrow.Api
+dotnet user-secrets set "Email:ResendApiKey" "<API key de Resend>" --project src/FinGrow.Api
 ```
 
-Si `Jwt:SecretKey`, `AiService:ApiKey` o las credenciales de Twilio, Telegram o Gmail faltan, la API no arranca y
+Si `Jwt:SecretKey`, `AiService:ApiKey`, las credenciales de Twilio, Telegram o Gmail, o la API key de Resend faltan, la API no arranca y
 el log dice cuál es. Con `dotnet run` contra una FinGrow-AI levantada con `uvicorn` y `API_KEY`
 vacía, `AiService:ApiKey` puede ser cualquier texto porque la IA no lo valida. Con Docker y en
 producción los dos servicios tienen que compartir el mismo valor.
@@ -239,7 +248,7 @@ mismo código funciona contra Cloudflare R2 en los entornos desplegados y contra
 
 **Un movimiento tiene como máximo un comprobante** (índice único en `transaction_receipts.transaction_id`): asociarle otro reemplaza al anterior, que queda suelto. Las respuestas de los movimientos (listado, detalle, crear, editar, pendientes y confirmar) informan su `receiptId`, o `null` si no tiene.
 
-Un comprobante que deja de usarse (se reemplaza, se quita o se borra su movimiento) **no se borra en el momento**: queda suelto, sin movimiento, y lo limpia el trabajo de SCRUM-132.
+Un comprobante que deja de usarse (se reemplaza, se quita o se borra su movimiento) **no se borra en el momento**: queda suelto, sin movimiento, y lo limpia el trabajo `receipts-cleanup` (ver [Trabajos programados](#trabajos-programados-dokploy)) cuando pasan `ReceiptsCleanup:GraceDays` días desde que se subió. La espera protege la foto que un empleado acaba de subir y todavía no guardó; un comprobante viejo que se suelta hoy se borra en la corrida siguiente.
 
 Un comprobante nace sin movimiento: si el OCR falla, la imagen ya quedó guardada y se asocia
 después. Si el almacenamiento no responde, la subida devuelve 503 y no se crea nada en la base.
@@ -284,6 +293,18 @@ código con `POST /api/integrations/whatsapp/link-code`, lo manda por el chat de
 minutos y la API le contesta que quedó vinculado. Desde ahí cada mensaje de ese número se
 resuelve a ese empleado. Un número sin vincular solo recibe las instrucciones para hacerlo.
 
+Con el número vinculado, el empleado registra movimientos escribiendo o mandando una nota de voz
+(HU-14). Una nota de voz se descarga de Twilio, se transcribe con FinGrow-AI
+(`POST /api/v1/transcription/audio`, que necesita `TRANSCRIPTION_PROVIDER=openai` en ese
+servicio) y se descarta: el audio no se guarda. El texto, escrito o transcripto, sigue el mismo
+camino que en Telegram: queda pendiente con fuente `WhatsApp` y la respuesta muestra la propuesta,
+precedida de «🎙️ Entendí: …» si fue un audio. Como TwiML no tiene botones, el empleado contesta
+**SÍ** o **NO**, o el **número** del medio de pago cuando el mensaje no lo dijo (elegir uno
+confirma). La respuesta aplica a la última propuesta de WhatsApp pendiente de las últimas 24
+horas; si no hay ninguna, el mensaje se interpreta como un movimiento nuevo. Twilio espera la
+respuesta del webhook 15 segundos como mucho: si la descarga, la transcripción y la
+interpretación no terminan en 12, el empleado recibe el aviso de que lo intente de nuevo.
+
 ### Telegram (Bot API)
 
 Los mensajes de Telegram entran por `POST /api/webhooks/telegram`. También es público y rechaza
@@ -321,6 +342,30 @@ uno confirma con ese medio; si el empleado no contesta, queda pendiente en la ba
 con Efectivo. Si falta el monto, el bot repregunta y no registra nada. Los toques de botón llegan
 como `callback_query`, por eso el webhook tiene que registrarse con ese tipo en `allowed_updates`.
 
+Una nota de voz (HU-71) sigue el mismo camino: la API la baja con `getFile` del Bot API, la
+transcribe con FinGrow-AI (`POST /api/v1/transcription/audio`, que necesita
+`TRANSCRIPTION_PROVIDER=openai` en ese servicio) y propone el movimiento con los mismos botones,
+precedido de «🎙️ Entendí: …». El audio no se guarda. Las notas de voz llegan como `message`,
+así que no hace falta tocar `allowed_updates`.
+
+### InvertirOnline (IOL)
+
+IOL no tiene una pantalla de consentimiento como Mercado Pago: autentica con usuario y
+contraseña (`POST /token`, `grant_type=password`) y devuelve un bearer de 15 minutos y un
+refresh token. Por eso la contraseña pasa por la API de FinGrow: el empleado la manda a
+`POST /api/integrations/iol/link`, la API la canjea en el momento y guarda solo los tokens,
+cifrados. La contraseña no se persiste, no se loguea y no vuelve en la respuesta.
+
+Cada empleado tiene que tener las APIs activadas en su cuenta de IOL (menú de usuario >
+*Configuración API*, aceptando los términos); si no, IOL rechaza el login como si la contraseña
+fuera incorrecta.
+
+Antes de cada llamada a IOL, `IolAccessTokenProvider` renueva el bearer si le quedan menos de
+2 minutos (`grant_type=refresh_token`). Si IOL rechaza el refresh token, la integración queda en
+estado `Error` con el motivo, que `GET /api/integrations/iol` devuelve en `errorReason`, y el
+empleado tiene que volver a vincular. Una caída de IOL no marca error: se reintenta en la próxima
+llamada. `DELETE /api/integrations/iol` desvincula y borra los tokens.
+
 ### Trabajos programados (Dokploy)
 
 La API no tiene un scheduler propio. Lo que corre "solo cada tanto" son **trabajos** registrados
@@ -331,11 +376,13 @@ siguiente.
 
 | Trabajo | Cron sugerido (UTC) | Qué hace |
 |---|---|---|
-| `metrics-snapshot` | `0 4 1 * *` (el 1 de cada mes, 01:00 de Argentina) | Genera las fotos mensuales de métricas por empresa y por departamento (`company_metrics_snapshots` y `department_metrics_snapshots`) del último mes cerrado, y completa las de los meses anteriores que falten desde el alta de cada empresa. Es idempotente: correrlo de nuevo actualiza la foto del último mes cerrado en lugar de duplicarla |
+| `metrics-snapshot` | `0 4 1 * *` (el 1 de cada mes, 01:00 de Argentina) | Genera las fotos mensuales de métricas por empresa y por departamento (`company_metrics_snapshots` y `department_metrics_snapshots`) del último mes cerrado, y completa las de los meses anteriores que falten desde el alta de cada empresa. En la misma pasada calcula el puntaje de salud financiera de cada empleado (ver más abajo). Es idempotente: correrlo de nuevo actualiza la foto del último mes cerrado en lugar de duplicarla. Si un mes necesita el dólar MEP y DolarApi no responde, esa foto queda pendiente y la corrida, fallida |
 | `mercadopago-sync` | `0 * * * *` (cada hora) | Recorre las cuentas de Mercado Pago vinculadas y trae los movimientos nuevos como pendientes de revisión. Mercado Pago no avisa por webhook lo que un usuario paga, por eso se consulta |
 | `gmail-sync` | `0 13 * * *` (todos los días, 10:00 de Argentina: las facturas llegan una vez por mes) | Recorre los Gmail vinculados y activos, busca los mails que parecen facturas por su contenido (no por remitente, así un reenvío también entra) y le pide a FinGrow-AI que decida si lo son (`POST /api/v1/email-parsing/bills`). Cada factura entra como gasto pendiente con fuente `Gmail`, identificada por empresa + vencimiento + importe para que la original y su reenvío no se propongan dos veces. Si Google responde `invalid_grant` (el empleado quitó el permiso o venció), la integración queda en `Failed` y se le avisa (`IntegrationAccessLost`); deja de sincronizarse hasta que vuelva a autorizar. Si FinGrow-AI no responde, la próxima corrida retoma desde el último mail leído. Lee hasta 50 mails por corrida; si hay más, siguen al día siguiente. Solo importa facturas de servicios: un viaje (Cabify, Uber) o una compra no entra aunque traiga un total. El empleado también puede sincronizar a mano desde la card de Gmail (`POST /api/integrations/gmail/sync`), que corre lo mismo solo para su cuenta
 | `investment-quotes` | `30 21 * * 1-5` (días hábiles, 18:30 de Argentina) | Guarda en `security_prices` el último precio de cada símbolo de BYMA, cada fondo de ArgentinaDatos y cada cripto de CoinGecko (aunque nadie tenga inversiones con símbolo) y cotiza con esos precios las inversiones cargadas con símbolo y cantidad, registrándoles la valuación de mercado del día. Correrlo de nuevo el mismo día actualiza esa valuación en lugar de duplicarla. Si una fuente no responde, cotiza con las otras y la corrida queda fallida con el motivo; si no responde ninguna, no toca nada |
+| `receipts-cleanup` | `0 7 * * *` (todos los días, 04:00 de Argentina) | Borra los comprobantes sueltos (sin movimiento) subidos hace más de `ReceiptsCleanup:GraceDays` días (default 7): primero el archivo de R2 y después la fila de `transaction_receipts`. Si R2 falla para uno, sigue con el resto, la corrida queda fallida con el motivo y ese comprobante se reintenta en la siguiente. Nunca toca un comprobante asociado a un movimiento |
 | `goal-progress-alerts` | `0 12 * * *` (todos los días, 09:00 de Argentina) | Recorre las metas activas y avisa al empleado cuando una lleva 30 días sin aportes (`GoalStalled`, como máximo uno cada 30 días mientras siga quieta) o cuando se acerca su fecha límite con saldo pendiente (`GoalDeadlineApproaching`, una vez a los 30, a los 7 y a 1 día, con cuánto falta y cuántos días quedan). Si la fecha límite está cerca solo manda esa, que ya dice lo mismo. Correrlo de nuevo el mismo día no repite avisos |
+| `email-delivery` | `*/5 * * * *` (cada 5 minutos) | Reintenta los correos de `outbound_emails` que no salieron en el momento (`Failed`, o `Pending` que su primer intento dejó colgado hace más de un minuto), hasta 50 por corrida. Cada fallo espera más para el siguiente intento (5 min, 15 min, 1 h, 4 h) y al quinto el correo queda `Abandoned`. Si alguno no sale, la corrida queda fallida con el motivo de cada uno |
 
 Los endpoints viven bajo `/api/jobs` y se protegen con la cabecera `X-Jobs-Key`, que tiene que
 coincidir con `Jobs:ApiKey`. No usan JWT: los llama un cron, no una persona logueada.
@@ -365,6 +412,58 @@ La respuesta es la corrida registrada; si `status` es `Failed`, `error` dice por
 la API tiene el detalle completo. `GET /api/jobs` sirve para verificar de un vistazo que cada
 cron esté corriendo: muestra la última corrida de cada trabajo.
 
+### Puntaje de salud financiera
+
+Cada empleado con actividad suficiente recibe por mes un puntaje de 0 a 100
+(`financial_health_scores`), que calcula `metrics-snapshot` al fotografiar el mes. Es un
+indicador para la empresa, que solo lo ve agregado (promedio de la plantilla y por departamento:
+HU-57, HU-60 y HU-62). El empleado no ve el suyo.
+
+**Quién recibe puntaje.** Solo quien tuvo en el mes al menos 10 movimientos confirmados y algún
+ingreso. Sin eso no se guarda nada, ni siquiera un cero: un mes casi vacío no dice nada de la
+salud financiera de la persona, y un cero es otra cosa (alguien con actividad al que le va mal).
+
+**Factores.** Cada uno va de 0 a 100 y es lineal entre los dos extremos.
+
+| Factor | Peso | Qué mide | 0 | 100 |
+|---|---|---|---|---|
+| Ahorro | 40 % | (ingresos − gastos) / ingresos del mes. Lo gastado en `ahorro_inversion` cuenta como ahorro, no como gasto | ahorro de 0 % o menos | ahorro del 20 % o más |
+| Presupuesto | 25 % | De las categorías con tope en el presupuesto mensual, cuántas no se pasaron. Pasarse es gastar el tope o más; estar en alerta (80 %) no resta | todas pasadas | ninguna pasada |
+| Metas | 20 % | Promedio, entre las metas con cuota ese mes, de lo aportado en el mes sobre la cuota mensual (tope 100 % por meta). La meta que se alcanza ese mes cuenta completa | nada aportado | cuota cubierta |
+| Colchón | 15 % | Saldo acumulado al cierre del mes (ingresos − gastos de toda la historia, sin restar `ahorro_inversion`) sobre el gasto mensual promedio de los últimos 3 meses, o de los que haya desde el primer movimiento | saldo de 0 o negativo | 3 meses de gasto cubiertos |
+
+**Si no hay presupuesto del mes o ninguna meta con cuota, ese factor no cuenta y su peso se
+reparte entre los demás**: el puntaje mide las finanzas, no cuántas pantallas usa la persona.
+Ahorro y colchón están siempre.
+
+```
+puntaje = Σ (factor × peso) / Σ pesos de los factores presentes      (redondeado al entero)
+```
+
+| Banda | Puntaje |
+|---|---|
+| Crítica | 0 a 39 |
+| Frágil | 40 a 59 |
+| Estable | 60 a 79 |
+| Saludable | 80 a 100 |
+
+**Monedas.** Ahorro y colchón suman todo en pesos: lo que está en dólares se convierte al MEP
+de venta de DolarApi del momento del cálculo, y lo que está en EUR o BRL no cuenta (igual que en
+el dashboard). Presupuesto y metas comparan cada tope y cada meta en su propia moneda. Si hace
+falta el MEP y DolarApi no responde, la foto de ese mes de esa empresa no se genera y la corrida
+queda fallida; como la foto falta, la corrida siguiente la genera. Un mes viejo que se fotografía
+por primera vez usa el MEP del día de la corrida, no el de ese mes.
+
+**Cuándo se recalcula.** En cada corrida de `metrics-snapshot` el último mes cerrado se rehace
+entero (factores y puntaje), así que un movimiento confirmado tarde lo actualiza, y si alguien
+deja de tener actividad suficiente su puntaje se borra. Los meses que ya tenían foto antes de
+este cambio quedan sin puntaje.
+
+Las fotos guardan `employees_with_score` y `financial_health_score_sum`; el promedio se deriva
+(`PeriodMetrics.AverageFinancialHealthScore`) y el umbral mínimo de anonimización de T-11 se
+aplica al mostrarlo. La fórmula vive en `FinancialHealthFactors` (`Domain/ValueObjects/`): pesos
+y umbrales son constantes de esa clase.
+
 ### Alertas y notificaciones
 
 Las alertas salen de un único motor (`Notifier`, en `Application/Features/Notifications`) que
@@ -377,9 +476,10 @@ pasos, siempre en este orden:
 2. **Persistencia.** La notificación queda en la tabla `notifications`, que es la bandeja de la
    app y el historial de todo lo que se avisó. Por eso la bandeja no se puede apagar.
 3. **Entrega.** Se empuja al instante a las pestañas abiertas del destinatario (SignalR, ver más
-   abajo) y se manda además por cada canal externo que el empleado no haya desactivado. Hoy el
-   único externo es Telegram, y solo si el empleado tiene el chat vinculado. Si un canal falla,
-   se loguea y la notificación queda igual en la bandeja.
+   abajo) y se manda además por cada canal externo que el empleado no haya desactivado. Telegram
+   requiere tener el chat vinculado; las alertas `BudgetWarning` y `BudgetExceeded` también se
+   encolan como email en `outbound_emails` para que las entregue el job de correos con reintentos.
+   Si un canal falla, se loguea y la notificación queda igual en la bandeja.
 
 El destinatario puede ser un empleado o la empresa (`recipient_type`), así que la misma bandeja
 sirve para las alertas de bienestar del panel de empresa. Los canales externos son solo para
@@ -392,7 +492,7 @@ porque esa ya quedó guardada. La primera alerta es `TransactionsToReview`: cuan
 Gmail traen movimientos pendientes, el empleado recibe un aviso para revisarlos, como máximo uno
 cada 12 horas por origen (un sync de 30 movimientos genera una sola alerta). Lo que carga el
 empleado a mano, por foto o por chat no avisa: ya está mirando la app.
-`IntegrationAccessLost` avisa cuando la sincronización pierde el acceso a una cuenta vinculada (hoy, Gmail), una
+`IntegrationAccessLost` avisa cuando la sincronización pierde el acceso a una cuenta vinculada (Gmail o IOL), una
 sola vez hasta que el empleado la vuelva a autorizar.
 
 | Método y ruta | Quién | Qué hace |
@@ -517,7 +617,8 @@ Siete entidades y tres value objects. El esquema se crea con la migración `Init
 | `investments` | Investment | Posiciones del portafolio: capital invertido y valuación actual. `symbol` es el ticker (hasta 20 caracteres) o, en un fondo común, su nombre completo (hasta 150); `quantity` admite 10 decimales para fracciones de cripto |
 | `security_prices` | SecurityPrice | El último precio por unidad de cada mercado, símbolo y moneda (BYMA, fondos de ArgentinaDatos y cripto de CoinGecko); una fila por mercado, símbolo y moneda que `investment-quotes` pisa en cada corrida. En los fondos el símbolo es el nombre del fondo. Es lo que cotiza el formulario de inversiones cuando la fuente no publica precios (BYMA los fines de semana y feriados) o no responde |
 | `job_runs` | JobRun | Registro de cada corrida de un trabajo programado: inicio, fin, resultado y error |
-| `company_metrics_snapshots` | CompanyMetricsSnapshot | Foto mensual de métricas agregadas de una empresa: empleados activos, cuántos participaron, movimientos confirmados, presupuestos, metas e integraciones |
+| `company_metrics_snapshots` | CompanyMetricsSnapshot | Foto mensual de métricas agregadas de una empresa: empleados activos, cuántos participaron, movimientos confirmados, presupuestos, metas, integraciones, y cuántos tienen puntaje de salud financiera con la suma de esos puntajes |
+| `financial_health_scores` | FinancialHealthScore | El puntaje de salud financiera de cada empleado por mes, con sus cuatro factores y la fecha de cómputo. Solo existe para los meses con actividad suficiente |
 | `department_metrics_snapshots` | DepartmentMetricsSnapshot | La misma foto, por departamento |
 | `courses` | Course | Cursos del catálogo de educación financiera: nivel, categoría y tipo de activo relacionado; la duración se deriva de las lecciones |
 | `lessons` | (parte de Course) | Lecciones de un curso, ordenadas por `position`, con su duración y el video |

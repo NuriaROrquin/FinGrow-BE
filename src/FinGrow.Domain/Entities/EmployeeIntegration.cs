@@ -9,6 +9,7 @@ using FinGrow.Domain.ValueObjects;
 public sealed class EmployeeIntegration : AggregateRoot
 {
     public const int MaxExternalAccountIdLength = 200;
+    public const int MaxErrorReasonLength = 300;
 
     private EmployeeIntegration()
     {
@@ -26,7 +27,6 @@ public sealed class EmployeeIntegration : AggregateRoot
         Provider = provider;
         ExternalAccountId = externalAccountId;
         LinkedAt = linkedAt;
-        Status = IntegrationStatus.Active;
         CreatedAt = linkedAt;
         UpdatedAt = linkedAt;
     }
@@ -39,9 +39,11 @@ public sealed class EmployeeIntegration : AggregateRoot
 
     public DateTimeOffset LinkedAt { get; private set; }
 
-    public IntegrationStatus Status { get; private set; }
-
     public OAuthGrant? Grant { get; private set; }
+
+    public IntegrationStatus Status { get; private set; } = IntegrationStatus.Active;
+
+    public string? ErrorReason { get; private set; }
 
     public DateTimeOffset? LastSyncedAt { get; private set; }
 
@@ -72,7 +74,6 @@ public sealed class EmployeeIntegration : AggregateRoot
     {
         ExternalAccountId = EnsureValidExternalAccountId(externalAccountId);
         LinkedAt = linkedAt;
-        Status = IntegrationStatus.Active;
         UpdatedAt = linkedAt;
     }
 
@@ -87,19 +88,29 @@ public sealed class EmployeeIntegration : AggregateRoot
 
         Grant = grant;
         Status = IntegrationStatus.Active;
+        ErrorReason = null;
         UpdatedAt = now;
     }
 
-    public void MarkFailed(DateTimeOffset now)
+    public void MarkFailed(string reason, DateTimeOffset now)
     {
-        if (Status == IntegrationStatus.Failed)
-        {
-            return;
-        }
+        var trimmed = (reason ?? string.Empty).Trim();
 
-        Status = IntegrationStatus.Failed;
+        ErrorReason = trimmed.Length switch
+        {
+            0 => throw new DomainException("Una integracion con error necesita el motivo para mostrarselo al empleado."),
+            > MaxErrorReasonLength => throw new DomainException(
+                $"El motivo del error no puede superar los {MaxErrorReasonLength} caracteres."),
+            _ => trimmed
+        };
         UpdatedAt = now;
-        Raise(new IntegrationAccessLost(Id, EmployeeId, Provider, now));
+
+        // Se avisa al pasar a error, no en cada sincronizacion que lo vuelva a encontrar asi.
+        if (Status != IntegrationStatus.Error)
+        {
+            Status = IntegrationStatus.Error;
+            Raise(new IntegrationAccessLost(Id, EmployeeId, Provider, now));
+        }
     }
 
     public void MarkSynced(DateTimeOffset syncedAt)

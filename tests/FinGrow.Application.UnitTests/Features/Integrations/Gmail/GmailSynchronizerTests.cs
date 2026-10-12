@@ -196,7 +196,7 @@ public class GmailSynchronizerTests
         var result = await Sync();
 
         result.Error.ShouldBe(GmailSynchronizer.AccessLost);
-        _integration.Status.ShouldBe(IntegrationStatus.Failed);
+        _integration.Status.ShouldBe(IntegrationStatus.Error);
         _integration.DequeueDomainEvents().ShouldHaveSingleItem().ShouldBeOfType<IntegrationAccessLost>();
         _unitOfWork.SaveCount.ShouldBe(1);
         _transactions.Transactions.ShouldBeEmpty();
@@ -216,7 +216,7 @@ public class GmailSynchronizerTests
     [Fact]
     public async Task A_failed_integration_is_not_synchronized()
     {
-        _integration.MarkFailed(Now.AddHours(-1));
+        _integration.MarkFailed("Sin acceso", Now.AddHours(-1));
         Receive("m1", Now.AddHours(-2), "TOTAL A PAGAR $73.456,92");
 
         var result = await Sync();

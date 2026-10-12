@@ -83,7 +83,10 @@ public sealed class FakeEmployeeIntegrationRepository : IEmployeeIntegrationRepo
 
     public Task<IReadOnlyList<EmployeeIntegration>> ListAuthorizedAsync(IntegrationProvider provider, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<EmployeeIntegration>>(
-            Integrations.Where(integration => integration.Provider == provider && integration.Grant is not null).ToList());
+            Integrations.Where(integration =>
+                integration.Provider == provider
+                && integration.Grant is not null
+                && integration.Status == IntegrationStatus.Active).ToList());
 
     public void Add(EmployeeIntegration integration) => Integrations.Add(integration);
 
@@ -188,6 +191,23 @@ public sealed class FakeTelegramBotClient : ITelegramBotClient
         return Task.CompletedTask;
     }
 
+    public List<string> DownloadedFiles { get; } = new();
+
+    public bool FilesUnavailable { get; set; }
+
+    public Task<ReadOnlyMemory<byte>> DownloadFileAsync(string fileId, CancellationToken cancellationToken = default)
+    {
+        ThrowIfUnreachable();
+
+        if (FilesUnavailable)
+        {
+            throw new HttpRequestException("api.telegram.org no devuelve el archivo");
+        }
+
+        DownloadedFiles.Add(fileId);
+        return Task.FromResult<ReadOnlyMemory<byte>>(new byte[] { 1, 2, 3 });
+    }
+
     private void ThrowIfUnreachable()
     {
         if (Unreachable)
@@ -201,8 +221,15 @@ public sealed class FakeTwilioMediaClient : ITwilioMediaClient
 {
     public List<Uri> Downloaded { get; } = new();
 
+    public bool Unreachable { get; set; }
+
     public Task<TwilioMedia> DownloadAsync(Uri url, CancellationToken cancellationToken = default)
     {
+        if (Unreachable)
+        {
+            throw new HttpRequestException("Twilio unreachable");
+        }
+
         Downloaded.Add(url);
         return Task.FromResult(new TwilioMedia(new byte[] { 1, 2, 3 }, "audio/ogg"));
     }
@@ -412,6 +439,31 @@ public sealed class FakeGmailOAuthClient : IGmailOAuthClient
     }
 }
 
+public sealed class FakeIolAuthClient : IIolAuthClient
+{
+    public IolTokens Tokens { get; set; } = new("iol-access", "iol-refresh", TimeSpan.FromMinutes(15));
+
+    public Exception? Failure { get; set; }
+
+    public List<(string Username, string Password)> Logins { get; } = new();
+
+    public List<string> Refreshes { get; } = new();
+
+    public Task<IolTokens> LoginAsync(string username, string password, CancellationToken cancellationToken = default)
+    {
+        Logins.Add((username, password));
+
+        return Failure is null ? Task.FromResult(Tokens) : Task.FromException<IolTokens>(Failure);
+    }
+
+    public Task<IolTokens> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default)
+    {
+        Refreshes.Add(refreshToken);
+
+        return Failure is null ? Task.FromResult(Tokens) : Task.FromException<IolTokens>(Failure);
+    }
+}
+
 public sealed class FakeMercadoPagoPaymentsClient : IMercadoPagoPaymentsClient
 {
     public List<MercadoPagoPayment> Payments { get; } = new();
@@ -502,6 +554,30 @@ public sealed class FakeAiService : IAiService
 
         return Task.FromResult(ParseBill(email));
     }
+
+    public AudioTranscription TranscriptionResult { get; set; } =
+        new(AudioTranscriptionOutcome.Transcribed, "Gasté 500 en el super", "fake-transcribe");
+
+    public List<(byte[] Audio, string ContentType)> TranscribedAudios { get; } = new();
+
+    public bool TranscriptionHangs { get; set; }
+
+    public async Task<AudioTranscription> TranscribeAudioAsync(ReadOnlyMemory<byte> audio, string contentType, CancellationToken cancellationToken = default)
+    {
+        if (Unreachable)
+        {
+            throw new HttpRequestException("FinGrow-AI unreachable");
+        }
+
+        if (TranscriptionHangs)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }
+
+        TranscribedAudios.Add((audio.ToArray(), contentType));
+
+        return TranscriptionResult;
+    }
 }
 
 public sealed class FakeRefreshTokenRepository : IRefreshTokenRepository
@@ -537,6 +613,11 @@ public sealed class FakeGoalRepository : IGoalRepository
         Task.FromResult<IReadOnlyList<Goal>>(Goals
             .Where(goal => goal.EmployeeId == employeeId)
             .OrderByDescending(goal => goal.CreatedAt)
+            .ToList());
+
+    public Task<IReadOnlyList<Goal>> ListByEmployeesAsync(IReadOnlyCollection<Guid> employeeIds, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Goal>>(Goals
+            .Where(goal => employeeIds.Contains(goal.EmployeeId))
             .ToList());
 
     public Task<IReadOnlyList<Guid>> ListEmployeesWithActiveGoalsAsync(CancellationToken cancellationToken = default) =>
@@ -583,6 +664,32 @@ public sealed class FakeMetricsSnapshotRepository : IMetricsSnapshotRepository
     public Task<DepartmentMetricsSnapshot?> FindDepartmentAsync(Guid departmentId, DateOnly periodStart, CancellationToken cancellationToken = default) =>
         Task.FromResult(DepartmentSnapshots.SingleOrDefault(snapshot => snapshot.DepartmentId == departmentId && snapshot.PeriodStart == periodStart));
 
+    public Task<IReadOnlyList<CompanyMetricsSnapshot>> ListCompanyAsync(
+        Guid companyId,
+        DateOnly? from,
+        DateOnly? to,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<CompanyMetricsSnapshot>>(CompanySnapshots
+            .Where(snapshot => snapshot.CompanyId == companyId
+                && (from == null || snapshot.PeriodStart >= from)
+                && (to == null || snapshot.PeriodStart <= to))
+            .OrderBy(snapshot => snapshot.PeriodStart)
+            .ToList());
+
+    public Task<IReadOnlyList<DepartmentMetricsSnapshot>> ListDepartmentAsync(
+        Guid companyId,
+        Guid departmentId,
+        DateOnly? from,
+        DateOnly? to,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<DepartmentMetricsSnapshot>>(DepartmentSnapshots
+            .Where(snapshot => snapshot.CompanyId == companyId
+                && snapshot.DepartmentId == departmentId
+                && (from == null || snapshot.PeriodStart >= from)
+                && (to == null || snapshot.PeriodStart <= to))
+            .OrderBy(snapshot => snapshot.PeriodStart)
+            .ToList());
+
     public void Add(CompanyMetricsSnapshot snapshot) => CompanySnapshots.Add(snapshot);
 
     public void Add(DepartmentMetricsSnapshot snapshot) => DepartmentSnapshots.Add(snapshot);
@@ -601,6 +708,46 @@ public sealed class FakePeriodActivityReadRepository : IPeriodActivityReadReposi
         return Task.FromResult<IReadOnlyList<EmployeePeriodActivity>>(
             Activity.TryGetValue((companyId, period.Start), out var employees) ? employees : new List<EmployeePeriodActivity>());
     }
+}
+
+public sealed class FakeFinancialHealthReadRepository : IFinancialHealthReadRepository
+{
+    public List<EmployeeCurrencyTotals> Totals { get; } = new();
+
+    public List<EmployeeBudgetLimit> Limits { get; } = new();
+
+    public Task<IReadOnlyList<EmployeeCurrencyTotals>> ListMovementTotalsAsync(
+        IReadOnlyCollection<Guid> employeeIds,
+        MetricsPeriod period,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<EmployeeCurrencyTotals>>(Totals
+            .Where(total => employeeIds.Contains(total.EmployeeId))
+            .ToList());
+
+    public Task<IReadOnlyList<EmployeeBudgetLimit>> ListBudgetLimitsAsync(
+        IReadOnlyCollection<Guid> employeeIds,
+        MetricsPeriod period,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<EmployeeBudgetLimit>>(Limits
+            .Where(limit => employeeIds.Contains(limit.EmployeeId))
+            .ToList());
+}
+
+public sealed class FakeFinancialHealthScoreRepository : IFinancialHealthScoreRepository
+{
+    public List<FinancialHealthScore> Scores { get; } = new();
+
+    public Task<IReadOnlyList<FinancialHealthScore>> ListByCompanyAsync(
+        Guid companyId,
+        DateOnly periodStart,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<FinancialHealthScore>>(Scores
+            .Where(score => score.PeriodStart == periodStart)
+            .ToList());
+
+    public void Add(FinancialHealthScore score) => Scores.Add(score);
+
+    public void Remove(FinancialHealthScore score) => Scores.Remove(score);
 }
 
 public sealed class FakeInvestmentRepository : IInvestmentRepository
@@ -640,8 +787,14 @@ public sealed class FakeExchangeRateProvider : IExchangeRateProvider
 
     public Exception? Failure { get; set; }
 
-    public Task<MepQuote> GetMepQuoteAsync(CancellationToken cancellationToken = default) =>
-        Failure is null ? Task.FromResult(Quote) : Task.FromException<MepQuote>(Failure);
+    public int Calls { get; private set; }
+
+    public Task<MepQuote> GetMepQuoteAsync(CancellationToken cancellationToken = default)
+    {
+        Calls++;
+
+        return Failure is null ? Task.FromResult(Quote) : Task.FromException<MepQuote>(Failure);
+    }
 }
 
 public sealed class FakeInvestmentReadRepository : IInvestmentReadRepository
@@ -898,6 +1051,8 @@ public sealed class FakeTransactionReceiptRepository : ITransactionReceiptReposi
 
     public void Add(TransactionReceipt receipt) => Receipts.Add(receipt);
 
+    public void Remove(TransactionReceipt receipt) => Receipts.Remove(receipt);
+
     public Task<TransactionReceipt?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Receipts.FirstOrDefault(receipt => receipt.Id == id));
 
@@ -916,6 +1071,14 @@ public sealed class FakeTransactionReceiptRepository : ITransactionReceiptReposi
             .Where(receipt => receipt.EmployeeId == employeeId)
             .Select(receipt => receipt.StorageKey)
             .ToList());
+
+    public Task<IReadOnlyList<TransactionReceipt>> ListDetachedUploadedBeforeAsync(
+        DateTimeOffset cutoff,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<TransactionReceipt>>(Receipts
+            .Where(receipt => receipt.TransactionId is null && receipt.UploadedAt < cutoff)
+            .OrderBy(receipt => receipt.UploadedAt)
+            .ToList());
 }
 
 public sealed class FakeFileStorage : IFileStorage
@@ -923,6 +1086,8 @@ public sealed class FakeFileStorage : IFileStorage
     public Dictionary<string, (byte[] Content, string ContentType)> Files { get; } = new(StringComparer.Ordinal);
 
     public bool Unreachable { get; set; }
+
+    public HashSet<string> UndeletableKeys { get; } = new(StringComparer.Ordinal);
 
     public Task SaveAsync(string key, Stream content, string contentType, CancellationToken cancellationToken = default)
     {
@@ -948,6 +1113,11 @@ public sealed class FakeFileStorage : IFileStorage
     {
         EnsureReachable();
 
+        if (UndeletableKeys.Contains(key))
+        {
+            throw new FileStorageUnavailableException($"el almacenamiento no pudo borrar {key}");
+        }
+
         Files.Remove(key);
         return Task.CompletedTask;
     }
@@ -958,5 +1128,41 @@ public sealed class FakeFileStorage : IFileStorage
         {
             throw new FileStorageUnavailableException("el almacenamiento no responde");
         }
+    }
+}
+
+public sealed class FakeOutboundEmailRepository : IOutboundEmailRepository
+{
+    public List<OutboundEmail> Emails { get; } = new();
+
+    public void Add(OutboundEmail email) => Emails.Add(email);
+
+    public Task<OutboundEmail?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Emails.FirstOrDefault(email => email.Id == id));
+
+    public Task<IReadOnlyList<Guid>> ListDueIdsAsync(DateTimeOffset now, int take, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>(Emails
+            .Where(email => email.IsAwaitingDelivery && email.NextAttemptAt <= now)
+            .OrderBy(email => email.NextAttemptAt)
+            .Select(email => email.Id)
+            .Take(take)
+            .ToList());
+}
+
+public sealed class FakeEmailSender : IEmailSender
+{
+    public List<EmailMessage> Sent { get; } = new();
+
+    public EmailDeliveryException? Failure { get; set; }
+
+    public Task<string> SendAsync(EmailMessage message, CancellationToken cancellationToken = default)
+    {
+        if (Failure is not null)
+        {
+            throw Failure;
+        }
+
+        Sent.Add(message);
+        return Task.FromResult($"re-{Sent.Count}");
     }
 }

@@ -15,9 +15,21 @@ internal sealed class UpdateGoalHandler(
 {
     public async Task<Result<GoalResponse>> Handle(UpdateGoalCommand request, CancellationToken cancellationToken)
     {
-        var goal = await goalRepository.GetByIdAsync(request.GoalId, cancellationToken);
+        var owned = Ownership.Require(
+            await goalRepository.GetByIdAsync(request.GoalId, cancellationToken),
+            goal => goal.EmployeeId,
+            request.EmployeeId,
+            GoalErrors.NotFound(request.GoalId),
+            GoalErrors.NotOwned());
 
-        if (goal is null || goal.EmployeeId != request.EmployeeId || goal.Status == GoalStatus.Cancelled)
+        if (owned.IsFailure)
+        {
+            return Result.Failure<GoalResponse>(owned.Error);
+        }
+
+        var goal = owned.Value;
+
+        if (goal.Status == GoalStatus.Cancelled)
         {
             return Result.Failure<GoalResponse>(GoalErrors.NotFound(request.GoalId));
         }

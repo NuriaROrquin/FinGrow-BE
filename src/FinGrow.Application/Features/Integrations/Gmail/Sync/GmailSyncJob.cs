@@ -36,8 +36,9 @@ internal sealed partial class GmailSyncJob : IScheduledJob
 
     public async Task<JobResult> ExecuteAsync(CancellationToken cancellationToken)
     {
+        // ListAuthorizedAsync ya deja afuera las que quedaron con error: hasta que el empleado vuelva a
+        // autorizar, Google va a seguir rechazando el token.
         var employees = (await _integrations.ListAuthorizedAsync(IntegrationProvider.Gmail, cancellationToken))
-            .Where(integration => integration.Status == IntegrationStatus.Active)
             .Select(integration => integration.EmployeeId)
             .ToList();
 

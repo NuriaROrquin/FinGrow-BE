@@ -9,7 +9,10 @@ internal sealed class EmployeeIntegrationConfiguration : IEntityTypeConfiguratio
 {
     public void Configure(EntityTypeBuilder<EmployeeIntegration> builder)
     {
-        builder.ToTable("employee_integrations");
+        builder.ToTable("employee_integrations", table =>
+            table.HasCheckConstraint(
+                "ck_employee_integrations_error_has_reason",
+                "(status = 'Error') = (error_reason IS NOT NULL)"));
 
         builder.HasKey(integration => integration.Id);
 
@@ -23,11 +26,6 @@ internal sealed class EmployeeIntegrationConfiguration : IEntityTypeConfiguratio
             .IsRequired();
 
         builder.Property(integration => integration.LinkedAt).IsRequired();
-
-        builder.Property(integration => integration.Status)
-            .HasConversion<string>()
-            .HasMaxLength(20)
-            .IsRequired();
 
         builder.OwnsOne(integration => integration.Grant, grant =>
         {
@@ -44,6 +42,14 @@ internal sealed class EmployeeIntegrationConfiguration : IEntityTypeConfiguratio
                 .HasColumnName("oauth_expires_at")
                 .IsRequired();
         });
+
+        builder.Property(integration => integration.Status)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
+        builder.Property(integration => integration.ErrorReason)
+            .HasMaxLength(EmployeeIntegration.MaxErrorReasonLength);
 
         builder.Property(integration => integration.LastSyncedAt);
         builder.Property(integration => integration.CreatedAt).IsRequired();

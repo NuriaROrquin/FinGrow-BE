@@ -124,6 +124,7 @@ public class GmailOAuthCallbackTests
                     ["Gmail:ClientId"] = "unit-test-gmail-client-id",
                     ["Gmail:ClientSecret"] = "unit-test-gmail-client-secret",
                     ["Gmail:RedirectUri"] = "https://api.test/api/integrations/gmail/oauth/callback",
+                    ["Email:ResendApiKey"] = "re_unit_test_key",
                     ["Gmail:FrontendReturnUrl"] = ReturnUrl,
                     ["TokenEncryption:Key"] = "dW5pdC10ZXN0LXRva2VuLWVuY3J5cHRpb24ta2V5ISE=",
                     ["Jobs:ApiKey"] = "unit-test-jobs-api-key-1234",

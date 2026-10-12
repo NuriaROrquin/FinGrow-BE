@@ -16,13 +16,19 @@ internal sealed class RemoveTransactionReceiptHandler(
     {
         var employeeId = currentUser.UserId!.Value;
 
-        var transaction = await transactionRepository.GetByIdAsync(request.TransactionId, cancellationToken);
+        var owned = Ownership.Require(
+            await transactionRepository.GetByIdAsync(request.TransactionId, cancellationToken),
+            transaction => transaction.EmployeeId,
+            employeeId,
+            TransactionReviewErrors.NotFound(request.TransactionId),
+            TransactionReviewErrors.NotOwned);
 
-        if (transaction is null || transaction.EmployeeId != employeeId)
+        if (owned.IsFailure)
         {
-            return Result.Failure(
-                Error.NotFound("Transaction.NotFound", $"No existe un movimiento con id '{request.TransactionId}'."));
+            return Result.Failure(owned.Error);
         }
+
+        var transaction = owned.Value;
 
         var receipt = await receiptRepository.GetByTransactionIdAsync(transaction.Id, cancellationToken);
 

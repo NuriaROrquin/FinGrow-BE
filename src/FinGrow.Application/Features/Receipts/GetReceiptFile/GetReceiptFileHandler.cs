@@ -17,17 +17,19 @@ internal sealed partial class GetReceiptFileHandler(
     {
         var employeeId = currentUser.UserId!.Value;
 
-        var receipt = await receipts.GetByIdAsync(request.Id, cancellationToken);
+        var owned = Ownership.Require(
+            await receipts.GetByIdAsync(request.Id, cancellationToken),
+            found => found.EmployeeId,
+            employeeId,
+            ReceiptErrors.NotFound(request.Id),
+            ReceiptErrors.NotOwned);
 
-        if (receipt is null)
+        if (owned.IsFailure)
         {
-            return Result.Failure<ReceiptFile>(ReceiptErrors.NotFound(request.Id));
+            return Result.Failure<ReceiptFile>(owned.Error);
         }
 
-        if (receipt.EmployeeId != employeeId)
-        {
-            return Result.Failure<ReceiptFile>(ReceiptErrors.NotOwned);
-        }
+        var receipt = owned.Value;
 
         StoredFile? file;
 
