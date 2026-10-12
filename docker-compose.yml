@@ -16,8 +16,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # S3 de mentira para desarrollo: acepta cualquier credencial y crea el bucket al arrancar.
-  # Los archivos se guardan en el volumen, asi que sobreviven a un `docker compose down`.
   s3:
     image: adobe/s3mock:5.2.2
     container_name: fingrow-s3
@@ -46,6 +44,8 @@ services:
       Twilio__PublicBaseUrl: "${TWILIO_PUBLIC_BASE_URL:-}"
       Telegram__BotToken: "${TELEGRAM_BOT_TOKEN:-}"
       Telegram__WebhookSecret: "${TELEGRAM_WEBHOOK_SECRET:-}"
+      Email__ResendApiKey: "${RESEND_API_KEY:-}"
+      Email__RedirectAllTo: "${EMAIL_REDIRECT_ALL_TO:-delivered@resend.dev}"
       MercadoPago__ClientId: "${MERCADOPAGO_CLIENT_ID:-}"
       MercadoPago__ClientSecret: "${MERCADOPAGO_CLIENT_SECRET:-}"
       MercadoPago__RedirectUri: "${MERCADOPAGO_REDIRECT_URI:-}"

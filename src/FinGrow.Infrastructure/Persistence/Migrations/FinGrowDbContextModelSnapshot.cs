@@ -1195,6 +1195,83 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("FinGrow.Domain.Entities.OutboundEmail", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("HtmlBody")
+                        .HasColumnType("text")
+                        .HasColumnName("html_body")
+                        .HasAnnotation("FinGrow:Encrypted", true);
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTimeOffset?>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at");
+
+                    b.Property<string>("ProviderMessageId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("provider_message_id");
+
+                    b.Property<string>("Recipient")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("recipient");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("subject");
+
+                    b.Property<string>("TextBody")
+                        .HasColumnType("text")
+                        .HasColumnName("text_body")
+                        .HasAnnotation("FinGrow:Encrypted", true);
+
+                    b.HasKey("Id")
+                        .HasName("pk_outbound_emails");
+
+                    b.HasIndex("Status", "NextAttemptAt")
+                        .HasDatabaseName("ix_outbound_emails_status_next_attempt_at");
+
+                    b.ToTable("outbound_emails", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_outbound_emails_attempts_not_negative", "attempts >= 0");
+
+                            t.HasCheckConstraint("ck_outbound_emails_body_only_while_awaiting", "status IN ('Pending', 'Failed') OR (html_body IS NULL AND text_body IS NULL)");
+
+                            t.HasCheckConstraint("ck_outbound_emails_sent_has_provider_id", "status <> 'Sent' OR (sent_at IS NOT NULL AND provider_message_id IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("FinGrow.Domain.Entities.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")

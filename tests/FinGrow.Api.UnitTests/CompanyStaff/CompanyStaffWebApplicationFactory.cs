@@ -78,6 +78,7 @@ internal sealed class CompanyStaffWebApplicationFactory : WebApplicationFactory<
                 ["Twilio:AuthToken"] = "unit-test-twilio-auth-token",
                 ["Telegram:BotToken"] = "unit-test-telegram-bot-token",
                 ["Telegram:WebhookSecret"] = "unit-test-telegram-secret",
+                ["Email:ResendApiKey"] = "re_unit_test_key",
                 ["MercadoPago:ClientId"] = "unit-test-mp-client-id",
                 ["MercadoPago:ClientSecret"] = "unit-test-mp-client-secret",
                 ["MercadoPago:RedirectUri"] = "https://api.test/api/integrations/mercadopago/oauth/callback",
@@ -89,6 +90,7 @@ internal sealed class CompanyStaffWebApplicationFactory : WebApplicationFactory<
         {
             services.AddScoped<ICompanyRepository>(_ => new InMemoryCompanyRepository(Companies));
             services.AddScoped<IEmployeeRepository>(_ => new InMemoryEmployeeRepository(Employees));
+            services.AddScoped<IOutboundEmailRepository>(_ => new InMemoryOutboundEmailRepository(QueuedEmails));
             services.AddScoped<ITransactionReceiptRepository, NoReceiptsRepository>();
             services.AddScoped<INotificationRepository>(_ => new RecordingNotificationRepository(ClearedRecipients));
             services.AddScoped<IRefreshTokenRepository>(_ => new RecordingRefreshTokenRepository(RevokedUsers));
@@ -99,6 +101,19 @@ internal sealed class CompanyStaffWebApplicationFactory : WebApplicationFactory<
     public List<NotificationRecipient> ClearedRecipients { get; } = new();
 
     public List<Guid> RevokedUsers { get; } = new();
+
+    public List<OutboundEmail> QueuedEmails { get; } = new();
+
+    private sealed class InMemoryOutboundEmailRepository(List<OutboundEmail> emails) : IOutboundEmailRepository
+    {
+        public void Add(OutboundEmail email) => emails.Add(email);
+
+        public Task<OutboundEmail?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+            Task.FromResult(emails.FirstOrDefault(email => email.Id == id));
+
+        public Task<IReadOnlyList<Guid>> ListDueIdsAsync(DateTimeOffset now, int take, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Guid>>(Array.Empty<Guid>());
+    }
 
     private sealed class RecordingRefreshTokenRepository(List<Guid> revokedUsers) : IRefreshTokenRepository
     {
