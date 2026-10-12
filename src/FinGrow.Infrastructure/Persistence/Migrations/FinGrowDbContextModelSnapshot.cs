@@ -662,6 +662,11 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("employee_id");
 
+                    b.Property<string>("ErrorReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("error_reason");
+
                     b.Property<string>("ExternalAccountId")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -682,6 +687,12 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("provider");
 
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -697,7 +708,10 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_employee_integrations_provider_external_account_id");
 
-                    b.ToTable("employee_integrations", (string)null);
+                    b.ToTable("employee_integrations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_employee_integrations_error_has_reason", "(status = 'Error') = (error_reason IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.FinancialHealthScore", b =>
@@ -1480,7 +1494,7 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_transactions_amount_positive", "amount > 0");
 
-                            t.HasCheckConstraint("ck_transactions_category_matches_type", "(type = 'Expense' AND expense_category IS NOT NULL AND income_category IS NULL)\r\nOR (type = 'Income' AND income_category IS NOT NULL AND expense_category IS NULL)");
+                            t.HasCheckConstraint("ck_transactions_category_matches_type", "(type = 'Expense' AND expense_category IS NOT NULL AND income_category IS NULL)\nOR (type = 'Income' AND income_category IS NOT NULL AND expense_category IS NULL)");
                         });
                 });
 
