@@ -31,6 +31,38 @@ internal sealed class MetricsSnapshotRepository : IMetricsSnapshotRepository
             snapshot => snapshot.DepartmentId == departmentId && snapshot.PeriodStart == periodStart,
             cancellationToken);
 
+    public async Task<IReadOnlyList<CompanyMetricsSnapshot>> ListCompanyAsync(
+        Guid companyId,
+        DateOnly? from,
+        DateOnly? to,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.CompanyMetricsSnapshots
+            .AsNoTracking()
+            .Where(snapshot => snapshot.CompanyId == companyId
+                && (from == null || snapshot.PeriodStart >= from)
+                && (to == null || snapshot.PeriodStart <= to))
+            .OrderBy(snapshot => snapshot.PeriodStart)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<DepartmentMetricsSnapshot>> ListDepartmentAsync(
+        Guid companyId,
+        Guid departmentId,
+        DateOnly? from,
+        DateOnly? to,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.DepartmentMetricsSnapshots
+            .AsNoTracking()
+            .Where(snapshot => snapshot.CompanyId == companyId
+                && snapshot.DepartmentId == departmentId
+                && (from == null || snapshot.PeriodStart >= from)
+                && (to == null || snapshot.PeriodStart <= to))
+            .OrderBy(snapshot => snapshot.PeriodStart)
+            .ToListAsync(cancellationToken);
+    }
+
     public void Add(CompanyMetricsSnapshot snapshot) => _dbContext.CompanyMetricsSnapshots.Add(snapshot);
 
     public void Add(DepartmentMetricsSnapshot snapshot) => _dbContext.DepartmentMetricsSnapshots.Add(snapshot);

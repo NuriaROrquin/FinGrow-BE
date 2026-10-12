@@ -41,6 +41,8 @@ services:
       ConnectionStrings__Database: "Host=db;Port=5432;Database=fingrow;Username=fingrow;Password=fingrow"
       AiService__BaseUrl: "http://ai:8000"
       AiService__ApiKey: "${API_KEY:-dev-ai-api-key}"
+      Metrics__CompanyMinimumEmployees: "${METRICS_COMPANY_MINIMUM_EMPLOYEES:-3}"
+      Metrics__DepartmentMinimumEmployees: "${METRICS_DEPARTMENT_MINIMUM_EMPLOYEES:-3}"
       Twilio__AccountSid: "${TWILIO_ACCOUNT_SID:-}"
       Twilio__AuthToken: "${TWILIO_AUTH_TOKEN:-}"
       Twilio__PublicBaseUrl: "${TWILIO_PUBLIC_BASE_URL:-}"

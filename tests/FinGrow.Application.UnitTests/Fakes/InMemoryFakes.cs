@@ -468,6 +468,32 @@ public sealed class FakeMetricsSnapshotRepository : IMetricsSnapshotRepository
     public Task<DepartmentMetricsSnapshot?> FindDepartmentAsync(Guid departmentId, DateOnly periodStart, CancellationToken cancellationToken = default) =>
         Task.FromResult(DepartmentSnapshots.SingleOrDefault(snapshot => snapshot.DepartmentId == departmentId && snapshot.PeriodStart == periodStart));
 
+    public Task<IReadOnlyList<CompanyMetricsSnapshot>> ListCompanyAsync(
+        Guid companyId,
+        DateOnly? from,
+        DateOnly? to,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<CompanyMetricsSnapshot>>(CompanySnapshots
+            .Where(snapshot => snapshot.CompanyId == companyId
+                && (from == null || snapshot.PeriodStart >= from)
+                && (to == null || snapshot.PeriodStart <= to))
+            .OrderBy(snapshot => snapshot.PeriodStart)
+            .ToList());
+
+    public Task<IReadOnlyList<DepartmentMetricsSnapshot>> ListDepartmentAsync(
+        Guid companyId,
+        Guid departmentId,
+        DateOnly? from,
+        DateOnly? to,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<DepartmentMetricsSnapshot>>(DepartmentSnapshots
+            .Where(snapshot => snapshot.CompanyId == companyId
+                && snapshot.DepartmentId == departmentId
+                && (from == null || snapshot.PeriodStart >= from)
+                && (to == null || snapshot.PeriodStart <= to))
+            .OrderBy(snapshot => snapshot.PeriodStart)
+            .ToList());
+
     public void Add(CompanyMetricsSnapshot snapshot) => CompanySnapshots.Add(snapshot);
 
     public void Add(DepartmentMetricsSnapshot snapshot) => DepartmentSnapshots.Add(snapshot);

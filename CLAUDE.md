@@ -240,6 +240,40 @@ siguiente corre igual. Un mismo trabajo no corre dos veces a la vez (`RunningJob
   falten desde el alta de la empresa. Las fotos guardan conteos, no porcentajes: la tasa de
   participación se deriva (`PeriodMetrics.ParticipationRate`), fiel a "un total no se persiste".
 
+## Panel empresarial y anonimización
+
+La empresa nunca ve datos de una persona identificable. La anonimización se garantiza en
+Application, antes de serializar la respuesta, y no escondiendo columnas en el frontend.
+
+- **Las métricas empresariales siempre son agregadas.** Los endpoints
+  `GET /api/company/metrics` y `GET /api/company/departments/{departmentId}/metrics` leen
+  `CompanyMetricsSnapshot` o `DepartmentMetricsSnapshot`; no consultan ni proyectan empleados,
+  movimientos, metas o inversiones individuales.
+- **El umbral mínimo es configurable por alcance y por defecto es de tres empleados activos.**
+  `MetricsAnonymizationPolicy` (`Application/Features/Metrics/`) lee
+  `Metrics:CompanyMinimumEmployees` para métricas de empresa y
+  `Metrics:DepartmentMinimumEmployees` para métricas de departamento. Se configuran por
+  variables de entorno como `Metrics__CompanyMinimumEmployees` y
+  `Metrics__DepartmentMinimumEmployees`. En Docker Compose se pasan desde
+  `METRICS_COMPANY_MINIMUM_EMPLOYEES` y `METRICS_DEPARTMENT_MINIMUM_EMPLOYEES`, ambos con
+  valor predeterminado 3. Cada handler rechaza la métrica si el período tiene menos empleados
+  que su umbral. No devuelvas el dato parcialmente ni completes el resultado con ceros para
+  ocultarlo.
+- **Las respuestas usan DTOs exclusivos del panel.** `CompanyMetricsResponse` y
+  `DepartmentMetricsResponse` solo pueden contener períodos, conteos, tasas y promedios
+  agregados. No agregues `EmployeeId`, `UserId`, nombres, emails, `TransactionId`, `GoalId`,
+  `InvestmentId` ni colecciones de entidades personales.
+- **El mapeo al DTO es explícito.** No serialices snapshots, entidades ni `PeriodMetrics`
+  directamente desde un controller o handler. Si se agrega un campo al modelo, debe evaluarse
+  expresamente si puede formar parte del contrato anonimizado.
+- **El alcance de empresa se verifica siempre.** El handler usa el `CompanyId` de
+  `ICurrentUser`; el acceso a un departamento de otra empresa se trata como inexistente y no
+  confirma que el recurso existe.
+- **Toda modificación del contrato debe tener una prueba.** Los tests deben comprobar el umbral
+  de tres empleados, el aislamiento entre empresas y que la respuesta serializada no expone
+  identificadores, montos, saldos ni movimientos individuales. Un test arquitectónico debe
+  fallar si los DTOs incorporan propiedades identificables.
+
 ## Puntaje de salud financiera
 
 La fórmula está en `FinancialHealthFactors` (`Domain/ValueObjects/`) y explicada en el README;
