@@ -5,6 +5,7 @@ using Common.Behaviors;
 using Events;
 using Features.Integrations.ChatTransactions;
 using Features.Integrations.Iol;
+using Features.Integrations.Iol.KeepAlive;
 using Features.Integrations.Iol.Sync;
 using Features.Integrations.Linking;
 using Features.Integrations.MercadoPago.Sync;
@@ -62,6 +63,7 @@ public static class DependencyInjection
         services.AddScoped<IScheduledJob, MetricsSnapshotJob>();
         services.AddScoped<IScheduledJob, MercadoPagoSyncJob>();
         services.AddScoped<IScheduledJob, IolSyncJob>();
+        services.AddScoped<IScheduledJob, IolTokenRefreshJob>();
         services.AddScoped<IScheduledJob, InvestmentQuotesJob>();
         services.AddScoped<IScheduledJob, GoalProgressAlertsJob>();
         services.AddScoped<IScheduledJob, EmailDeliveryJob>();

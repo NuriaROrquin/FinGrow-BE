@@ -59,6 +59,38 @@ public class IolAuthClientTests
     }
 
     [Fact]
+    public async Task The_bearer_lasts_what_its_dates_say_and_not_the_declared_expires_in()
+    {
+        using var handler = new RecordingHandler("""
+            {
+              "access_token": "iol-access",
+              "token_type": "bearer",
+              "expires_in": 1200,
+              "refresh_token": "iol-refresh",
+              ".issued": "Mon, 12 Oct 2026 20:39:41 GMT",
+              ".expires": "Mon, 12 Oct 2026 20:54:41 GMT",
+              ".refreshexpires": "Mon, 12 Oct 2026 20:59:41 GMT"
+            }
+            """);
+
+        var tokens = await Client(handler).LoginAsync("juan.perez", Password);
+
+        tokens.ExpiresIn.ShouldBe(TimeSpan.FromMinutes(15));
+    }
+
+    [Fact]
+    public async Task Without_readable_dates_the_bearer_lasts_the_declared_expires_in()
+    {
+        using var handler = new RecordingHandler("""
+            {"access_token": "iol-access", "expires_in": 1200, "refresh_token": "iol-refresh", ".issued": "ayer", ".expires": "hoy"}
+            """);
+
+        var tokens = await Client(handler).LoginAsync("juan.perez", Password);
+
+        tokens.ExpiresIn.ShouldBe(TimeSpan.FromMinutes(20));
+    }
+
+    [Fact]
     public async Task A_response_without_refresh_token_is_rejected_as_incomplete()
     {
         using var handler = new RecordingHandler("""{"access_token": "iol-access", "expires_in": 899}""");
