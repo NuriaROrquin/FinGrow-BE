@@ -101,6 +101,19 @@ public class TelegramWebhookTests
     }
 
     [Fact]
+    public async Task A_voice_note_from_an_unlinked_chat_gets_the_linking_instructions()
+    {
+        using var factory = new WebhookWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var response = await PostAsync(client, PrivateVoiceNote());
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        factory.Bot.Sent.ShouldHaveSingleItem().Text.ShouldContain("todavía no está vinculado");
+        factory.Bot.DownloadedFiles.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task A_linked_chat_writing_an_expense_gets_a_proposal_with_buttons()
     {
         using var factory = new WebhookWebApplicationFactory();
@@ -173,6 +186,17 @@ public class TelegramWebhookTests
             message_id = 7,
             chat = new { id = ChatId, type = "private" },
             text,
+        },
+    };
+
+    private static object PrivateVoiceNote() => new
+    {
+        update_id = 102,
+        message = new
+        {
+            message_id = 9,
+            chat = new { id = ChatId, type = "private" },
+            voice = new { file_id = "AwACAgEAAxkBAAIB", file_unique_id = "AgADBQ", duration = 4, mime_type = "audio/ogg", file_size = 10137 },
         },
     };
 
