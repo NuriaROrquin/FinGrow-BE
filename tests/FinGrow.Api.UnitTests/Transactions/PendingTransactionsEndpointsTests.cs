@@ -258,6 +258,7 @@ public class PendingTransactionsEndpointsTests
                     ["Twilio:AuthToken"] = "unit-test-twilio-auth-token",
                     ["Telegram:BotToken"] = "unit-test-telegram-bot-token",
                     ["Telegram:WebhookSecret"] = "unit-test-telegram-secret",
+                    ["Email:ResendApiKey"] = "re_unit_test_key",
                     ["MercadoPago:ClientId"] = "unit-test-mp-client-id",
                     ["MercadoPago:ClientSecret"] = "unit-test-mp-client-secret",
                     ["MercadoPago:RedirectUri"] = "https://api.test/api/integrations/mercadopago/oauth/callback",
@@ -335,6 +336,11 @@ public class PendingTransactionsEndpointsTests
 
         public Task<IReadOnlyList<string>> ListStorageKeysByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
+
+        public void Remove(TransactionReceipt receipt) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<TransactionReceipt>> ListDetachedUploadedBeforeAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class NoOpUnitOfWork : IUnitOfWork

@@ -112,6 +112,10 @@ variables de entorno usando `__` como separador de sección.
 | `CoinGecko:CacheMinutes` | `CoinGecko__CacheMinutes` | Minutos que se reutilizan los precios bajados (default 10) |
 | `CoinGecko:TopCoins` | `CoinGecko__TopCoins` | Cuántas criptomonedas, de mayor a menor capitalización, se cotizan (default y máximo 250) |
 | `Cors:AllowedOrigins` | `Cors__AllowedOrigins__0` | Orígenes habilitados para el frontend |
+| `Email:ResendApiKey` | `Email__ResendApiKey` | API key de [Resend](https://resend.com/api-keys), el proveedor de los correos transaccionales (por ejemplo, las credenciales del alta de un empleado) |
+| `Email:From` | `Email__From` | Remitente de los correos. Tiene que ser una dirección del dominio verificado en Resend (default `FinGrow <no-reply@fingrow.com.ar>`) |
+| `Email:RedirectAllTo` | `Email__RedirectAllTo` | Si tiene valor, todos los correos van a esa dirección en lugar de a su destinatario, que queda en el asunto (`[Para ana@empresa.com] ...`). En `Development` es `delivered@resend.dev`, una casilla de prueba de Resend que acepta el correo sin entregarlo a nadie: para verlo en tu bandeja, pisala con tu dirección. En producción va vacía |
+| `Email:TimeoutSeconds` | `Email__TimeoutSeconds` | Timeout de cada envío a Resend (default 30) |
 | `Storage:ServiceUrl` | `Storage__ServiceUrl` | URL del almacenamiento compatible con S3 donde viven los comprobantes. En Cloudflare R2 es `https://<account-id>.r2.cloudflarestorage.com`; en desarrollo, el S3Mock de compose (`http://localhost:9090`). Ver [Comprobantes](#comprobantes-cloudflare-r2) |
 | `Storage:BucketName` | `Storage__BucketName` | Bucket de los comprobantes. Uno por entorno, siempre privado |
 | `Storage:AccessKey` | `Storage__AccessKey` | Access Key ID del token de API de R2 |
@@ -119,6 +123,7 @@ variables de entorno usando `__` como separador de sección.
 | `Storage:Region` | `Storage__Region` | Región del bucket. En R2 es `auto` (default) |
 | `Storage:ForcePathStyle` | `Storage__ForcePathStyle` | Arma las URLs como `<host>/<bucket>` en lugar de `<bucket>.<host>` (default `true`, que es lo que necesitan R2 y S3Mock) |
 | `Storage:TimeoutSeconds` | `Storage__TimeoutSeconds` | Timeout de cada operación contra el almacenamiento (default 30) |
+| `ReceiptsCleanup:GraceDays` | `ReceiptsCleanup__GraceDays` | Días que espera `receipts-cleanup` antes de borrar un comprobante suelto, contados desde que se subió (default 7, entre 1 y 365) |
 
 Los secretos no se commitean. En desarrollo local:
 
@@ -132,9 +137,10 @@ dotnet user-secrets set "Telegram:BotToken" "<token del bot>" --project src/FinG
 dotnet user-secrets set "Telegram:WebhookSecret" "<secreto inventado para el webhook>" --project src/FinGrow.Api
 dotnet user-secrets set "TokenEncryption:Key" "$(openssl rand -base64 32)" --project src/FinGrow.Api
 dotnet user-secrets set "Jobs:ApiKey" "$(openssl rand -base64 24)" --project src/FinGrow.Api
+dotnet user-secrets set "Email:ResendApiKey" "<API key de Resend>" --project src/FinGrow.Api
 ```
 
-Si `Jwt:SecretKey`, `AiService:ApiKey` o las credenciales de Twilio o Telegram faltan, la API no arranca y
+Si `Jwt:SecretKey`, `AiService:ApiKey`, las credenciales de Twilio o Telegram, o la API key de Resend faltan, la API no arranca y
 el log dice cuál es. Con `dotnet run` contra una FinGrow-AI levantada con `uvicorn` y `API_KEY`
 vacía, `AiService:ApiKey` puede ser cualquier texto porque la IA no lo valida. Con Docker y en
 producción los dos servicios tienen que compartir el mismo valor.
@@ -232,7 +238,7 @@ mismo código funciona contra Cloudflare R2 en los entornos desplegados y contra
 
 **Un movimiento tiene como máximo un comprobante** (índice único en `transaction_receipts.transaction_id`): asociarle otro reemplaza al anterior, que queda suelto. Las respuestas de los movimientos (listado, detalle, crear, editar, pendientes y confirmar) informan su `receiptId`, o `null` si no tiene.
 
-Un comprobante que deja de usarse (se reemplaza, se quita o se borra su movimiento) **no se borra en el momento**: queda suelto, sin movimiento, y lo limpia el trabajo de SCRUM-132.
+Un comprobante que deja de usarse (se reemplaza, se quita o se borra su movimiento) **no se borra en el momento**: queda suelto, sin movimiento, y lo limpia el trabajo `receipts-cleanup` (ver [Trabajos programados](#trabajos-programados-dokploy)) cuando pasan `ReceiptsCleanup:GraceDays` días desde que se subió. La espera protege la foto que un empleado acaba de subir y todavía no guardó; un comprobante viejo que se suelta hoy se borra en la corrida siguiente.
 
 Un comprobante nace sin movimiento: si el OCR falla, la imagen ya quedó guardada y se asocia
 después. Si el almacenamiento no responde, la subida devuelve 503 y no se crea nada en la base.
@@ -327,7 +333,9 @@ siguiente.
 | `metrics-snapshot` | `0 4 1 * *` (el 1 de cada mes, 01:00 de Argentina) | Genera las fotos mensuales de métricas por empresa y por departamento (`company_metrics_snapshots` y `department_metrics_snapshots`) del último mes cerrado, y completa las de los meses anteriores que falten desde el alta de cada empresa. En la misma pasada calcula el puntaje de salud financiera de cada empleado (ver más abajo). Es idempotente: correrlo de nuevo actualiza la foto del último mes cerrado en lugar de duplicarla. Si un mes necesita el dólar MEP y DolarApi no responde, esa foto queda pendiente y la corrida, fallida |
 | `mercadopago-sync` | `0 * * * *` (cada hora) | Recorre las cuentas de Mercado Pago vinculadas y trae los movimientos nuevos como pendientes de revisión. Mercado Pago no avisa por webhook lo que un usuario paga, por eso se consulta |
 | `investment-quotes` | `30 21 * * 1-5` (días hábiles, 18:30 de Argentina) | Guarda en `security_prices` el último precio de cada símbolo de BYMA, cada fondo de ArgentinaDatos y cada cripto de CoinGecko (aunque nadie tenga inversiones con símbolo) y cotiza con esos precios las inversiones cargadas con símbolo y cantidad, registrándoles la valuación de mercado del día. Correrlo de nuevo el mismo día actualiza esa valuación en lugar de duplicarla. Si una fuente no responde, cotiza con las otras y la corrida queda fallida con el motivo; si no responde ninguna, no toca nada |
+| `receipts-cleanup` | `0 7 * * *` (todos los días, 04:00 de Argentina) | Borra los comprobantes sueltos (sin movimiento) subidos hace más de `ReceiptsCleanup:GraceDays` días (default 7): primero el archivo de R2 y después la fila de `transaction_receipts`. Si R2 falla para uno, sigue con el resto, la corrida queda fallida con el motivo y ese comprobante se reintenta en la siguiente. Nunca toca un comprobante asociado a un movimiento |
 | `goal-progress-alerts` | `0 12 * * *` (todos los días, 09:00 de Argentina) | Recorre las metas activas y avisa al empleado cuando una lleva 30 días sin aportes (`GoalStalled`, como máximo uno cada 30 días mientras siga quieta) o cuando se acerca su fecha límite con saldo pendiente (`GoalDeadlineApproaching`, una vez a los 30, a los 7 y a 1 día, con cuánto falta y cuántos días quedan). Si la fecha límite está cerca solo manda esa, que ya dice lo mismo. Correrlo de nuevo el mismo día no repite avisos |
+| `email-delivery` | `*/5 * * * *` (cada 5 minutos) | Reintenta los correos de `outbound_emails` que no salieron en el momento (`Failed`, o `Pending` que su primer intento dejó colgado hace más de un minuto), hasta 50 por corrida. Cada fallo espera más para el siguiente intento (5 min, 15 min, 1 h, 4 h) y al quinto el correo queda `Abandoned`. Si alguno no sale, la corrida queda fallida con el motivo de cada uno |
 
 Los endpoints viven bajo `/api/jobs` y se protegen con la cabecera `X-Jobs-Key`, que tiene que
 coincidir con `Jobs:ApiKey`. No usan JWT: los llama un cron, no una persona logueada.

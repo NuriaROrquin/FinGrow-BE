@@ -382,6 +382,23 @@ public sealed class FakeAiService : IAiService
 
         return Task.FromResult(ParseResult);
     }
+
+    public AudioTranscription TranscriptionResult { get; set; } =
+        new(AudioTranscriptionOutcome.Transcribed, "Gasté 500 en el super", "fake-transcribe");
+
+    public List<(byte[] Audio, string ContentType)> TranscribedAudios { get; } = new();
+
+    public Task<AudioTranscription> TranscribeAudioAsync(ReadOnlyMemory<byte> audio, string contentType, CancellationToken cancellationToken = default)
+    {
+        if (Unreachable)
+        {
+            throw new HttpRequestException("FinGrow-AI unreachable");
+        }
+
+        TranscribedAudios.Add((audio.ToArray(), contentType));
+
+        return Task.FromResult(TranscriptionResult);
+    }
 }
 
 public sealed class FakeRefreshTokenRepository : IRefreshTokenRepository
@@ -855,6 +872,8 @@ public sealed class FakeTransactionReceiptRepository : ITransactionReceiptReposi
 
     public void Add(TransactionReceipt receipt) => Receipts.Add(receipt);
 
+    public void Remove(TransactionReceipt receipt) => Receipts.Remove(receipt);
+
     public Task<TransactionReceipt?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Receipts.FirstOrDefault(receipt => receipt.Id == id));
 
@@ -873,6 +892,14 @@ public sealed class FakeTransactionReceiptRepository : ITransactionReceiptReposi
             .Where(receipt => receipt.EmployeeId == employeeId)
             .Select(receipt => receipt.StorageKey)
             .ToList());
+
+    public Task<IReadOnlyList<TransactionReceipt>> ListDetachedUploadedBeforeAsync(
+        DateTimeOffset cutoff,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<TransactionReceipt>>(Receipts
+            .Where(receipt => receipt.TransactionId is null && receipt.UploadedAt < cutoff)
+            .OrderBy(receipt => receipt.UploadedAt)
+            .ToList());
 }
 
 public sealed class FakeFileStorage : IFileStorage
@@ -880,6 +907,8 @@ public sealed class FakeFileStorage : IFileStorage
     public Dictionary<string, (byte[] Content, string ContentType)> Files { get; } = new(StringComparer.Ordinal);
 
     public bool Unreachable { get; set; }
+
+    public HashSet<string> UndeletableKeys { get; } = new(StringComparer.Ordinal);
 
     public Task SaveAsync(string key, Stream content, string contentType, CancellationToken cancellationToken = default)
     {
@@ -905,6 +934,11 @@ public sealed class FakeFileStorage : IFileStorage
     {
         EnsureReachable();
 
+        if (UndeletableKeys.Contains(key))
+        {
+            throw new FileStorageUnavailableException($"el almacenamiento no pudo borrar {key}");
+        }
+
         Files.Remove(key);
         return Task.CompletedTask;
     }
@@ -915,5 +949,41 @@ public sealed class FakeFileStorage : IFileStorage
         {
             throw new FileStorageUnavailableException("el almacenamiento no responde");
         }
+    }
+}
+
+public sealed class FakeOutboundEmailRepository : IOutboundEmailRepository
+{
+    public List<OutboundEmail> Emails { get; } = new();
+
+    public void Add(OutboundEmail email) => Emails.Add(email);
+
+    public Task<OutboundEmail?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Emails.FirstOrDefault(email => email.Id == id));
+
+    public Task<IReadOnlyList<Guid>> ListDueIdsAsync(DateTimeOffset now, int take, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>(Emails
+            .Where(email => email.IsAwaitingDelivery && email.NextAttemptAt <= now)
+            .OrderBy(email => email.NextAttemptAt)
+            .Select(email => email.Id)
+            .Take(take)
+            .ToList());
+}
+
+public sealed class FakeEmailSender : IEmailSender
+{
+    public List<EmailMessage> Sent { get; } = new();
+
+    public EmailDeliveryException? Failure { get; set; }
+
+    public Task<string> SendAsync(EmailMessage message, CancellationToken cancellationToken = default)
+    {
+        if (Failure is not null)
+        {
+            throw Failure;
+        }
+
+        Sent.Add(message);
+        return Task.FromResult($"re-{Sent.Count}");
     }
 }

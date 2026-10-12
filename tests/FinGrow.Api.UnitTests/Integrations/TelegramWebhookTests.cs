@@ -223,6 +223,7 @@ public class TelegramWebhookTests
                     ["Twilio:AuthToken"] = "unit-test-twilio-auth-token",
                     ["Telegram:BotToken"] = "unit-test-telegram-bot-token",
                     ["Telegram:WebhookSecret"] = Secret,
+                    ["Email:ResendApiKey"] = "re_unit_test_key",
                     ["MercadoPago:ClientId"] = "unit-test-mp-client-id",
                     ["MercadoPago:ClientSecret"] = "unit-test-mp-client-secret",
                     ["MercadoPago:RedirectUri"] = "https://api.test/api/integrations/mercadopago/oauth/callback",
@@ -299,6 +300,12 @@ public class TelegramWebhookTests
                 MessageParsingOutcome.Parsed,
                 new ParsedTransaction(TransactionType.Expense, 500m, defaultCurrency, ExpenseCategory.Alimentos, null, "Supermercado", null, 0.9),
                 "fake-model"));
+
+        public Task<AudioTranscription> TranscribeAudioAsync(
+            ReadOnlyMemory<byte> audio,
+            string contentType,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class InMemoryTransactionRepository : ITransactionRepository

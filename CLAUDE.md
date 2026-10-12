@@ -158,8 +158,8 @@ esa empresa, pero **cada handler sigue filtrando por `ICurrentUser.CompanyId`** 
 ante un recurso de otra empresa, para no confirmar que existe.
 
 - **El alta de un empleado devuelve una contraseña temporal una sola vez**
-  (`CreatedEmployeeResponse`); en la base queda solo el hash. Mandarla por mail es T-17: cuando
-  exista, se engancha en `CreateEmployeeCommandHandler`.
+  (`CreatedEmployeeResponse`); en la base queda solo el hash. Además se le manda por correo
+  (`WelcomeEmail`), encolado en el mismo `SaveChanges` que el empleado.
 - **El email de un empleado es único en toda la plataforma**, no por empresa: es su credencial
   de login.
 - **Eliminar un empleado es definitivo.** La cascada se lleva sus movimientos, metas,
@@ -211,7 +211,12 @@ y del id del comprobante. Lo que sume otro tipo de archivo (los audios de HU-14)
 `IFileStorage`. Un almacenamiento que no responde llega como `FileStorageUnavailableException`
 y el caso de uso lo traduce a `Unavailable` (503). Los handlers la atrapan; no dejes que
 escape como 500. Un movimiento tiene un solo comprobante, y lo que deja de usar uno lo suelta
-con `Detach()`, no lo borra: el borrado real es del trabajo de limpieza (SCRUM-132).
+con `Detach()`, no lo borra: el borrado real es exclusivo de `receipts-cleanup`
+(`Application/Features/Receipts/Cleanup/`), que borra los sueltos pasado el período de gracia
+(`ReceiptsCleanup:GraceDays`, medido desde `UploadedAt`). Primero borra el archivo y después la
+fila, y guarda todas las filas juntas al final: si se corta a mitad de camino, quedan filas cuyo
+archivo ya no existe, y la corrida siguiente las limpia porque borrar un archivo inexistente no
+falla. Al revés quedaría un archivo sin fila que nadie volvería a encontrar.
 
 ## Trabajos programados
 
@@ -295,6 +300,23 @@ la aplica `FinancialHealthScorer` (`Application/Features/Metrics/FinancialHealth
 - **Sin MEP no se fotografía el mes** de una empresa con movimientos en dólares: la corrida queda
   fallida y la siguiente genera la foto que falta. No conviertas con una cotización inventada ni
   guardes una foto con parte de la plantilla sin puntuar.
+
+## Correos
+
+Un correo nunca se manda directo desde un handler: se encola con `OutboundEmail.Queue` en
+`outbound_emails` dentro del mismo `SaveChanges` que el cambio que lo origina, así una falla de
+Resend no deshace ese cambio. El evento `OutboundEmailQueued` dispara el primer intento apenas se
+guarda, y `OutboundEmailDispatcher` (`Application/Features/OutboundEmails/`) registra el resultado:
+`Sent`, `Failed` con el próximo intento, o `Abandoned` después de `OutboundEmail.MaxAttempts`.
+Los reintentos los hace el trabajo `email-delivery`. Un correo recién encolado le pertenece a su
+primer intento durante `OutboundEmail.FirstAttemptGrace`: así el trabajo no lo manda a la vez.
+
+- **El cuerpo va cifrado y se borra cuando el correo deja de esperar envío**: puede llevar
+  credenciales. Un `CHECK` impide que un correo enviado o abandonado conserve el cuerpo.
+- **En `Development` todo correo va a `Email:RedirectAllTo`**, no a su destinatario: lo resuelve
+  `ResendEmailSender`, no quien encola.
+- **El cliente de Resend no reintenta**: repetir el `POST` cuando Resend ya lo recibió duplica el
+  correo. Los reintentos son de `outbound_emails`.
 
 ## Eventos de dominio y alertas
 
