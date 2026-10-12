@@ -12,6 +12,9 @@ using FinGrow.Domain.ValueObjects;
 public sealed class Company : AggregateRoot, ITwoFactorAccount
 {
     public const int MaxNameLength = 200;
+    public const int MaxIndustryLength = 100;
+    public const int MaxPhoneNumberLength = 30;
+    public const int MaxFiscalAddressLength = 300;
 
     private readonly List<Department> _departments = new();
 
@@ -45,6 +48,14 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
     public TaxId TaxId { get; private set; } = null!;
 
     public Email Email { get; private set; } = null!;
+
+    public string? Industry { get; private set; }
+
+    public string? PhoneNumber { get; private set; }
+
+    public string? FiscalAddress { get; private set; }
+
+    public int? FoundedYear { get; private set; }
 
     public string PasswordHash { get; private set; } = string.Empty;
 
@@ -159,6 +170,40 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
         UpdatedAt = updatedAt;
     }
 
+    public void UpdateCorporateProfile(string name, TaxId taxId, Email email, DateTimeOffset updatedAt)
+    {
+        ArgumentNullException.ThrowIfNull(taxId);
+        ArgumentNullException.ThrowIfNull(email);
+
+        Name = EnsureValidName(name);
+        TaxId = taxId;
+        Email = email;
+        UpdatedAt = updatedAt;
+    }
+
+    public void UpdateCorporateInformation(
+        string name,
+        TaxId taxId,
+        Email email,
+        string? industry,
+        string? phoneNumber,
+        string? fiscalAddress,
+        int? foundedYear,
+        DateTimeOffset updatedAt)
+    {
+        UpdateCorporateProfile(name, taxId, email, updatedAt);
+        Industry = EnsureIndustry(industry);
+        PhoneNumber = EnsureOptionalText(phoneNumber, MaxPhoneNumberLength, "El teléfono");
+        FiscalAddress = EnsureOptionalText(fiscalAddress, MaxFiscalAddressLength, "La dirección fiscal");
+
+        if (foundedYear is < 1800 or > 9999)
+        {
+            throw new DomainException("El año de fundación no es válido.");
+        }
+
+        FoundedYear = foundedYear;
+    }
+
     public void ChangePassword(string passwordHash, DateTimeOffset updatedAt)
     {
         PasswordHash = EnsureHash(passwordHash);
@@ -237,4 +282,30 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
         string.IsNullOrWhiteSpace(passwordHash)
             ? throw new DomainException("La contrasena es obligatoria.")
             : passwordHash;
+
+    private static string? EnsureOptionalText(string? value, int maxLength, string fieldName)
+    {
+        var trimmed = value?.Trim();
+
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            return null;
+        }
+
+        if (trimmed.Length > maxLength)
+        {
+            throw new DomainException($"{fieldName} no puede superar los {maxLength} caracteres.");
+        }
+
+        return trimmed;
+    }
+
+    private static string? EnsureIndustry(string? value)
+    {
+        var industry = EnsureOptionalText(value, MaxIndustryLength, "La industria");
+
+        return industry is null || IndustryTypes.IsValid(industry)
+            ? industry
+            : throw new DomainException("La industria seleccionada no es válida.");
+    }
 }

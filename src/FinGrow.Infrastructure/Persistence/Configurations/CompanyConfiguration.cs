@@ -30,6 +30,17 @@ internal sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
             .HasMaxLength(Email.MaxLength)
             .IsRequired();
 
+        builder.Property(company => company.Industry)
+            .HasMaxLength(Company.MaxIndustryLength);
+
+        builder.Property(company => company.PhoneNumber)
+            .HasMaxLength(Company.MaxPhoneNumberLength);
+
+        builder.Property(company => company.FiscalAddress)
+            .HasMaxLength(Company.MaxFiscalAddressLength);
+
+        builder.Property(company => company.FoundedYear);
+
         builder.Property(company => company.PasswordHash)
             .HasMaxLength(200)
             .IsRequired();

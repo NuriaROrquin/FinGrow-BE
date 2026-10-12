@@ -203,6 +203,30 @@ public class CompanyTests
             Now));
     }
 
+    [Fact]
+    public void Corporate_information_can_be_updated()
+    {
+        var company = CreateCompany();
+
+        company.UpdateCorporateInformation(
+            "Nueva Empresa S.A.",
+            TaxId.From("30712345671"),
+            Email.From("contacto@nuevaempresa.com"),
+            "Tecnología",
+            "+54 11 4321-8765",
+            "Av. Corrientes 1234, CABA",
+            2010,
+            Now.AddDays(1));
+
+        company.Name.ShouldBe("Nueva Empresa S.A.");
+        company.TaxId.Value.ShouldBe("30712345671");
+        company.Email.Value.ShouldBe("contacto@nuevaempresa.com");
+        company.Industry.ShouldBe("Tecnología");
+        company.PhoneNumber.ShouldBe("+54 11 4321-8765");
+        company.FiscalAddress.ShouldBe("Av. Corrientes 1234, CABA");
+        company.FoundedYear.ShouldBe(2010);
+    }
+
     private static Company CreateCompany() => Company.Create(
         "Empresa Demo S.A.",
         TaxId.From("20123456786"),
