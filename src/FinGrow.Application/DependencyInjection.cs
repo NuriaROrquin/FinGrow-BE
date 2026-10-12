@@ -6,6 +6,7 @@ using Events;
 using Features.Integrations.ChatTransactions;
 using Features.Integrations.Linking;
 using Features.Integrations.MercadoPago.Sync;
+using Features.Integrations.WhatsApp;
 using Features.Investments.QuoteInvestments;
 using Features.Metrics.FinancialHealth;
 using Features.Metrics.SnapshotMetrics;
@@ -36,6 +37,7 @@ public static class DependencyInjection
         services.AddScoped<LinkCodeRedeemer>();
         services.AddScoped<ChatTransactionProposer>();
         services.AddScoped<ChatTransactionReviewer>();
+        services.AddScoped<WhatsAppProposalReviewer>();
         services.AddScoped<MercadoPagoSynchronizer>();
         services.AddScoped<SessionIssuer>();
         services.AddScoped<TwoFactorAccountFinder>();

@@ -1,8 +1,9 @@
 namespace FinGrow.Application.Features.Integrations.WhatsApp.ReceiveWhatsAppMessage;
 
+using System.Globalization;
 using FinGrow.Application.Common;
+using FinGrow.Application.Features.Integrations.ChatTransactions;
 using FinGrow.Application.Features.Integrations.Linking;
-using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.Repositories;
@@ -21,23 +22,23 @@ internal sealed partial class ReceiveWhatsAppMessageHandler
 
     internal const string LinkedReplySuffix = ": este WhatsApp quedó vinculado a tu cuenta de FinGrow.";
 
-    internal const string MessageReceivedReply =
-        "Recibido. Todavía no registro movimientos por WhatsApp, pero tu número ya está vinculado.";
-
     private readonly IEmployeeIntegrationRepository _integrations;
     private readonly LinkCodeRedeemer _linker;
-    private readonly ITwilioMediaClient _media;
+    private readonly ChatTransactionProposer _proposer;
+    private readonly WhatsAppProposalReviewer _reviewer;
     private readonly ILogger<ReceiveWhatsAppMessageHandler> _logger;
 
     public ReceiveWhatsAppMessageHandler(
         IEmployeeIntegrationRepository integrations,
         LinkCodeRedeemer linker,
-        ITwilioMediaClient media,
+        ChatTransactionProposer proposer,
+        WhatsAppProposalReviewer reviewer,
         ILogger<ReceiveWhatsAppMessageHandler> logger)
     {
         _integrations = integrations;
         _linker = linker;
-        _media = media;
+        _proposer = proposer;
+        _reviewer = reviewer;
         _logger = logger;
     }
 
@@ -54,6 +55,9 @@ internal sealed partial class ReceiveWhatsAppMessageHandler
 
         return Result.Success(reply);
     }
+
+    internal static string ExternalReference(string phoneNumber, string messageSid) =>
+        string.Create(CultureInfo.InvariantCulture, $"whatsapp:{phoneNumber}:{messageSid}");
 
     private async Task<WhatsAppReply> TryLinkAsync(string phoneNumber, string body, CancellationToken cancellationToken)
     {
@@ -72,20 +76,60 @@ internal sealed partial class ReceiveWhatsAppMessageHandler
         ReceiveWhatsAppMessageCommand request,
         CancellationToken cancellationToken)
     {
-        foreach (var attachment in request.Media)
-        {
-            var media = await _media.DownloadAsync(attachment.Url, cancellationToken);
-
-            LogAttachment(_logger, integration.EmployeeId, media.ContentType, media.Content.Length, request.MessageSid);
-        }
-
         LogMessage(_logger, integration.EmployeeId, request.Body.Length, request.Media.Count, request.MessageSid);
 
-        return new WhatsAppReply(MessageReceivedReply);
+        if (await _reviewer.TryReviewAsync(integration.EmployeeId, request.Body, cancellationToken) is { } review)
+        {
+            return new WhatsAppReply(ReviewReply(review));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Body))
+        {
+            return new WhatsAppReply(WhatsAppTransactionText.HelpReply);
+        }
+
+        return await ProposeAsync(integration.EmployeeId, request, request.Body, heard: null, cancellationToken);
     }
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Adjunto de WhatsApp del empleado {EmployeeId}: {ContentType}, {Bytes} bytes (mensaje {MessageSid}).")]
-    private static partial void LogAttachment(ILogger logger, Guid employeeId, string contentType, int bytes, string messageSid);
+    private async Task<WhatsAppReply> ProposeAsync(
+        Guid employeeId,
+        ReceiveWhatsAppMessageCommand request,
+        string text,
+        string? heard,
+        CancellationToken cancellationToken)
+    {
+        var proposal = await _proposer.ProposeAsync(
+            employeeId,
+            TransactionSource.WhatsApp,
+            ExternalReference(request.PhoneNumber, request.MessageSid),
+            text,
+            cancellationToken);
+
+        if (proposal.Outcome == ProposalOutcome.AlreadyProposed)
+        {
+            return WhatsAppReply.Silent;
+        }
+
+        var reply = proposal.Outcome switch
+        {
+            ProposalOutcome.Proposed => WhatsAppTransactionText.Proposal(proposal.Transaction!, proposal.AsksPaymentMethod),
+            ProposalOutcome.TooLong => ChatTransactionText.TooLongReply,
+            ProposalOutcome.MissingAmount => ChatTransactionText.MissingAmountReply,
+            ProposalOutcome.MultipleTransactions => ChatTransactionText.MultipleTransactionsReply,
+            ProposalOutcome.NotATransaction => WhatsAppTransactionText.HelpReply,
+            _ => ChatTransactionText.AiUnavailableReply
+        };
+
+        return new WhatsAppReply(heard is null ? reply : heard + "\n\n" + reply);
+    }
+
+    private static string ReviewReply(Review review) =>
+        review.Outcome switch
+        {
+            ReviewOutcome.Confirmed => ChatTransactionText.Confirmed(review.Transaction!),
+            ReviewOutcome.Discarded => ChatTransactionText.DiscardedReply,
+            _ => ChatTransactionText.AlreadyReviewedReply
+        };
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Mensaje de WhatsApp del empleado {EmployeeId}: {Characters} caracteres, {Attachments} adjuntos (mensaje {MessageSid}).")]
     private static partial void LogMessage(ILogger logger, Guid employeeId, int characters, int attachments, string messageSid);

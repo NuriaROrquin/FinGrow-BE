@@ -1,8 +1,11 @@
 namespace FinGrow.Application.UnitTests.Features.Integrations.WhatsApp;
 
 using FinGrow.Application.Common;
+using FinGrow.Application.Features.Integrations.ChatTransactions;
 using FinGrow.Application.Features.Integrations.Linking;
+using FinGrow.Application.Features.Integrations.WhatsApp;
 using FinGrow.Application.Features.Integrations.WhatsApp.ReceiveWhatsAppMessage;
+using FinGrow.Application.Interfaces;
 using FinGrow.Application.UnitTests.Fakes;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
@@ -19,6 +22,8 @@ public class ReceiveWhatsAppMessageHandlerTests
     private readonly FakeEmployeeIntegrationRepository _integrations = new();
     private readonly FakeIntegrationLinkCodeRepository _linkCodes = new();
     private readonly FakeTwilioMediaClient _media = new();
+    private readonly FakeTransactionRepository _transactions = new();
+    private readonly FakeAiService _ai = new();
     private readonly FakeUnitOfWork _unitOfWork = new();
     private readonly FakeDateTimeProvider _clock = new(Now);
     private readonly Employee _employee = CreateEmployee();
@@ -108,38 +113,249 @@ public class ReceiveWhatsAppMessageHandlerTests
     }
 
     [Fact]
-    public async Task A_linked_number_is_resolved_to_its_employee_and_its_attachments_are_downloaded()
+    public async Task A_linked_number_writing_an_expense_gets_the_proposal_and_it_stays_pending()
     {
-        _integrations.Add(EmployeeIntegration.Create(_employee.Id, IntegrationProvider.WhatsApp, Phone, Now));
-        var audio = new Uri("https://api.twilio.com/2010-04-01/Accounts/AC1/Messages/MM1/Media/ME1");
+        LinkPhone();
+        _ai.ParseResult = Parsed(Expense(PaymentMethod.DebitCard));
 
-        var result = await Handle(Phone, string.Empty, new WhatsAppInboundMedia(audio, "audio/ogg"));
+        var result = await Handle(Phone, "Gasté $500 en el super con débito");
 
-        result.Value.Text.ShouldBe(ReceiveWhatsAppMessageHandler.MessageReceivedReply);
-        _media.Downloaded.ShouldBe(new[] { audio });
+        var transaction = _transactions.Transactions.ShouldHaveSingleItem();
+        transaction.EmployeeId.ShouldBe(_employee.Id);
+        transaction.Status.ShouldBe(TransactionStatus.Pending);
+        transaction.Source.ShouldBe(TransactionSource.WhatsApp);
+        transaction.ExternalReference.ShouldBe("whatsapp:+5491112345678:SM123");
+        transaction.PaymentMethod.ShouldBe(PaymentMethod.DebitCard);
+        result.Value.Text.ShouldBe(WhatsAppTransactionText.Proposal(transaction, asksPaymentMethod: false));
+        _ai.ParsedMessages.ShouldHaveSingleItem().Text.ShouldBe("Gasté $500 en el super con débito");
+    }
+
+    [Fact]
+    public async Task Without_a_payment_method_the_proposal_asks_for_it_with_numbers()
+    {
+        LinkPhone();
+        _ai.ParseResult = Parsed(Expense(paymentMethod: null));
+
+        var result = await Handle(Phone, "Gasté $500 en el super");
+
+        result.Value.Text!.ShouldContain("¿Cómo lo pagaste? Respondé con el número:");
+        _transactions.Transactions.ShouldHaveSingleItem().Status.ShouldBe(TransactionStatus.Pending);
+    }
+
+    [Theory]
+    [InlineData("SÍ")]
+    [InlineData("dale")]
+    [InlineData("👍")]
+    public async Task Answering_yes_confirms_the_whatsapp_proposal(string answer)
+    {
+        LinkPhone();
+        _ai.ParseResult = Parsed(Expense(PaymentMethod.DebitCard));
+        await Handle(Phone, "Gasté $500 en el super con débito");
+
+        var result = await HandleMessage(Phone, answer, "SM124");
+
+        var transaction = _transactions.Transactions.ShouldHaveSingleItem();
+        transaction.Status.ShouldBe(TransactionStatus.Confirmed);
+        result.Value.Text.ShouldBe(ChatTransactionText.Confirmed(transaction));
+        _ai.ParsedMessages.ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task Answering_no_discards_the_proposal()
+    {
+        LinkPhone();
+        _ai.ParseResult = Parsed(Expense(PaymentMethod.Cash));
+        await Handle(Phone, "Gasté $500 en el super");
+
+        var result = await HandleMessage(Phone, "No", "SM124");
+
+        _transactions.Transactions.ShouldHaveSingleItem().Status.ShouldBe(TransactionStatus.Discarded);
+        result.Value.Text.ShouldBe(ChatTransactionText.DiscardedReply);
+    }
+
+    [Fact]
+    public async Task Answering_a_number_sets_that_payment_method_and_confirms()
+    {
+        LinkPhone();
+        _ai.ParseResult = Parsed(Expense(paymentMethod: null));
+        await Handle(Phone, "Gasté $500 en el super");
+
+        await HandleMessage(Phone, "3", "SM124");
+
+        var transaction = _transactions.Transactions.ShouldHaveSingleItem();
+        transaction.Status.ShouldBe(TransactionStatus.Confirmed);
+        transaction.PaymentMethod.ShouldBe(PaymentMethod.CreditCard);
+    }
+
+    [Fact]
+    public async Task A_number_outside_the_options_is_handled_as_a_new_message()
+    {
+        LinkPhone();
+        _ai.ParseResult = Parsed(new ParsedTransaction(
+            TransactionType.Income, 10000m, Currency.ARS, null, IncomeCategory.Freelance, "Freelance", null, 0.9));
+        await Handle(Phone, "Cobré $10000 por un freelance");
+        _ai.ParseResult = ParsedMessage.Of(MessageParsingOutcome.NotATransaction);
+
+        await HandleMessage(Phone, "4", "SM124");
+
+        _transactions.Transactions.ShouldHaveSingleItem().Status.ShouldBe(TransactionStatus.Pending);
+        _ai.ParsedMessages.Last().Text.ShouldBe("4");
+    }
+
+    [Fact]
+    public async Task Yes_confirms_the_most_recent_proposal_when_there_are_several()
+    {
+        LinkPhone();
+        _ai.ParseResult = Parsed(Expense(PaymentMethod.Cash));
+        await HandleMessage(Phone, "Gasté $500 en el super", "SM1");
+        _clock.UtcNow = Now.AddMinutes(5);
+        await HandleMessage(Phone, "Gasté $500 en el kiosco", "SM2");
+
+        await HandleMessage(Phone, "sí", "SM3");
+
+        ProposalOf("SM2").Status.ShouldBe(TransactionStatus.Confirmed);
+        ProposalOf("SM1").Status.ShouldBe(TransactionStatus.Pending);
+    }
+
+    [Fact]
+    public async Task Yes_without_a_recent_whatsapp_proposal_is_handled_as_a_new_message()
+    {
+        LinkPhone();
+        _ai.ParseResult = Parsed(Expense(PaymentMethod.Cash));
+        await Handle(Phone, "Gasté $500 en el super");
+        _clock.UtcNow = Now.Add(WhatsAppProposalReviewer.ProposalWindow).AddMinutes(1);
+        _ai.ParseResult = ParsedMessage.Of(MessageParsingOutcome.NotATransaction);
+
+        var result = await HandleMessage(Phone, "sí", "SM124");
+
+        result.Value.Text.ShouldBe(WhatsAppTransactionText.HelpReply);
+        _transactions.Transactions.ShouldHaveSingleItem().Status.ShouldBe(TransactionStatus.Pending);
+        _ai.ParsedMessages.Last().Text.ShouldBe("sí");
+    }
+
+    [Fact]
+    public async Task Yes_does_not_confirm_a_proposal_from_another_channel()
+    {
+        LinkPhone();
+        var telegramProposal = Transaction.RegisterExpense(
+            _employee.Id,
+            Money.From(500m, Currency.ARS),
+            ExpenseCategory.Alimentos,
+            "Supermercado",
+            new DateOnly(2026, 3, 15),
+            PaymentMethod.Cash,
+            TransactionSource.Telegram,
+            TransactionStatus.Pending,
+            Now,
+            "telegram:123456789:42");
+        _transactions.Add(telegramProposal);
+
+        await Handle(Phone, "sí");
+
+        telegramProposal.Status.ShouldBe(TransactionStatus.Pending);
+    }
+
+    [Fact]
+    public async Task A_message_twilio_delivers_twice_is_proposed_once_and_the_retry_gets_no_reply()
+    {
+        LinkPhone();
+        _ai.ParseResult = Parsed(Expense(PaymentMethod.Cash));
+        await Handle(Phone, "Gasté $500 en el super");
+
+        var retry = await Handle(Phone, "Gasté $500 en el super");
+
+        retry.Value.ShouldBe(WhatsAppReply.Silent);
+        _transactions.Transactions.ShouldHaveSingleItem();
+    }
+
+    [Theory]
+    [InlineData(MessageParsingOutcome.MissingAmount, ChatTransactionText.MissingAmountReply)]
+    [InlineData(MessageParsingOutcome.MultipleTransactions, ChatTransactionText.MultipleTransactionsReply)]
+    [InlineData(MessageParsingOutcome.NotATransaction, WhatsAppTransactionText.HelpReply)]
+    public async Task A_message_that_cannot_be_registered_is_answered_without_creating_a_transaction(
+        MessageParsingOutcome outcome,
+        string expectedReply)
+    {
+        LinkPhone();
+        _ai.ParseResult = ParsedMessage.Of(outcome);
+
+        var result = await Handle(Phone, "Gasté en el super");
+
+        result.Value.Text.ShouldBe(expectedReply);
+        _transactions.Transactions.ShouldBeEmpty();
+        _unitOfWork.SaveCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task When_the_AI_is_down_the_employee_is_told_to_try_again()
+    {
+        LinkPhone();
+        _ai.Unreachable = true;
+
+        var result = await Handle(Phone, "Gasté $500 en el super");
+
+        result.Value.Text.ShouldBe(ChatTransactionText.AiUnavailableReply);
+        _transactions.Transactions.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_message_without_text_or_audio_gets_the_help()
+    {
+        LinkPhone();
+        var image = new WhatsAppInboundMedia(new Uri("https://api.twilio.com/2010-04-01/Accounts/AC1/Messages/MM1/Media/ME1"), "image/jpeg");
+
+        var result = await Handle(Phone, string.Empty, image);
+
+        result.Value.Text.ShouldBe(WhatsAppTransactionText.HelpReply);
+        _media.Downloaded.ShouldBeEmpty();
+        _ai.ParsedMessages.ShouldBeEmpty();
     }
 
     [Fact]
     public async Task A_linked_number_sending_a_code_is_not_relinked()
     {
-        _integrations.Add(EmployeeIntegration.Create(_employee.Id, IntegrationProvider.WhatsApp, Phone, Now));
+        LinkPhone();
         _linkCodes.Add(IntegrationLinkCode.Create(_employee.Id, IntegrationProvider.WhatsApp, Code, Now));
 
         var result = await Handle(Phone, Code);
 
-        result.Value.Text.ShouldBe(ReceiveWhatsAppMessageHandler.MessageReceivedReply);
+        result.Value.Text.ShouldBe(WhatsAppTransactionText.HelpReply);
         _linkCodes.LinkCodes.Single().UsedAt.ShouldBeNull();
     }
 
-    private Task<Result<WhatsAppReply>> Handle(string phoneNumber, string body, params WhatsAppInboundMedia[] media)
+    private Task<Result<WhatsAppReply>> Handle(string phoneNumber, string body, params WhatsAppInboundMedia[] media) =>
+        HandleMessage(phoneNumber, body, "SM123", media);
+
+    private Task<Result<WhatsAppReply>> HandleMessage(
+        string phoneNumber,
+        string body,
+        string messageSid,
+        params WhatsAppInboundMedia[] media)
     {
         var linker = new LinkCodeRedeemer(
             _integrations, _linkCodes, _employees, _unitOfWork, _clock, NullLogger<LinkCodeRedeemer>.Instance);
+        var proposer = new ChatTransactionProposer(
+            _ai, _transactions, _unitOfWork, _clock, NullLogger<ChatTransactionProposer>.Instance);
+        var reviewer = new WhatsAppProposalReviewer(
+            _transactions, new ChatTransactionReviewer(_transactions, _unitOfWork, _clock), _clock);
         var handler = new ReceiveWhatsAppMessageHandler(
-            _integrations, linker, _media, NullLogger<ReceiveWhatsAppMessageHandler>.Instance);
+            _integrations, linker, proposer, reviewer, NullLogger<ReceiveWhatsAppMessageHandler>.Instance);
 
-        return handler.Handle(new ReceiveWhatsAppMessageCommand(phoneNumber, body, "SM123", media), CancellationToken.None);
+        return handler.Handle(new ReceiveWhatsAppMessageCommand(phoneNumber, body, messageSid, media), CancellationToken.None);
     }
+
+    private void LinkPhone() =>
+        _integrations.Add(EmployeeIntegration.Create(_employee.Id, IntegrationProvider.WhatsApp, Phone, Now));
+
+    private Transaction ProposalOf(string messageSid) =>
+        _transactions.Transactions.Single(transaction =>
+            transaction.ExternalReference == ReceiveWhatsAppMessageHandler.ExternalReference(Phone, messageSid));
+
+    private static ParsedTransaction Expense(PaymentMethod? paymentMethod) => new(
+        TransactionType.Expense, 500m, Currency.ARS, ExpenseCategory.Alimentos, null, "Supermercado", paymentMethod, 0.9);
+
+    private static ParsedMessage Parsed(ParsedTransaction transaction) =>
+        new(MessageParsingOutcome.Parsed, transaction, "fake-model");
 
     private static Employee CreateEmployee() => Employee.Create(
         Guid.CreateVersion7(),
