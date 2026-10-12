@@ -20,6 +20,7 @@ public class IolEndpointsTests
 {
     private const string LinkPath = "/api/integrations/iol/link";
     private const string IntegrationPath = "/api/integrations/iol";
+    private const string SyncPath = "/api/integrations/iol/sync";
     private const string Password = "s3creta-IOL";
 
     [Fact]
@@ -97,6 +98,86 @@ public class IolEndpointsTests
         factory.Integrations.ShouldBeEmpty();
     }
 
+    [Fact]
+    public async Task Syncing_imports_the_portfolio_and_answers_the_summary()
+    {
+        using var factory = new IolWebApplicationFactory();
+        factory.Integrations.Add(LinkedIntegration(factory.EmployeeId));
+        factory.Portfolio.Positions.Add(new IolPosition("GGAL", "Grupo Financiero Galicia", "ACCIONES", "bCBA", "peso_Argentino", 10m, 5000m, 56_000m));
+        factory.Portfolio.Positions.Add(new IolPosition("GFGC5000OC", "Opcion", "Opciones", "bCBA", "peso_Argentino", 1m, 100m, 120m));
+
+        var response = await CreateAuthenticatedClient(factory).PostAsync(new Uri(SyncPath, UriKind.Relative), content: null);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        json.RootElement.GetProperty("imported").GetInt32().ShouldBe(1);
+        json.RootElement.GetProperty("ignored").GetInt32().ShouldBe(1);
+        var investment = factory.Investments.ShouldHaveSingleItem();
+        investment.EmployeeId.ShouldBe(factory.EmployeeId);
+        investment.Source.ShouldBe(InvestmentSource.Iol);
+        investment.ExternalReference.ShouldBe("bcba:GGAL");
+    }
+
+    [Fact]
+    public async Task Syncing_without_iol_linked_is_not_found()
+    {
+        using var factory = new IolWebApplicationFactory();
+
+        var response = await CreateAuthenticatedClient(factory).PostAsync(new Uri(SyncPath, UriKind.Relative), content: null);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await response.Content.ReadAsStringAsync()).ShouldContain("Integrations.Iol.NotLinked");
+    }
+
+    [Fact]
+    public async Task Syncing_while_iol_is_down_answers_service_unavailable_and_imports_nothing()
+    {
+        using var factory = new IolWebApplicationFactory();
+        factory.Integrations.Add(LinkedIntegration(factory.EmployeeId));
+        factory.Portfolio.Positions.Add(new IolPosition("GGAL", "Grupo Financiero Galicia", "ACCIONES", "bCBA", "peso_Argentino", 10m, 5000m, 56_000m));
+        factory.Portfolio.Failure = new HttpRequestException("bad gateway", null, HttpStatusCode.BadGateway);
+
+        var response = await CreateAuthenticatedClient(factory).PostAsync(new Uri(SyncPath, UriKind.Relative), content: null);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+        (await response.Content.ReadAsStringAsync()).ShouldContain("Integrations.Iol.Unavailable");
+        factory.Investments.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Syncing_with_an_expired_authorization_answers_conflict_to_link_again()
+    {
+        using var factory = new IolWebApplicationFactory();
+        var integration = LinkedIntegration(factory.EmployeeId);
+        integration.MarkFailed("La autorizacion de IOL vencio o fue revocada: volve a vincular la cuenta.", DateTimeOffset.UtcNow);
+        factory.Integrations.Add(integration);
+
+        var response = await CreateAuthenticatedClient(factory).PostAsync(new Uri(SyncPath, UriKind.Relative), content: null);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        (await response.Content.ReadAsStringAsync()).ShouldContain("Integrations.Iol.GrantExpired");
+        factory.Portfolio.Requests.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Syncing_requires_a_session()
+    {
+        using var factory = new IolWebApplicationFactory();
+
+        var response = await factory.CreateClient().PostAsync(new Uri(SyncPath, UriKind.Relative), content: null);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        factory.Portfolio.Requests.ShouldBe(0);
+    }
+
+    private static EmployeeIntegration LinkedIntegration(Guid employeeId)
+    {
+        var integration = EmployeeIntegration.Create(employeeId, IntegrationProvider.Iol, "juan.perez", DateTimeOffset.UtcNow);
+        integration.Authorize(OAuthGrant.From("access", "refresh", DateTimeOffset.UtcNow.AddMinutes(15)), DateTimeOffset.UtcNow);
+
+        return integration;
+    }
+
     private static HttpClient CreateAuthenticatedClient(IolWebApplicationFactory factory)
     {
         var client = factory.CreateClient();
@@ -116,6 +197,10 @@ public class IolEndpointsTests
         public List<EmployeeIntegration> Integrations { get; } = new();
 
         public RecordingIolAuthClient Iol { get; } = new();
+
+        public List<Investment> Investments { get; } = new();
+
+        public StubIolPortfolioClient Portfolio { get; } = new();
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
@@ -142,6 +227,8 @@ public class IolEndpointsTests
                 services.AddScoped<IEmployeeIntegrationRepository>(_ => new InMemoryEmployeeIntegrationRepository(Integrations));
                 services.AddScoped<IUnitOfWork, NoOpUnitOfWork>();
                 services.AddSingleton<IIolAuthClient>(Iol);
+                services.AddSingleton<IIolPortfolioClient>(Portfolio);
+                services.AddScoped<IInvestmentRepository>(_ => new InMemoryInvestmentRepository(Investments));
             });
         }
     }
@@ -183,6 +270,59 @@ public class IolEndpointsTests
         public void Add(EmployeeIntegration integration) => _integrations.Add(integration);
 
         public void Remove(EmployeeIntegration integration) => _integrations.Remove(integration);
+    }
+
+    private sealed class StubIolPortfolioClient : IIolPortfolioClient
+    {
+        public List<IolPosition> Positions { get; } = new();
+
+        public Exception? Failure { get; set; }
+
+        public int Requests { get; private set; }
+
+        public Task<IReadOnlyList<IolPosition>> GetPortfolioAsync(string accessToken, IolCountry country, CancellationToken cancellationToken = default)
+        {
+            Requests++;
+
+            if (Failure is not null)
+            {
+                return Task.FromException<IReadOnlyList<IolPosition>>(Failure);
+            }
+
+            return Task.FromResult<IReadOnlyList<IolPosition>>(
+                country == IolCountry.Argentina ? Positions.ToList() : new List<IolPosition>());
+        }
+
+        public Task<IReadOnlyList<IolOperation>> ListCompletedOperationsAsync(string accessToken, DateOnly from, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<IolOperation>>(new List<IolOperation>());
+    }
+
+    private sealed class InMemoryInvestmentRepository : IInvestmentRepository
+    {
+        private readonly List<Investment> _investments;
+
+        public InMemoryInvestmentRepository(List<Investment> investments) => _investments = investments;
+
+        public void Add(Investment investment) => _investments.Add(investment);
+
+        public void Remove(Investment investment) => _investments.Remove(investment);
+
+        public Task<Investment?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+            Task.FromResult(_investments.FirstOrDefault(investment => investment.Id == id));
+
+        public Task<IReadOnlyList<Investment>> ListByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<Guid>> ListEmployeesWithTrackedInvestmentsAsync(CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<Investment>> ListTrackedByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<Investment>> ListImportedAsync(Guid employeeId, InvestmentSource source, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Investment>>(_investments
+                .Where(investment => investment.EmployeeId == employeeId && investment.Source == source)
+                .ToList());
     }
 
     private sealed class NoOpUnitOfWork : IUnitOfWork
