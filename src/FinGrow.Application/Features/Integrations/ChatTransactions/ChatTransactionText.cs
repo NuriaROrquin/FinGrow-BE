@@ -22,6 +22,9 @@ internal static class ChatTransactionText
         "• Pagué $1500 el almuerzo con débito\n" +
         "• Cobré $10000 por un freelance";
 
+    public const string AudioNotUnderstoodReply =
+        "No pude entender el audio. ¿Me lo mandás de nuevo o me lo escribís? Por ejemplo: Gasté $500 en el súper.";
+
     public const string AiUnavailableReply =
         "No pude procesar tu mensaje en este momento. Probá de nuevo en unos minutos.";
 
@@ -85,6 +88,8 @@ internal static class ChatTransactionText
 
         return string.Join('\n', lines);
     }
+
+    public static string Heard(string transcript) => "🎙️ Entendí: «" + transcript + "»";
 
     public static string PaymentMethodQuestion(TransactionType type) =>
         type == TransactionType.Income ? "¿Cómo lo cobraste?" : "¿Cómo lo pagaste?";

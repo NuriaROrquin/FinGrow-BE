@@ -369,7 +369,7 @@ public class ReceiveWhatsAppMessageHandlerTests
 
         var result = await Handle(Phone, string.Empty, VoiceNote);
 
-        result.Value.Text.ShouldBe(WhatsAppTransactionText.AudioNotUnderstoodReply);
+        result.Value.Text.ShouldBe(ChatTransactionText.AudioNotUnderstoodReply);
         _ai.ParsedMessages.ShouldBeEmpty();
         _transactions.Transactions.ShouldBeEmpty();
     }
@@ -436,13 +436,13 @@ public class ReceiveWhatsAppMessageHandlerTests
     {
         var linker = new LinkCodeRedeemer(
             _integrations, _linkCodes, _employees, _unitOfWork, _clock, NullLogger<LinkCodeRedeemer>.Instance);
-        var voiceNotes = new WhatsAppVoiceNoteTranscriber(_media, _ai, NullLogger<WhatsAppVoiceNoteTranscriber>.Instance);
+        var voiceNotes = new ChatVoiceNoteTranscriber(_ai, NullLogger<ChatVoiceNoteTranscriber>.Instance);
         var proposer = new ChatTransactionProposer(
             _ai, _transactions, _unitOfWork, _clock, NullLogger<ChatTransactionProposer>.Instance);
         var reviewer = new WhatsAppProposalReviewer(
             _transactions, new ChatTransactionReviewer(_transactions, _unitOfWork, _clock), _clock);
         var handler = new ReceiveWhatsAppMessageHandler(
-            _integrations, linker, voiceNotes, proposer, reviewer, NullLogger<ReceiveWhatsAppMessageHandler>.Instance)
+            _integrations, linker, _media, voiceNotes, proposer, reviewer, NullLogger<ReceiveWhatsAppMessageHandler>.Instance)
         {
             ProcessingBudget = TimeSpan.FromMilliseconds(200)
         };

@@ -4,6 +4,7 @@ using System.Globalization;
 using FinGrow.Application.Common;
 using FinGrow.Application.Features.Integrations.ChatTransactions;
 using FinGrow.Application.Features.Integrations.Linking;
+using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.Repositories;
@@ -26,7 +27,8 @@ internal sealed partial class ReceiveWhatsAppMessageHandler
 
     private readonly IEmployeeIntegrationRepository _integrations;
     private readonly LinkCodeRedeemer _linker;
-    private readonly WhatsAppVoiceNoteTranscriber _voiceNotes;
+    private readonly ITwilioMediaClient _media;
+    private readonly ChatVoiceNoteTranscriber _voiceNotes;
     private readonly ChatTransactionProposer _proposer;
     private readonly WhatsAppProposalReviewer _reviewer;
     private readonly ILogger<ReceiveWhatsAppMessageHandler> _logger;
@@ -34,13 +36,15 @@ internal sealed partial class ReceiveWhatsAppMessageHandler
     public ReceiveWhatsAppMessageHandler(
         IEmployeeIntegrationRepository integrations,
         LinkCodeRedeemer linker,
-        WhatsAppVoiceNoteTranscriber voiceNotes,
+        ITwilioMediaClient media,
+        ChatVoiceNoteTranscriber voiceNotes,
         ChatTransactionProposer proposer,
         WhatsAppProposalReviewer reviewer,
         ILogger<ReceiveWhatsAppMessageHandler> logger)
     {
         _integrations = integrations;
         _linker = linker;
+        _media = media;
         _voiceNotes = voiceNotes;
         _proposer = proposer;
         _reviewer = reviewer;
@@ -84,7 +88,7 @@ internal sealed partial class ReceiveWhatsAppMessageHandler
         CancellationToken cancellationToken)
     {
         var employeeId = integration.EmployeeId;
-        var voiceNote = request.Media.FirstOrDefault(WhatsAppVoiceNoteTranscriber.IsVoiceNote);
+        var voiceNote = request.Media.FirstOrDefault(IsVoiceNote);
 
         LogMessage(_logger, employeeId, request.Body.Length, request.Media.Count, request.MessageSid);
 
@@ -129,16 +133,20 @@ internal sealed partial class ReceiveWhatsAppMessageHandler
         WhatsAppInboundMedia attachment,
         CancellationToken cancellationToken)
     {
-        var voiceNote = await _voiceNotes.TranscribeAsync(employeeId, attachment, cancellationToken);
+        var voiceNote = await _voiceNotes.TranscribeAsync(
+            employeeId,
+            async token => (await _media.DownloadAsync(attachment.Url, token)).Content,
+            attachment.ContentType,
+            cancellationToken);
 
         if (voiceNote is not { Outcome: VoiceNoteOutcome.Transcribed, Text: { } text })
         {
             return new WhatsAppReply(voiceNote.Outcome == VoiceNoteOutcome.NotUnderstood
-                ? WhatsAppTransactionText.AudioNotUnderstoodReply
+                ? ChatTransactionText.AudioNotUnderstoodReply
                 : ChatTransactionText.AiUnavailableReply);
         }
 
-        var heard = WhatsAppTransactionText.Heard(text);
+        var heard = ChatTransactionText.Heard(text);
 
         if (await _reviewer.TryReviewAsync(employeeId, text, cancellationToken) is { } review)
         {
@@ -179,6 +187,9 @@ internal sealed partial class ReceiveWhatsAppMessageHandler
 
         return new WhatsAppReply(heard is null ? reply : heard + "\n\n" + reply);
     }
+
+    private static bool IsVoiceNote(WhatsAppInboundMedia attachment) =>
+        attachment.ContentType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase);
 
     private static string ReviewReply(Review review) =>
         review.Outcome switch
