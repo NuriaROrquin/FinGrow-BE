@@ -17,7 +17,7 @@ internal static class IolErrors
     public static readonly Error NotLinked = Error.NotFound(
         "Integrations.Iol.NotLinked", "No tenes IOL vinculado.");
 
-    public static readonly Error GrantExpired = Error.Failure(
+    public static readonly Error GrantExpired = Error.Conflict(
         "Integrations.Iol.GrantExpired", "La autorizacion de IOL vencio o fue revocada: volve a vincular la cuenta.");
 
     public static bool IsRejection(HttpRequestException exception) =>
