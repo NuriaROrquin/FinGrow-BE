@@ -829,6 +829,8 @@ public sealed class FakeTransactionReceiptRepository : ITransactionReceiptReposi
 
     public void Add(TransactionReceipt receipt) => Receipts.Add(receipt);
 
+    public void Remove(TransactionReceipt receipt) => Receipts.Remove(receipt);
+
     public Task<TransactionReceipt?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Receipts.FirstOrDefault(receipt => receipt.Id == id));
 
@@ -847,6 +849,14 @@ public sealed class FakeTransactionReceiptRepository : ITransactionReceiptReposi
             .Where(receipt => receipt.EmployeeId == employeeId)
             .Select(receipt => receipt.StorageKey)
             .ToList());
+
+    public Task<IReadOnlyList<TransactionReceipt>> ListDetachedUploadedBeforeAsync(
+        DateTimeOffset cutoff,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<TransactionReceipt>>(Receipts
+            .Where(receipt => receipt.TransactionId is null && receipt.UploadedAt < cutoff)
+            .OrderBy(receipt => receipt.UploadedAt)
+            .ToList());
 }
 
 public sealed class FakeFileStorage : IFileStorage
@@ -854,6 +864,8 @@ public sealed class FakeFileStorage : IFileStorage
     public Dictionary<string, (byte[] Content, string ContentType)> Files { get; } = new(StringComparer.Ordinal);
 
     public bool Unreachable { get; set; }
+
+    public HashSet<string> UndeletableKeys { get; } = new(StringComparer.Ordinal);
 
     public Task SaveAsync(string key, Stream content, string contentType, CancellationToken cancellationToken = default)
     {
@@ -878,6 +890,11 @@ public sealed class FakeFileStorage : IFileStorage
     public Task DeleteAsync(string key, CancellationToken cancellationToken = default)
     {
         EnsureReachable();
+
+        if (UndeletableKeys.Contains(key))
+        {
+            throw new FileStorageUnavailableException($"el almacenamiento no pudo borrar {key}");
+        }
 
         Files.Remove(key);
         return Task.CompletedTask;

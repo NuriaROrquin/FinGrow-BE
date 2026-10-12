@@ -291,6 +291,8 @@ public class ReceiptsEndpointsTests
     {
         public void Add(TransactionReceipt receipt) => receipts.Add(receipt);
 
+        public void Remove(TransactionReceipt receipt) => receipts.Remove(receipt);
+
         public Task<TransactionReceipt?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
             Task.FromResult(receipts.FirstOrDefault(receipt => receipt.Id == id));
 
@@ -305,6 +307,9 @@ public class ReceiptsEndpointsTests
                 .ToDictionary(receipt => receipt.TransactionId!.Value, receipt => receipt.Id));
 
         public Task<IReadOnlyList<string>> ListStorageKeysByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<TransactionReceipt>> ListDetachedUploadedBeforeAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
     }
 

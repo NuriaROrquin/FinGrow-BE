@@ -336,6 +336,11 @@ public class PendingTransactionsEndpointsTests
 
         public Task<IReadOnlyList<string>> ListStorageKeysByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
+
+        public void Remove(TransactionReceipt receipt) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<TransactionReceipt>> ListDetachedUploadedBeforeAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class NoOpUnitOfWork : IUnitOfWork
