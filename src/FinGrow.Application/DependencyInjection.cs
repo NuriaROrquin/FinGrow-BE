@@ -4,6 +4,7 @@ using System.Reflection;
 using Common.Behaviors;
 using Events;
 using Features.Integrations.ChatTransactions;
+using Features.Integrations.Iol;
 using Features.Integrations.Linking;
 using Features.Integrations.MercadoPago.Sync;
 using Features.Investments.QuoteInvestments;
@@ -37,6 +38,7 @@ public static class DependencyInjection
         services.AddScoped<ChatTransactionProposer>();
         services.AddScoped<ChatTransactionReviewer>();
         services.AddScoped<MercadoPagoSynchronizer>();
+        services.AddScoped<IolAccessTokenProvider>();
         services.AddScoped<SessionIssuer>();
         services.AddScoped<TwoFactorAccountFinder>();
         services.AddScoped<DepartmentResponseBuilder>();
