@@ -113,7 +113,7 @@ internal sealed class GmailOAuthClient : IGmailOAuthClient
             scopes.Contains(ReadOnlyScope, StringComparer.Ordinal));
     }
 
-    private static async Task EnsureSuccessAsync(
+    internal static async Task EnsureSuccessAsync(
         HttpResponseMessage response,
         string operation,
         CancellationToken cancellationToken)

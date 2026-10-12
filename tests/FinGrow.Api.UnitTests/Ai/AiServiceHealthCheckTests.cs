@@ -48,6 +48,12 @@ public class AiServiceHealthCheckTests
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<ParsedBillEmail> ParseBillEmailAsync(
+            BillEmail email,
+            Currency defaultCurrency,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<ParsedMessage> ParseTransactionMessageAsync(
             string text,
             Currency defaultCurrency,

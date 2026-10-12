@@ -3,6 +3,7 @@ namespace FinGrow.Domain.Entities;
 using FinGrow.Domain.Common;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.Errors;
+using FinGrow.Domain.Events;
 using FinGrow.Domain.ValueObjects;
 
 public sealed class EmployeeIntegration : AggregateRoot
@@ -91,8 +92,14 @@ public sealed class EmployeeIntegration : AggregateRoot
 
     public void MarkFailed(DateTimeOffset now)
     {
+        if (Status == IntegrationStatus.Failed)
+        {
+            return;
+        }
+
         Status = IntegrationStatus.Failed;
         UpdatedAt = now;
+        Raise(new IntegrationAccessLost(Id, EmployeeId, Provider, now));
     }
 
     public void MarkSynced(DateTimeOffset syncedAt)

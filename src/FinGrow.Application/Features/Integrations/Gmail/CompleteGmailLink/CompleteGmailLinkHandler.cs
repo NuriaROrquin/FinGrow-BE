@@ -22,6 +22,10 @@ internal sealed partial class CompleteGmailLinkHandler : IRequestHandler<Complet
         "Integrations.Gmail.ExchangeFailed",
         "Google no entrego las credenciales. Volve a intentar.");
 
+    internal static readonly Error AccountTaken = Error.Conflict(
+        "Integrations.Gmail.AccountTaken",
+        "El mail que estas intentando vincular ya esta asociado a otro usuario.");
+
     private readonly LinkCodeRedeemer _linker;
     private readonly IGmailOAuthClient _oauth;
     private readonly IDateTimeProvider _clock;
@@ -91,7 +95,14 @@ internal sealed partial class CompleteGmailLinkHandler : IRequestHandler<Complet
         var attempt = await _linker.TryLinkAsync(
             IntegrationProvider.Gmail, emailAddress, request.State, cancellationToken, grant);
 
-        return attempt.Outcome == LinkOutcome.Linked ? Result.Success() : Result.Failure(InvalidState);
+        // Si la cuenta ya es de otro empleado no se revoca el token recien obtenido: Google revoca la
+        // autorizacion completa de esa cuenta para FinGrow y el otro empleado perderia el acceso.
+        return attempt.Outcome switch
+        {
+            LinkOutcome.Linked => Result.Success(),
+            LinkOutcome.AccountTaken => Result.Failure(AccountTaken),
+            _ => Result.Failure(InvalidState)
+        };
     }
 
     [LoggerMessage(Level = LogLevel.Error, Message = "No se pudo canjear el codigo de autorizacion de Google.")]

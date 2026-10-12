@@ -81,8 +81,8 @@ internal sealed partial class ReceiveTelegramMessageHandler : IRequestHandler<Re
         return attempt.Outcome switch
         {
             LinkOutcome.NotACode => NotLinkedReply,
-            LinkOutcome.InvalidCode => InvalidCodeReply,
-            _ => $"Listo, {attempt.Employee!.FullName}{LinkedReplySuffix}"
+            LinkOutcome.Linked => $"Listo, {attempt.Employee!.FullName}{LinkedReplySuffix}",
+            _ => InvalidCodeReply
         };
     }
 

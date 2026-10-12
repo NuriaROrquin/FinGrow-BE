@@ -14,6 +14,10 @@ internal sealed partial class CompleteMercadoPagoLinkHandler : IRequestHandler<C
         "Integrations.MercadoPago.InvalidState",
         "La vinculacion vencio o no fue iniciada desde FinGrow. Volve a intentar.");
 
+    internal static readonly Error AccountTaken = Error.Conflict(
+        "Integrations.MercadoPago.AccountTaken",
+        "La cuenta de Mercado Pago que estas intentando vincular ya esta asociada a otro usuario.");
+
     private readonly LinkCodeRedeemer _linker;
     private readonly IMercadoPagoOAuthClient _oauth;
     private readonly IDateTimeProvider _clock;
@@ -68,7 +72,12 @@ internal sealed partial class CompleteMercadoPagoLinkHandler : IRequestHandler<C
         var attempt = await _linker.TryLinkAsync(
             IntegrationProvider.MercadoPago, tokens.UserId, request.State, cancellationToken, grant);
 
-        return attempt.Outcome == LinkOutcome.Linked ? Result.Success() : Result.Failure(InvalidState);
+        return attempt.Outcome switch
+        {
+            LinkOutcome.Linked => Result.Success(),
+            LinkOutcome.AccountTaken => Result.Failure(AccountTaken),
+            _ => Result.Failure(InvalidState)
+        };
     }
 
     [LoggerMessage(Level = LogLevel.Error, Message = "No se pudo canjear el codigo de autorizacion de Mercado Pago.")]

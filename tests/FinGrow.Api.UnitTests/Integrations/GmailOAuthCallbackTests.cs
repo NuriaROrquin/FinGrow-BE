@@ -50,6 +50,33 @@ public class GmailOAuthCallbackTests
     }
 
     [Fact]
+    public async Task A_mailbox_linked_to_another_employee_is_reported_to_the_frontend()
+    {
+        using var factory = new OAuthWebApplicationFactory();
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        factory.LinkCodes.Add(IntegrationLinkCode.Create(factory.Employee.Id, IntegrationProvider.Gmail, State, DateTimeOffset.UtcNow));
+        factory.Integrations.Add(EmployeeIntegration.Create(
+            Guid.CreateVersion7(), IntegrationProvider.Gmail, "juan.perez@gmail.com", DateTimeOffset.UtcNow));
+
+        var response = await client.GetAsync(new Uri($"{CallbackPath}?code=TG-123&state={State}", UriKind.Relative));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Redirect);
+        response.Headers.Location.ShouldBe(new Uri($"{ReturnUrl}?gmail=error&reason=Integrations.Gmail.AccountTaken"));
+        factory.Integrations.ShouldHaveSingleItem().EmployeeId.ShouldNotBe(factory.Employee.Id);
+    }
+
+    [Fact]
+    public async Task Syncing_on_demand_requires_a_session()
+    {
+        using var factory = new OAuthWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var response = await client.PostAsync(new Uri("/api/integrations/gmail/sync", UriKind.Relative), content: null);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
     public async Task Starting_a_link_requires_a_session()
     {
         using var factory = new OAuthWebApplicationFactory();
@@ -147,6 +174,22 @@ public class GmailOAuthCallbackTests
 
         public Task<Employee?> GetByEmailAsync(Email email, CancellationToken cancellationToken) =>
             Task.FromResult(_employee.Email == email ? _employee : null);
+
+        public Task<IReadOnlyDictionary<Guid, int>> CountByDepartmentAsync(Guid companyId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<Employee>> ListByCompanyAsync(Guid companyId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<Employee>> ListByDepartmentAsync(Guid departmentId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<Employee>> ListByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public void Add(Employee employee) => throw new NotSupportedException();
+
+        public void Remove(Employee employee) => throw new NotSupportedException();
     }
 
     private sealed class InMemoryEmployeeIntegrationRepository : IEmployeeIntegrationRepository

@@ -226,6 +226,15 @@ public static class DependencyInjection
             })
             .AddPolicyHandler(GetRetryPolicy());
 
+        services.AddHttpClient<IGmailMailboxClient, GmailMailboxClient>((provider, client) =>
+            {
+                var options = provider.GetRequiredService<IOptions<GmailOptions>>().Value;
+
+                client.BaseAddress = new Uri(options.ApiBaseUrl);
+                client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+            })
+            .AddPolicyHandler(GetRetryPolicy());
+
         return services;
     }
 

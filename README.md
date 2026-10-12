@@ -333,6 +333,7 @@ siguiente.
 |---|---|---|
 | `metrics-snapshot` | `0 4 1 * *` (el 1 de cada mes, 01:00 de Argentina) | Genera las fotos mensuales de métricas por empresa y por departamento (`company_metrics_snapshots` y `department_metrics_snapshots`) del último mes cerrado, y completa las de los meses anteriores que falten desde el alta de cada empresa. Es idempotente: correrlo de nuevo actualiza la foto del último mes cerrado en lugar de duplicarla |
 | `mercadopago-sync` | `0 * * * *` (cada hora) | Recorre las cuentas de Mercado Pago vinculadas y trae los movimientos nuevos como pendientes de revisión. Mercado Pago no avisa por webhook lo que un usuario paga, por eso se consulta |
+| `gmail-sync` | `0 13 * * *` (todos los días, 10:00 de Argentina: las facturas llegan una vez por mes) | Recorre los Gmail vinculados y activos, busca los mails que parecen facturas por su contenido (no por remitente, así un reenvío también entra) y le pide a FinGrow-AI que decida si lo son (`POST /api/v1/email-parsing/bills`). Cada factura entra como gasto pendiente con fuente `Gmail`, identificada por empresa + vencimiento + importe para que la original y su reenvío no se propongan dos veces. Si Google responde `invalid_grant` (el empleado quitó el permiso o venció), la integración queda en `Failed` y se le avisa (`IntegrationAccessLost`); deja de sincronizarse hasta que vuelva a autorizar. Si FinGrow-AI no responde, la próxima corrida retoma desde el último mail leído. Lee hasta 50 mails por corrida; si hay más, siguen al día siguiente. Solo importa facturas de servicios: un viaje (Cabify, Uber) o una compra no entra aunque traiga un total. El empleado también puede sincronizar a mano desde la card de Gmail (`POST /api/integrations/gmail/sync`), que corre lo mismo solo para su cuenta
 | `investment-quotes` | `30 21 * * 1-5` (días hábiles, 18:30 de Argentina) | Guarda en `security_prices` el último precio de cada símbolo de BYMA, cada fondo de ArgentinaDatos y cada cripto de CoinGecko (aunque nadie tenga inversiones con símbolo) y cotiza con esos precios las inversiones cargadas con símbolo y cantidad, registrándoles la valuación de mercado del día. Correrlo de nuevo el mismo día actualiza esa valuación en lugar de duplicarla. Si una fuente no responde, cotiza con las otras y la corrida queda fallida con el motivo; si no responde ninguna, no toca nada |
 | `goal-progress-alerts` | `0 12 * * *` (todos los días, 09:00 de Argentina) | Recorre las metas activas y avisa al empleado cuando una lleva 30 días sin aportes (`GoalStalled`, como máximo uno cada 30 días mientras siga quieta) o cuando se acerca su fecha límite con saldo pendiente (`GoalDeadlineApproaching`, una vez a los 30, a los 7 y a 1 día, con cuánto falta y cuántos días quedan). Si la fecha límite está cerca solo manda esa, que ya dice lo mismo. Correrlo de nuevo el mismo día no repite avisos |
 
@@ -391,6 +392,8 @@ porque esa ya quedó guardada. La primera alerta es `TransactionsToReview`: cuan
 Gmail traen movimientos pendientes, el empleado recibe un aviso para revisarlos, como máximo uno
 cada 12 horas por origen (un sync de 30 movimientos genera una sola alerta). Lo que carga el
 empleado a mano, por foto o por chat no avisa: ya está mirando la app.
+`IntegrationAccessLost` avisa cuando la sincronización pierde el acceso a una cuenta vinculada (hoy, Gmail), una
+sola vez hasta que el empleado la vuelva a autorizar.
 
 | Método y ruta | Quién | Qué hace |
 |---|---|---|
@@ -476,7 +479,7 @@ src/
 │   ├── Persistence/        DbContext, Configurations, Repositories, Migrations
 │   ├── Identity/           Resolución del usuario autenticado
 │   ├── Ai/                 Cliente HTTP hacia FinGrow-AI
-│   ├── Integrations/       Twilio (firma de webhooks y descarga de adjuntos) y Telegram (secreto del webhook y Bot API), Mercado Pago y Gmail (OAuth)
+│   ├── Integrations/       Twilio (firma de webhooks y descarga de adjuntos) y Telegram (secreto del webhook y Bot API), Mercado Pago y Gmail (OAuth y lectura de mails)
 │   └── Services/
 └── FinGrow.Api/
     ├── Controllers/

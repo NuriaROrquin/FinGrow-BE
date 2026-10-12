@@ -49,6 +49,20 @@ public class CompleteMercadoPagoLinkHandlerTests
     }
 
     [Fact]
+    public async Task An_account_already_linked_to_another_employee_is_rejected()
+    {
+        var otherEmployee = Guid.CreateVersion7();
+        _integrations.Integrations.Add(
+            EmployeeIntegration.Create(otherEmployee, IntegrationProvider.MercadoPago, _oauth.Tokens.UserId, Now.AddDays(-10)));
+
+        var result = await Handle(Code, _state);
+
+        result.Error.ShouldBe(CompleteMercadoPagoLinkHandler.AccountTaken);
+        _integrations.Integrations.ShouldHaveSingleItem().EmployeeId.ShouldBe(otherEmployee);
+        _linkCodes.LinkCodes.Single().UsedAt.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task Relinking_replaces_the_grant_of_the_existing_integration()
     {
         var existing = EmployeeIntegration.Create(_employee.Id, IntegrationProvider.MercadoPago, "111", Now.AddDays(-30));

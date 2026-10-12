@@ -66,6 +66,37 @@ public class CompleteGmailLinkHandlerTests
     }
 
     [Fact]
+    public async Task A_mailbox_already_linked_to_another_employee_is_rejected_and_left_untouched()
+    {
+        var otherEmployee = Guid.CreateVersion7();
+        var taken = EmployeeIntegration.Create(otherEmployee, IntegrationProvider.Gmail, "juan.perez@gmail.com", Now.AddDays(-10));
+        taken.Authorize(OAuthGrant.From("other-access", "other-refresh", Now.AddHours(1)), Now.AddDays(-10));
+        _integrations.Integrations.Add(taken);
+
+        var result = await Handle(Code, _state);
+
+        result.Error.ShouldBe(CompleteGmailLinkHandler.AccountTaken);
+        result.Error.Type.ShouldBe(ErrorType.Conflict);
+        _integrations.Integrations.ShouldHaveSingleItem().EmployeeId.ShouldBe(otherEmployee);
+        taken.Grant!.RefreshToken.ShouldBe("other-refresh");
+        _oauth.RevokedTokens.ShouldBeEmpty();
+        _linkCodes.LinkCodes.Single().UsedAt.ShouldBeNull();
+        _unitOfWork.SaveCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Relinking_the_same_mailbox_by_its_owner_is_not_a_conflict()
+    {
+        var existing = EmployeeIntegration.Create(_employee.Id, IntegrationProvider.Gmail, "juan.perez@gmail.com", Now.AddDays(-10));
+        _integrations.Integrations.Add(existing);
+
+        var result = await Handle(Code, _state);
+
+        result.IsSuccess.ShouldBeTrue();
+        _integrations.Integrations.ShouldHaveSingleItem().ShouldBeSameAs(existing);
+    }
+
+    [Fact]
     public async Task A_state_that_was_not_issued_by_fingrow_is_rejected_before_talking_to_google()
     {
         var result = await Handle(Code, IntegrationLinkCode.GenerateCode());

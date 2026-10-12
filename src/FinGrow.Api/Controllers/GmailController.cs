@@ -4,6 +4,7 @@ using FinGrow.Api.Extensions;
 using FinGrow.Api.Gmail;
 using FinGrow.Application.Features.Integrations.Gmail.CompleteGmailLink;
 using FinGrow.Application.Features.Integrations.Gmail.StartGmailLink;
+using FinGrow.Application.Features.Integrations.Gmail.Sync;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -51,4 +52,13 @@ public sealed class GmailController : ControllerBase
 
         return Redirect(QueryHelpers.AddQueryString(_options.FrontendReturnUrl, query));
     }
+
+    [HttpPost("sync")]
+    [Authorize]
+    [ProducesResponseType<GmailSyncSummary>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> Sync(CancellationToken cancellationToken) =>
+        (await _sender.Send(new SyncMyGmailCommand(), cancellationToken)).ToActionResult();
 }
