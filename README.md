@@ -93,6 +93,9 @@ variables de entorno usando `__` como separador de sección.
 | `MercadoPago:RedirectUri` | `MercadoPago__RedirectUri` | URL pública de `GET /api/integrations/mercadopago/oauth/callback`, idéntica a la cargada en la aplicación de Mercado Pago. MP no acepta `localhost`: en local se usa un túnel (ngrok) |
 | `MercadoPago:FrontendReturnUrl` | `MercadoPago__FrontendReturnUrl` | Página del frontend a la que vuelve el navegador al terminar la vinculación; recibe `?mercadopago=linked` o `?mercadopago=error&reason=...` (default `http://localhost:3000/dashboard/settings`) |
 | `MercadoPago:TimeoutSeconds` | `MercadoPago__TimeoutSeconds` | Timeout de las llamadas a la API de Mercado Pago (default 30) |
+| `Iol:ApiBaseUrl` | `Iol__ApiBaseUrl` | URL base de la API de InvertirOnline (default `https://api.invertironline.com/`). Todo lo que se hace por la API impacta en la cuenta real |
+| `Iol:SyncIntervalMinutes` | `Iol__SyncIntervalMinutes` | Cada cuántos minutos se sincroniza el portafolio de IOL (lo usa T-35; default 30) |
+| `Iol:TimeoutSeconds` | `Iol__TimeoutSeconds` | Timeout de las llamadas a la API de IOL (default 30) |
 | `TokenEncryption:Key` | `TokenEncryption__Key` | Clave AES-256 en base64 (`openssl rand -base64 32`) con la que se cifran en la base los tokens OAuth de las integraciones. Cambiarla deja ilegibles los tokens ya guardados |
 | `Jobs:ApiKey` | `Jobs__ApiKey` | Clave (mínimo 16 caracteres, `openssl rand -base64 24`) que tiene que traer la cabecera `X-Jobs-Key` para disparar o consultar los trabajos programados en `/api/jobs`. Es la que usa el cron de Dokploy; ver [Trabajos programados](#trabajos-programados-dokploy) |
 | `DolarApi:BaseUrl` | `DolarApi__BaseUrl` | URL base de [DolarApi](https://dolarapi.com), de donde sale la cotización del dólar MEP que usa la pantalla de Inversiones (default `https://dolarapi.com/`). Es pública y no pide credenciales |
@@ -319,6 +322,24 @@ descartarlo. Si el mensaje no dice el medio de pago, los botones son los medios 
 uno confirma con ese medio; si el empleado no contesta, queda pendiente en la bandeja de la app
 con Efectivo. Si falta el monto, el bot repregunta y no registra nada. Los toques de botón llegan
 como `callback_query`, por eso el webhook tiene que registrarse con ese tipo en `allowed_updates`.
+
+### InvertirOnline (IOL)
+
+IOL no tiene una pantalla de consentimiento como Mercado Pago: autentica con usuario y
+contraseña (`POST /token`, `grant_type=password`) y devuelve un bearer de 15 minutos y un
+refresh token. Por eso la contraseña pasa por la API de FinGrow: el empleado la manda a
+`POST /api/integrations/iol/link`, la API la canjea en el momento y guarda solo los tokens,
+cifrados. La contraseña no se persiste, no se loguea y no vuelve en la respuesta.
+
+Cada empleado tiene que tener las APIs activadas en su cuenta de IOL (menú de usuario >
+*Configuración API*, aceptando los términos); si no, IOL rechaza el login como si la contraseña
+fuera incorrecta.
+
+Antes de cada llamada a IOL, `IolAccessTokenProvider` renueva el bearer si le quedan menos de
+2 minutos (`grant_type=refresh_token`). Si IOL rechaza el refresh token, la integración queda en
+estado `Error` con el motivo, que `GET /api/integrations/iol` devuelve en `errorReason`, y el
+empleado tiene que volver a vincular. Una caída de IOL no marca error: se reintenta en la próxima
+llamada. `DELETE /api/integrations/iol` desvincula y borra los tokens.
 
 ### Trabajos programados (Dokploy)
 

@@ -132,6 +132,15 @@ confirma o descarta. Telegram lo muestra con botones (`TelegramTransactionCallba
 `callback_data`, limitado a 64 bytes) y `AnswerTelegramCallback` procesa el toque. Para sumar
 WhatsApp alcanza con una capa propia del canal que use esas dos piezas.
 
+**IOL (T-34) es la única integración que recibe una contraseña.** `POST /api/integrations/iol/link`
+la canjea por tokens en el momento y la descarta. `LinkIolCommand` redefine `PrintMembers` para
+que un log del comando no la imprima, e `IolAuthClient` no pone cuerpos de pedido ni de respuesta
+en sus excepciones. No le agregues la política de reintentos de Polly: repetir un refresh que IOL
+ya procesó puede invalidar el refresh token nuevo. Quien llame a IOL pide el bearer a
+`IolAccessTokenProvider`, que lo renueva y, si IOL rechaza el refresh token, deja la integración
+en `IntegrationStatus.Error` con `ErrorReason`. `ListAuthorizedAsync` excluye las integraciones
+en error, así que un trabajo de sincronización no las vuelve a intentar.
+
 ## Aislamiento de datos (T-10)
 
 **Entre empresas, lo garantiza la base de datos de EF**: `FinGrowDbContext.Tenancy.cs` registra un
