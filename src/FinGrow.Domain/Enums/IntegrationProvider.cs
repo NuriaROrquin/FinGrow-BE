@@ -5,5 +5,6 @@ public enum IntegrationProvider
     Gmail = 1,
     MercadoPago = 2,
     Telegram = 3,
-    WhatsApp = 4
+    WhatsApp = 4,
+    Iol = 5
 }

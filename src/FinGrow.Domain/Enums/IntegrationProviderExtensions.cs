@@ -6,5 +6,5 @@ public static class IntegrationProviderExtensions
         provider is IntegrationProvider.Telegram or IntegrationProvider.WhatsApp;
 
     public static bool LinksWithOAuth(this IntegrationProvider provider) =>
-        provider is IntegrationProvider.Gmail or IntegrationProvider.MercadoPago;
+        provider is IntegrationProvider.Gmail or IntegrationProvider.MercadoPago or IntegrationProvider.Iol;
 }

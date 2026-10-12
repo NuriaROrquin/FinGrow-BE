@@ -97,4 +97,66 @@ public class EmployeeIntegrationTests
         integration.LastSyncedAt.ShouldBe(Now.AddHours(1));
         integration.UpdatedAt.ShouldBe(Now.AddHours(1));
     }
+
+    [Fact]
+    public void Iol_links_with_tokens_like_an_oauth_provider()
+    {
+        IntegrationProvider.Iol.LinksWithOAuth().ShouldBeTrue();
+        IntegrationProvider.Iol.LinksWithCode().ShouldBeFalse();
+    }
+
+    [Fact]
+    public void A_new_integration_starts_active_without_an_error()
+    {
+        var integration = EmployeeIntegration.Create(EmployeeId, IntegrationProvider.Iol, "juan.perez", Now);
+
+        integration.Status.ShouldBe(IntegrationStatus.Active);
+        integration.ErrorReason.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Marking_a_failure_keeps_the_reason_to_show_the_employee()
+    {
+        var integration = EmployeeIntegration.Create(EmployeeId, IntegrationProvider.Iol, "juan.perez", Now);
+
+        integration.MarkFailed(" La autorizacion de IOL vencio. ", Now.AddHours(1));
+
+        integration.Status.ShouldBe(IntegrationStatus.Error);
+        integration.ErrorReason.ShouldBe("La autorizacion de IOL vencio.");
+        integration.UpdatedAt.ShouldBe(Now.AddHours(1));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void A_failure_always_has_a_reason(string reason)
+    {
+        var integration = EmployeeIntegration.Create(EmployeeId, IntegrationProvider.Iol, "juan.perez", Now);
+
+        Should.Throw<DomainException>(() => integration.MarkFailed(reason, Now));
+
+        integration.Status.ShouldBe(IntegrationStatus.Active);
+        integration.ErrorReason.ShouldBeNull();
+    }
+
+    [Fact]
+    public void A_failure_reason_has_a_maximum_length()
+    {
+        var integration = EmployeeIntegration.Create(EmployeeId, IntegrationProvider.Iol, "juan.perez", Now);
+
+        Should.Throw<DomainException>(() =>
+            integration.MarkFailed(new string('x', EmployeeIntegration.MaxErrorReasonLength + 1), Now));
+    }
+
+    [Fact]
+    public void Authorizing_again_clears_a_previous_failure()
+    {
+        var integration = EmployeeIntegration.Create(EmployeeId, IntegrationProvider.Iol, "juan.perez", Now);
+        integration.MarkFailed("La autorizacion de IOL vencio.", Now);
+
+        integration.Authorize(OAuthGrant.From("access", "refresh", Now.AddMinutes(15)), Now.AddDays(1));
+
+        integration.Status.ShouldBe(IntegrationStatus.Active);
+        integration.ErrorReason.ShouldBeNull();
+    }
 }
