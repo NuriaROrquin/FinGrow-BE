@@ -94,7 +94,6 @@ variables de entorno usando `__` como separador de sección.
 | `MercadoPago:FrontendReturnUrl` | `MercadoPago__FrontendReturnUrl` | Página del frontend a la que vuelve el navegador al terminar la vinculación; recibe `?mercadopago=linked` o `?mercadopago=error&reason=...` (default `http://localhost:3000/dashboard/settings`) |
 | `MercadoPago:TimeoutSeconds` | `MercadoPago__TimeoutSeconds` | Timeout de las llamadas a la API de Mercado Pago (default 30) |
 | `Iol:ApiBaseUrl` | `Iol__ApiBaseUrl` | URL base de la API de InvertirOnline (default `https://api.invertironline.com/`). Todo lo que se hace por la API impacta en la cuenta real |
-| `Iol:SyncIntervalMinutes` | `Iol__SyncIntervalMinutes` | Cada cuántos minutos se sincroniza el portafolio de IOL (lo usa T-35; default 30) |
 | `Iol:TimeoutSeconds` | `Iol__TimeoutSeconds` | Timeout de las llamadas a la API de IOL (default 30) |
 | `TokenEncryption:Key` | `TokenEncryption__Key` | Clave AES-256 en base64 (`openssl rand -base64 32`) con la que se cifran en la base los tokens OAuth de las integraciones. Cambiarla deja ilegibles los tokens ya guardados |
 | `Jobs:ApiKey` | `Jobs__ApiKey` | Clave (mínimo 16 caracteres, `openssl rand -base64 24`) que tiene que traer la cabecera `X-Jobs-Key` para disparar o consultar los trabajos programados en `/api/jobs`. Es la que usa el cron de Dokploy; ver [Trabajos programados](#trabajos-programados-dokploy) |
@@ -219,8 +218,8 @@ Clase A"), no por un símbolo.
 - **Quién la usa.** `investment-quotes` valúa una vez por día hábil las inversiones con símbolo y
   guarda el último precio en `security_prices`; si una fuente no responde, cotiza con las otras y
   la corrida queda fallida con el motivo. `GET /api/security-prices` cotiza mientras se carga el
-  formulario y, si la fuente no tiene precio o no responde, usa ese último precio. Las cuentas
-  vinculadas a IOL se cotizan aparte con T-19.
+  formulario y, si la fuente no tiene precio o no responde, usa ese último precio. Las inversiones
+  importadas de IOL no pasan por acá: las valúa `iol-sync` con lo que informa IOL.
 
 ### Comprobantes (Cloudflare R2)
 
@@ -354,10 +353,43 @@ Cada empleado tiene que tener las APIs activadas en su cuenta de IOL (menú de u
 fuera incorrecta.
 
 Antes de cada llamada a IOL, `IolAccessTokenProvider` renueva el bearer si le quedan menos de
-2 minutos (`grant_type=refresh_token`). Si IOL rechaza el refresh token, la integración queda en
+2 minutos (`grant_type=refresh_token`).
+
+**El bearer dura 15 minutos y el refresh token, 20.** IOL los informa en `.issued`, `.expires` y
+`.refreshexpires`; `expires_in` dice 1200 segundos, pero el bearer muere a los 15, así que
+`IolAuthClient` toma la duración de las fechas. Como el refresh token no sobrevive 20 minutos sin
+uso, el trabajo `iol-token-refresh` renueva cada 5 minutos, las 24 horas, las autorizaciones a las
+que les quedan menos de 10 minutos: si no corre, cada empleado tendría que volver a poner su
+contraseña después de cualquier pausa. Si IOL rechaza el refresh token, la integración queda en
 estado `Error` con el motivo, que `GET /api/integrations/iol` devuelve en `errorReason`, y el
 empleado tiene que volver a vincular. Una caída de IOL no marca error: se reintenta en la próxima
 llamada. `DELETE /api/integrations/iol` desvincula y borra los tokens.
+
+**Importar el portafolio (T-35).** El trabajo `iol-sync` y `POST /api/integrations/iol/sync` (a
+demanda, para el empleado logueado) leen `GET /api/v2/portafolio/argentina` y
+`/estados_Unidos` y dejan cada posición como una inversión con `source = Iol` y
+`external_reference` = mercado + símbolo (`bcba:GGAL`), única por empleado:
+
+| Tipo de IOL | `InvestmentType` |
+|---|---|
+| `ACCIONES` | `Stock` |
+| `CEDEARS` | `Cedear` |
+| `TitulosPublicos` | `Bond` |
+| `ObligacionesNegociables` | `CorporateBond` |
+| `Letras` | `TreasuryBill` |
+| `FondoComundeInversion` | `MutualFund` |
+| `ETF` | `Etf` |
+
+Opciones, cauciones y cualquier otro tipo o moneda se omiten y se cuentan como `ignored` en el
+resumen. El capital es cantidad × `ppc` en la moneda del título; la fecha de compra, la de la
+primera compra terminada del símbolo en `GET /api/v2/operaciones` (o el día de hoy si no aparece o
+IOL no las devuelve); la primera valuación, `valorizado` con origen `Feed` y fecha del día. En las
+corridas siguientes una cantidad distinta ajusta el capital y un valor distinto registra la
+valuación del día (dos corridas el mismo día corrigen la misma). Una posición que deja de venir
+no se borra ni se sigue valuando: conserva su última valuación (`noLongerHeld` en el resumen). Si
+IOL no devuelve alguno de los dos portafolios no se toca ninguna inversión y la corrida queda
+fallida. Una inversión manual con el mismo símbolo no se pisa: conviven y se distinguen por
+`source`.
 
 ### Trabajos programados (Dokploy)
 
@@ -371,6 +403,8 @@ siguiente.
 |---|---|---|
 | `metrics-snapshot` | `0 4 1 * *` (el 1 de cada mes, 01:00 de Argentina) | Genera las fotos mensuales de métricas por empresa y por departamento (`company_metrics_snapshots` y `department_metrics_snapshots`) del último mes cerrado, y completa las de los meses anteriores que falten desde el alta de cada empresa. En la misma pasada calcula el puntaje de salud financiera de cada empleado (ver más abajo). Es idempotente: correrlo de nuevo actualiza la foto del último mes cerrado en lugar de duplicarla. Si un mes necesita el dólar MEP y DolarApi no responde, esa foto queda pendiente y la corrida, fallida |
 | `mercadopago-sync` | `0 * * * *` (cada hora) | Recorre las cuentas de Mercado Pago vinculadas y trae los movimientos nuevos como pendientes de revisión. Mercado Pago no avisa por webhook lo que un usuario paga, por eso se consulta |
+| `iol-token-refresh` | `*/5 * * * *` (cada 5 minutos, todo el día) | Renueva la autorización de cada cuenta de IOL vinculada a la que le quedan menos de 10 minutos, para que el refresh token (que dura 20) no venza. Si IOL la rechaza (el empleado cambió la contraseña o revocó el acceso), la integración queda en error; si IOL no responde, la corrida queda fallida y la siguiente reintenta sin perder la vinculación. **Tiene que estar programado**: sin él, las cuentas de IOL se desvinculan solas |
+| `iol-sync` | `*/30 14-21 * * 1-5` (cada media hora de 11 a 18:30 de Argentina, días hábiles) | Importa el portafolio de cada cuenta de IOL vinculada como inversiones (ver *InvertirOnline (IOL)*). Si IOL no responde para una cuenta, esa no se toca, la corrida queda fallida con el motivo y la siguiente la reintenta. Una integración en error no se visita |
 | `investment-quotes` | `30 21 * * 1-5` (días hábiles, 18:30 de Argentina) | Guarda en `security_prices` el último precio de cada símbolo de BYMA, cada fondo de ArgentinaDatos y cada cripto de CoinGecko (aunque nadie tenga inversiones con símbolo) y cotiza con esos precios las inversiones cargadas con símbolo y cantidad, registrándoles la valuación de mercado del día. Correrlo de nuevo el mismo día actualiza esa valuación en lugar de duplicarla. Si una fuente no responde, cotiza con las otras y la corrida queda fallida con el motivo; si no responde ninguna, no toca nada |
 | `receipts-cleanup` | `0 7 * * *` (todos los días, 04:00 de Argentina) | Borra los comprobantes sueltos (sin movimiento) subidos hace más de `ReceiptsCleanup:GraceDays` días (default 7): primero el archivo de R2 y después la fila de `transaction_receipts`. Si R2 falla para uno, sigue con el resto, la corrida queda fallida con el motivo y ese comprobante se reintenta en la siguiente. Nunca toca un comprobante asociado a un movimiento |
 | `goal-progress-alerts` | `0 12 * * *` (todos los días, 09:00 de Argentina) | Recorre las metas activas y avisa al empleado cuando una lleva 30 días sin aportes (`GoalStalled`, como máximo uno cada 30 días mientras siga quieta) o cuando se acerca su fecha límite con saldo pendiente (`GoalDeadlineApproaching`, una vez a los 30, a los 7 y a 1 día, con cuánto falta y cuántos días quedan). Si la fecha límite está cerca solo manda esa, que ya dice lo mismo. Correrlo de nuevo el mismo día no repite avisos |
@@ -603,7 +637,7 @@ Siete entidades y tres value objects. El esquema se crea con la migración `Init
 | `transactions` | Transaction | Ingresos y gastos, con importe siempre positivo y el signo dado por `type` |
 | `budgets` | Budget | Tope por categoría y período |
 | `goals` | Goal | Metas de ahorro con objetivo, avance y fecha límite |
-| `investments` | Investment | Posiciones del portafolio: capital invertido y valuación actual. `symbol` es el ticker (hasta 20 caracteres) o, en un fondo común, su nombre completo (hasta 150); `quantity` admite 10 decimales para fracciones de cripto |
+| `investments` | Investment | Posiciones del portafolio: capital invertido y valuación actual. `symbol` es el ticker (hasta 20 caracteres) o, en un fondo común, su nombre completo (hasta 150); `quantity` admite 10 decimales para fracciones de cripto. `source` dice si la cargó el empleado (`Manual`) o la importó IOL (`Iol`); las importadas llevan `external_reference` (mercado + símbolo), única por empleado y origen |
 | `security_prices` | SecurityPrice | El último precio por unidad de cada mercado, símbolo y moneda (BYMA, fondos de ArgentinaDatos y cripto de CoinGecko); una fila por mercado, símbolo y moneda que `investment-quotes` pisa en cada corrida. En los fondos el símbolo es el nombre del fondo. Es lo que cotiza el formulario de inversiones cuando la fuente no publica precios (BYMA los fines de semana y feriados) o no responde |
 | `job_runs` | JobRun | Registro de cada corrida de un trabajo programado: inicio, fin, resultado y error |
 | `company_metrics_snapshots` | CompanyMetricsSnapshot | Foto mensual de métricas agregadas de una empresa: empleados activos, cuántos participaron, movimientos confirmados, presupuestos, metas, integraciones, y cuántos tienen puntaje de salud financiera con la suma de esos puntajes |
