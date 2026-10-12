@@ -25,6 +25,7 @@ internal sealed partial class ReceiveTelegramMessageHandler : IRequestHandler<Re
 
     private readonly IEmployeeIntegrationRepository _integrations;
     private readonly LinkCodeRedeemer _linker;
+    private readonly ChatVoiceNoteTranscriber _voiceNotes;
     private readonly ChatTransactionProposer _proposer;
     private readonly ITelegramBotClient _bot;
     private readonly ILogger<ReceiveTelegramMessageHandler> _logger;
@@ -32,12 +33,14 @@ internal sealed partial class ReceiveTelegramMessageHandler : IRequestHandler<Re
     public ReceiveTelegramMessageHandler(
         IEmployeeIntegrationRepository integrations,
         LinkCodeRedeemer linker,
+        ChatVoiceNoteTranscriber voiceNotes,
         ChatTransactionProposer proposer,
         ITelegramBotClient bot,
         ILogger<ReceiveTelegramMessageHandler> logger)
     {
         _integrations = integrations;
         _linker = linker;
+        _voiceNotes = voiceNotes;
         _proposer = proposer;
         _bot = bot;
         _logger = logger;
@@ -91,7 +94,13 @@ internal sealed partial class ReceiveTelegramMessageHandler : IRequestHandler<Re
         ReceiveTelegramMessageCommand request,
         CancellationToken cancellationToken)
     {
-        LogMessage(_logger, employeeId, request.Text.Length, request.MessageId);
+        LogMessage(_logger, employeeId, request.Text.Length, request.VoiceNote is not null, request.MessageId);
+
+        if (request.VoiceNote is { } voiceNote)
+        {
+            await HandleVoiceNoteAsync(employeeId, request, voiceNote, cancellationToken);
+            return;
+        }
 
         if (string.IsNullOrWhiteSpace(request.Text) || request.Text.TrimStart().StartsWith('/'))
         {
@@ -99,11 +108,46 @@ internal sealed partial class ReceiveTelegramMessageHandler : IRequestHandler<Re
             return;
         }
 
+        await ProposeAsync(employeeId, request, request.Text, heard: null, cancellationToken);
+    }
+
+    private async Task HandleVoiceNoteAsync(
+        Guid employeeId,
+        ReceiveTelegramMessageCommand request,
+        TelegramVoiceNote voiceNote,
+        CancellationToken cancellationToken)
+    {
+        var transcription = await _voiceNotes.TranscribeAsync(
+            employeeId,
+            token => _bot.DownloadFileAsync(voiceNote.FileId, token),
+            voiceNote.ContentType,
+            cancellationToken);
+
+        if (transcription is not { Outcome: VoiceNoteOutcome.Transcribed, Text: { } text })
+        {
+            var reply = transcription.Outcome == VoiceNoteOutcome.NotUnderstood
+                ? ChatTransactionText.AudioNotUnderstoodReply
+                : ChatTransactionText.AiUnavailableReply;
+
+            await ReplyAsync(request.ChatId, reply, cancellationToken);
+            return;
+        }
+
+        await ProposeAsync(employeeId, request, text, ChatTransactionText.Heard(text), cancellationToken);
+    }
+
+    private async Task ProposeAsync(
+        Guid employeeId,
+        ReceiveTelegramMessageCommand request,
+        string text,
+        string? heard,
+        CancellationToken cancellationToken)
+    {
         var proposal = await _proposer.ProposeAsync(
             employeeId,
             TransactionSource.Telegram,
             ExternalReference(request.ChatId, request.MessageId),
-            request.Text,
+            text,
             cancellationToken);
 
         switch (proposal.Outcome)
@@ -111,29 +155,31 @@ internal sealed partial class ReceiveTelegramMessageHandler : IRequestHandler<Re
             case ProposalOutcome.Proposed:
                 await ReplyAsync(
                     request.ChatId,
-                    ChatTransactionText.Proposal(proposal.Transaction!, proposal.AsksPaymentMethod),
+                    WithHeard(heard, ChatTransactionText.Proposal(proposal.Transaction!, proposal.AsksPaymentMethod)),
                     TelegramTransactionCallback.KeyboardFor(proposal.Transaction!, proposal.AsksPaymentMethod),
                     cancellationToken);
                 break;
             case ProposalOutcome.AlreadyProposed:
                 break;
             case ProposalOutcome.TooLong:
-                await ReplyAsync(request.ChatId, ChatTransactionText.TooLongReply, cancellationToken);
+                await ReplyAsync(request.ChatId, WithHeard(heard, ChatTransactionText.TooLongReply), cancellationToken);
                 break;
             case ProposalOutcome.MissingAmount:
-                await ReplyAsync(request.ChatId, ChatTransactionText.MissingAmountReply, cancellationToken);
+                await ReplyAsync(request.ChatId, WithHeard(heard, ChatTransactionText.MissingAmountReply), cancellationToken);
                 break;
             case ProposalOutcome.MultipleTransactions:
-                await ReplyAsync(request.ChatId, ChatTransactionText.MultipleTransactionsReply, cancellationToken);
+                await ReplyAsync(request.ChatId, WithHeard(heard, ChatTransactionText.MultipleTransactionsReply), cancellationToken);
                 break;
             case ProposalOutcome.NotATransaction:
-                await ReplyAsync(request.ChatId, ChatTransactionText.HelpReply, cancellationToken);
+                await ReplyAsync(request.ChatId, WithHeard(heard, ChatTransactionText.HelpReply), cancellationToken);
                 break;
             default:
                 await ReplyAsync(request.ChatId, ChatTransactionText.AiUnavailableReply, cancellationToken);
                 break;
         }
     }
+
+    private static string WithHeard(string? heard, string reply) => heard is null ? reply : heard + "\n\n" + reply;
 
     private Task ReplyAsync(long chatId, string text, CancellationToken cancellationToken) =>
         SendSafelyAsync(chatId, () => _bot.SendMessageAsync(chatId, text, cancellationToken), cancellationToken);
@@ -161,8 +207,8 @@ internal sealed partial class ReceiveTelegramMessageHandler : IRequestHandler<Re
         }
     }
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Mensaje de Telegram del empleado {EmployeeId}: {Characters} caracteres (mensaje {MessageId}).")]
-    private static partial void LogMessage(ILogger logger, Guid employeeId, int characters, long messageId);
+    [LoggerMessage(Level = LogLevel.Information, Message = "Mensaje de Telegram del empleado {EmployeeId}: {Characters} caracteres, nota de voz {IsVoiceNote} (mensaje {MessageId}).")]
+    private static partial void LogMessage(ILogger logger, Guid employeeId, int characters, bool isVoiceNote, long messageId);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "No se pudo responder al chat de Telegram {ChatId}.")]
     private static partial void LogReplyFailed(ILogger logger, Exception exception, long chatId);

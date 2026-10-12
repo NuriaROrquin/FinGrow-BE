@@ -230,7 +230,7 @@ public class ReceiveWhatsAppMessageHandlerTests
 
         var result = await HandleMessage(Phone, "sí", "SM124");
 
-        result.Value.Text.ShouldBe(WhatsAppTransactionText.HelpReply);
+        result.Value.Text.ShouldBe(ChatTransactionText.HelpReply);
         _transactions.Transactions.ShouldHaveSingleItem().Status.ShouldBe(TransactionStatus.Pending);
         _ai.ParsedMessages.Last().Text.ShouldBe("sí");
     }
@@ -273,7 +273,7 @@ public class ReceiveWhatsAppMessageHandlerTests
     [Theory]
     [InlineData(MessageParsingOutcome.MissingAmount, ChatTransactionText.MissingAmountReply)]
     [InlineData(MessageParsingOutcome.MultipleTransactions, ChatTransactionText.MultipleTransactionsReply)]
-    [InlineData(MessageParsingOutcome.NotATransaction, WhatsAppTransactionText.HelpReply)]
+    [InlineData(MessageParsingOutcome.NotATransaction, ChatTransactionText.HelpReply)]
     public async Task A_message_that_cannot_be_registered_is_answered_without_creating_a_transaction(
         MessageParsingOutcome outcome,
         string expectedReply)
@@ -308,7 +308,7 @@ public class ReceiveWhatsAppMessageHandlerTests
 
         var result = await Handle(Phone, string.Empty, image);
 
-        result.Value.Text.ShouldBe(WhatsAppTransactionText.HelpReply);
+        result.Value.Text.ShouldBe(ChatTransactionText.HelpReply);
         _media.Downloaded.ShouldBeEmpty();
         _ai.ParsedMessages.ShouldBeEmpty();
     }
@@ -321,7 +321,7 @@ public class ReceiveWhatsAppMessageHandlerTests
 
         var result = await Handle(Phone, Code);
 
-        result.Value.Text.ShouldBe(WhatsAppTransactionText.HelpReply);
+        result.Value.Text.ShouldBe(ChatTransactionText.HelpReply);
         _linkCodes.LinkCodes.Single().UsedAt.ShouldBeNull();
     }
 

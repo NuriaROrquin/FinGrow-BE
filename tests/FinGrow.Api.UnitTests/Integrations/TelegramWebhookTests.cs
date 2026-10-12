@@ -132,6 +132,25 @@ public class TelegramWebhookTests
     }
 
     [Fact]
+    public async Task A_voice_note_from_a_linked_chat_is_transcribed_and_proposed_with_buttons()
+    {
+        using var factory = new WebhookWebApplicationFactory();
+        var client = factory.CreateClient();
+        factory.LinkChat();
+
+        var response = await PostAsync(client, PrivateVoiceNote());
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        factory.Bot.DownloadedFiles.ShouldHaveSingleItem().ShouldBe("AwACAgEAAxkBAAIB");
+        var transaction = factory.Transactions.ShouldHaveSingleItem();
+        transaction.Source.ShouldBe(TransactionSource.Telegram);
+        transaction.Status.ShouldBe(TransactionStatus.Pending);
+        var sent = factory.Bot.SentWithButtons.ShouldHaveSingleItem();
+        sent.Text.ShouldStartWith("🎙️ Entendí: «Gasté 500 pesos en el súper»");
+        sent.Text.ShouldContain("Alimentos");
+    }
+
+    [Fact]
     public async Task Tapping_a_button_confirms_the_transaction_and_edits_the_message()
     {
         using var factory = new WebhookWebApplicationFactory();
@@ -337,7 +356,8 @@ public class TelegramWebhookTests
             ReadOnlyMemory<byte> audio,
             string contentType,
             CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+            Task.FromResult(new AudioTranscription(
+                AudioTranscriptionOutcome.Transcribed, "Gasté 500 pesos en el súper", "fake-transcribe"));
     }
 
     private sealed class InMemoryTransactionRepository : ITransactionRepository

@@ -6,12 +6,6 @@ using FinGrow.Domain.Entities;
 
 internal static class WhatsAppTransactionText
 {
-    public const string HelpReply =
-        "Para registrar un movimiento escribime o mandame un audio contando qué fue y cuánto. Por ejemplo:\n" +
-        "• Gasté $500 en el súper\n" +
-        "• Pagué $1500 el almuerzo con débito\n" +
-        "• Cobré $10000 por un freelance";
-
     public static string Proposal(Transaction transaction, bool asksPaymentMethod)
     {
         ArgumentNullException.ThrowIfNull(transaction);

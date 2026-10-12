@@ -121,7 +121,7 @@ internal sealed partial class ReceiveWhatsAppMessageHandler
 
         if (string.IsNullOrWhiteSpace(request.Body))
         {
-            return new WhatsAppReply(WhatsAppTransactionText.HelpReply);
+            return new WhatsAppReply(ChatTransactionText.HelpReply);
         }
 
         return await ProposeAsync(employeeId, request, request.Body, heard: null, cancellationToken);
@@ -181,7 +181,7 @@ internal sealed partial class ReceiveWhatsAppMessageHandler
             ProposalOutcome.TooLong => ChatTransactionText.TooLongReply,
             ProposalOutcome.MissingAmount => ChatTransactionText.MissingAmountReply,
             ProposalOutcome.MultipleTransactions => ChatTransactionText.MultipleTransactionsReply,
-            ProposalOutcome.NotATransaction => WhatsAppTransactionText.HelpReply,
+            ProposalOutcome.NotATransaction => ChatTransactionText.HelpReply,
             _ => ChatTransactionText.AiUnavailableReply
         };
 

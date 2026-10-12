@@ -17,7 +17,7 @@ internal static class ChatTransactionText
         "Mandame un movimiento por mensaje así no se mezclan. Por ejemplo: Gasté $500 en el súper.";
 
     public const string HelpReply =
-        "Para registrar un movimiento escribime qué fue y cuánto. Por ejemplo:\n" +
+        "Para registrar un movimiento escribime o mandame un audio contando qué fue y cuánto. Por ejemplo:\n" +
         "• Gasté $500 en el súper\n" +
         "• Pagué $1500 el almuerzo con débito\n" +
         "• Cobré $10000 por un freelance";
