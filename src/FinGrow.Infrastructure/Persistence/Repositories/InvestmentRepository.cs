@@ -1,6 +1,7 @@
 namespace FinGrow.Infrastructure.Persistence.Repositories;
 
 using Domain.Entities;
+using Domain.Enums;
 using FinGrow.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,13 +23,23 @@ internal sealed class InvestmentRepository(FinGrowDbContext dbContext) : IInvest
 
     public async Task<IReadOnlyList<Guid>> ListEmployeesWithTrackedInvestmentsAsync(CancellationToken cancellationToken = default) =>
         await dbContext.Investments
-            .Where(investment => investment.Symbol != null)
+            .Where(investment => investment.Source == InvestmentSource.Manual && investment.Symbol != null)
             .Select(investment => investment.EmployeeId)
             .Distinct()
             .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<Investment>> ListTrackedByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
         await dbContext.Investments
-            .Where(investment => investment.EmployeeId == employeeId && investment.Symbol != null)
+            .Where(investment => investment.EmployeeId == employeeId
+                && investment.Source == InvestmentSource.Manual
+                && investment.Symbol != null)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Investment>> ListImportedAsync(
+        Guid employeeId,
+        InvestmentSource source,
+        CancellationToken cancellationToken = default) =>
+        await dbContext.Investments
+            .Where(investment => investment.EmployeeId == employeeId && investment.Source == source)
             .ToListAsync(cancellationToken);
 }

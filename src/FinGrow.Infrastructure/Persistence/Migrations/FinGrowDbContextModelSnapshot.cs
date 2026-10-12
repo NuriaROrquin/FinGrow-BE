@@ -909,6 +909,11 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("employee_id");
 
+                    b.Property<string>("ExternalReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("external_reference");
+
                     b.Property<DateOnly>("PurchasedOn")
                         .HasColumnType("date")
                         .HasColumnName("purchased_on");
@@ -917,6 +922,12 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasPrecision(30, 10)
                         .HasColumnType("numeric(30,10)")
                         .HasColumnName("quantity");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("source");
 
                     b.Property<string>("Symbol")
                         .HasMaxLength(150)
@@ -939,8 +950,15 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                     b.HasIndex("EmployeeId", "Type")
                         .HasDatabaseName("ix_investments_employee_id_type");
 
+                    b.HasIndex("EmployeeId", "Source", "ExternalReference")
+                        .IsUnique()
+                        .HasDatabaseName("ix_investments_employee_id_source_external_reference")
+                        .HasFilter("external_reference IS NOT NULL");
+
                     b.ToTable("investments", null, t =>
                         {
+                            t.HasCheckConstraint("ck_investments_external_reference_when_imported", "(source = 'Manual') = (external_reference IS NULL)");
+
                             t.HasCheckConstraint("ck_investments_invested_positive", "invested_amount > 0");
 
                             t.HasCheckConstraint("ck_investments_quantity_positive", "quantity IS NULL OR quantity > 0");
