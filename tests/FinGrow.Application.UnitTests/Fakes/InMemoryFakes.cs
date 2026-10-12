@@ -382,6 +382,23 @@ public sealed class FakeAiService : IAiService
 
         return Task.FromResult(ParseResult);
     }
+
+    public AudioTranscription TranscriptionResult { get; set; } =
+        new(AudioTranscriptionOutcome.Transcribed, "Gasté 500 en el super", "fake-transcribe");
+
+    public List<(byte[] Audio, string ContentType)> TranscribedAudios { get; } = new();
+
+    public Task<AudioTranscription> TranscribeAudioAsync(ReadOnlyMemory<byte> audio, string contentType, CancellationToken cancellationToken = default)
+    {
+        if (Unreachable)
+        {
+            throw new HttpRequestException("FinGrow-AI unreachable");
+        }
+
+        TranscribedAudios.Add((audio.ToArray(), contentType));
+
+        return Task.FromResult(TranscriptionResult);
+    }
 }
 
 public sealed class FakeRefreshTokenRepository : IRefreshTokenRepository

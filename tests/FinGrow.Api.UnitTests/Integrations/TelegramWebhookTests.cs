@@ -300,6 +300,12 @@ public class TelegramWebhookTests
                 MessageParsingOutcome.Parsed,
                 new ParsedTransaction(TransactionType.Expense, 500m, defaultCurrency, ExpenseCategory.Alimentos, null, "Supermercado", null, 0.9),
                 "fake-model"));
+
+        public Task<AudioTranscription> TranscribeAudioAsync(
+            ReadOnlyMemory<byte> audio,
+            string contentType,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class InMemoryTransactionRepository : ITransactionRepository

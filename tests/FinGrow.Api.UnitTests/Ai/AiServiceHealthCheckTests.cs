@@ -53,6 +53,12 @@ public class AiServiceHealthCheckTests
             Currency defaultCurrency,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+
+        public Task<AudioTranscription> TranscribeAudioAsync(
+            ReadOnlyMemory<byte> audio,
+            string contentType,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class AiHealthWebApplicationFactory : WebApplicationFactory<Program>
