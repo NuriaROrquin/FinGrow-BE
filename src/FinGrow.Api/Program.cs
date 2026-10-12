@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using FinGrow.Api.Authentication;
 using FinGrow.Api.Extensions;
+using FinGrow.Api.Gmail;
 using FinGrow.Api.Jobs;
 using FinGrow.Api.MercadoPago;
 using FinGrow.Api.Notifications;
@@ -25,6 +26,10 @@ builder.Services.AddSessionCookieAuthentication();
 builder.Services.AddNotificationsHub();
 builder.Services.AddOptions<MercadoPagoReturnOptions>()
     .Bind(builder.Configuration.GetSection(MercadoPagoReturnOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+builder.Services.AddOptions<GmailReturnOptions>()
+    .Bind(builder.Configuration.GetSection(GmailReturnOptions.SectionName))
     .ValidateDataAnnotations()
     .ValidateOnStart();
 builder.Services.AddOptions<JobsOptions>()

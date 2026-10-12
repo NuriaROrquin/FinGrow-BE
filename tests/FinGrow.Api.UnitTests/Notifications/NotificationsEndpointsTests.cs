@@ -120,9 +120,10 @@ public class NotificationsEndpointsTests
             new { isEnabled = false });
 
         var names = channels.EnumerateArray().Select(channel => channel.GetProperty("channel").GetString()).ToList();
-        names.Count.ShouldBe(2);
+        names.Count.ShouldBe(3);
         names.ShouldContain("InApp");
         names.ShouldContain("Telegram");
+        names.ShouldContain("Email");
         change.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await change.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("isEnabled").GetBoolean().ShouldBeFalse();
         var stored = factory.ChannelSettings.ShouldHaveSingleItem();
@@ -207,6 +208,9 @@ public class NotificationsEndpointsTests
                     ["MercadoPago:ClientId"] = "unit-test-mp-client-id",
                     ["MercadoPago:ClientSecret"] = "unit-test-mp-client-secret",
                     ["MercadoPago:RedirectUri"] = "https://api.test/api/integrations/mercadopago/oauth/callback",
+                    ["Gmail:ClientId"] = "unit-test-gmail-client-id",
+                    ["Gmail:ClientSecret"] = "unit-test-gmail-client-secret",
+                    ["Gmail:RedirectUri"] = "https://api.test/api/integrations/gmail/oauth/callback",
                     ["TokenEncryption:Key"] = "dW5pdC10ZXN0LXRva2VuLWVuY3J5cHRpb24ta2V5ISE=",
                     ["Jobs:ApiKey"] = "unit-test-jobs-api-key",
                 }));

@@ -1,5 +1,7 @@
 namespace FinGrow.Application.UnitTests.Fakes;
 
+using System.Globalization;
+using System.Net;
 using FinGrow.Application.Common;
 using FinGrow.Application.DTOs;
 using FinGrow.Application.Features.Investments.ListInvestments;
@@ -335,6 +337,108 @@ public sealed class FakeMercadoPagoOAuthClient : IMercadoPagoOAuthClient
         Task.FromResult(Tokens);
 }
 
+public sealed class FakeGmailMailboxClient : IGmailMailboxClient
+{
+    public List<GmailMessage> Messages { get; } = new();
+
+    public HashSet<string> RejectedTokens { get; } = new(StringComparer.Ordinal);
+
+    public int PageSize { get; set; } = 100;
+
+    public List<(string AccessToken, string Query)> Searches { get; } = new();
+
+    public List<string> ReadMessages { get; } = new();
+
+    public Task<GmailMessagePage> SearchAsync(string accessToken, string query, string? pageToken, CancellationToken cancellationToken = default)
+    {
+        ThrowIfRejected(accessToken);
+        Searches.Add((accessToken, query));
+
+        var skip = pageToken is null ? 0 : int.Parse(pageToken, CultureInfo.InvariantCulture);
+        var newestFirst = Messages.OrderByDescending(message => message.ReceivedAt).Select(message => message.Id).ToList();
+        var page = newestFirst.Skip(skip).Take(PageSize).ToList();
+        var next = skip + PageSize < newestFirst.Count ? (skip + PageSize).ToString(CultureInfo.InvariantCulture) : null;
+
+        return Task.FromResult(new GmailMessagePage(page, next));
+    }
+
+    public Task<GmailMessage> GetMessageAsync(string accessToken, string messageId, CancellationToken cancellationToken = default)
+    {
+        ThrowIfRejected(accessToken);
+        ReadMessages.Add(messageId);
+
+        return Task.FromResult(Messages.Single(message => message.Id == messageId));
+    }
+
+    private void ThrowIfRejected(string accessToken)
+    {
+        if (RejectedTokens.Contains(accessToken))
+        {
+            throw new HttpRequestException("Gmail respondio 401", inner: null, HttpStatusCode.Unauthorized);
+        }
+    }
+}
+
+public sealed class FakeGmailOAuthClient : IGmailOAuthClient
+{
+    public static readonly Uri AuthorizationBase = new("https://accounts.google.test/o/oauth2/v2/auth");
+
+    public GmailTokens Tokens { get; set; } = new("access-token", "refresh-token", TimeSpan.FromHours(1), CanReadMail: true);
+
+    public string EmailAddress { get; set; } = "juan.perez@gmail.com";
+
+    public bool Unreachable { get; set; }
+
+    public List<string> ExchangedCodes { get; } = new();
+
+    public List<string> RevokedTokens { get; } = new();
+
+    public Uri BuildAuthorizationUrl(string state) => new(AuthorizationBase, $"?state={state}");
+
+    public Task<GmailTokens> ExchangeCodeAsync(string code, CancellationToken cancellationToken = default)
+    {
+        ThrowIfUnreachable();
+        ExchangedCodes.Add(code);
+
+        return Task.FromResult(Tokens);
+    }
+
+    public Exception? RefreshFailure { get; set; }
+
+    public List<string> RefreshedTokens { get; } = new();
+
+    public Task<GmailTokens> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default)
+    {
+        if (RefreshFailure is not null)
+        {
+            throw RefreshFailure;
+        }
+
+        RefreshedTokens.Add(refreshToken);
+
+        return Task.FromResult(Tokens);
+    }
+
+    public Task<string> GetEmailAddressAsync(string accessToken, CancellationToken cancellationToken = default) =>
+        Task.FromResult(EmailAddress);
+
+    public Task RevokeAsync(string token, CancellationToken cancellationToken = default)
+    {
+        ThrowIfUnreachable();
+        RevokedTokens.Add(token);
+
+        return Task.CompletedTask;
+    }
+
+    private void ThrowIfUnreachable()
+    {
+        if (Unreachable)
+        {
+            throw new HttpRequestException("Google unreachable");
+        }
+    }
+}
+
 public sealed class FakeIolAuthClient : IIolAuthClient
 {
     public IolTokens Tokens { get; set; } = new("iol-access", "iol-refresh", TimeSpan.FromMinutes(15));
@@ -483,6 +587,22 @@ public sealed class FakeAiService : IAiService
         ParsedMessages.Add((text, defaultCurrency));
 
         return Task.FromResult(ParseResult);
+    }
+
+    public Func<BillEmail, ParsedBillEmail> ParseBill { get; set; } = _ => ParsedBillEmail.Of(BillParsingOutcome.NotABill, "fake-model");
+
+    public List<(BillEmail Email, Currency DefaultCurrency)> ParsedEmails { get; } = new();
+
+    public Task<ParsedBillEmail> ParseBillEmailAsync(BillEmail email, Currency defaultCurrency, CancellationToken cancellationToken = default)
+    {
+        if (Unreachable)
+        {
+            throw new HttpRequestException("FinGrow-AI unreachable");
+        }
+
+        ParsedEmails.Add((email, defaultCurrency));
+
+        return Task.FromResult(ParseBill(email));
     }
 
     public AudioTranscription TranscriptionResult { get; set; } =

@@ -15,6 +15,7 @@ using FinGrow.Infrastructure.Integrations.ArgentinaDatos;
 using FinGrow.Infrastructure.Integrations.Byma;
 using FinGrow.Infrastructure.Integrations.CoinGecko;
 using FinGrow.Infrastructure.Integrations.DolarApi;
+using FinGrow.Infrastructure.Integrations.Gmail;
 using FinGrow.Infrastructure.Integrations.Iol;
 using FinGrow.Infrastructure.Integrations.MercadoPago;
 using FinGrow.Infrastructure.Integrations.Telegram;
@@ -50,6 +51,7 @@ public static class DependencyInjection
         services.AddTwilio(configuration);
         services.AddTelegram(configuration);
         services.AddMercadoPago(configuration);
+        services.AddGmail(configuration);
         services.AddIol(configuration);
         services.AddDolarApi(configuration);
         services.AddByma(configuration);
@@ -212,6 +214,34 @@ public static class DependencyInjection
             .AddPolicyHandler(GetRetryPolicy());
 
         services.AddHttpClient<IMercadoPagoPaymentsClient, MercadoPagoPaymentsClient>(ConfigureMercadoPagoClient)
+            .AddPolicyHandler(GetRetryPolicy());
+
+        return services;
+    }
+
+    private static IServiceCollection AddGmail(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<GmailOptions>()
+            .Bind(configuration.GetSection(GmailOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddHttpClient<IGmailOAuthClient, GmailOAuthClient>((provider, client) =>
+            {
+                var options = provider.GetRequiredService<IOptions<GmailOptions>>().Value;
+
+                client.BaseAddress = new Uri(options.OAuthBaseUrl);
+                client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+            })
+            .AddPolicyHandler(GetRetryPolicy());
+
+        services.AddHttpClient<IGmailMailboxClient, GmailMailboxClient>((provider, client) =>
+            {
+                var options = provider.GetRequiredService<IOptions<GmailOptions>>().Value;
+
+                client.BaseAddress = new Uri(options.ApiBaseUrl);
+                client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+            })
             .AddPolicyHandler(GetRetryPolicy());
 
         return services;

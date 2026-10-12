@@ -77,8 +77,8 @@ internal sealed partial class ReceiveWhatsAppMessageHandler
         return attempt.Outcome switch
         {
             LinkOutcome.NotACode => new WhatsAppReply(NotLinkedReply),
-            LinkOutcome.InvalidCode => new WhatsAppReply(InvalidCodeReply),
-            _ => new WhatsAppReply($"Listo, {attempt.Employee!.FullName}{LinkedReplySuffix}")
+            LinkOutcome.Linked => new WhatsAppReply($"Listo, {attempt.Employee!.FullName}{LinkedReplySuffix}"),
+            _ => new WhatsAppReply(InvalidCodeReply)
         };
     }
 

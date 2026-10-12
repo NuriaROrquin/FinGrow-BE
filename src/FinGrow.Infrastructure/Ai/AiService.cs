@@ -19,6 +19,14 @@ internal sealed class AiService : IAiService
             ["multiple_transactions"] = MessageParsingOutcome.MultipleTransactions
         }.ToFrozenDictionary(StringComparer.Ordinal);
 
+    private static readonly FrozenDictionary<string, BillParsingOutcome> BillOutcomes =
+        new Dictionary<string, BillParsingOutcome>(StringComparer.Ordinal)
+        {
+            ["bill"] = BillParsingOutcome.Bill,
+            ["missing_amount"] = BillParsingOutcome.MissingAmount,
+            ["not_a_bill"] = BillParsingOutcome.NotABill
+        }.ToFrozenDictionary(StringComparer.Ordinal);
+
     private static readonly FrozenDictionary<string, TransactionType> Types =
         new Dictionary<string, TransactionType>(StringComparer.Ordinal)
         {
@@ -125,6 +133,56 @@ internal sealed class AiService : IAiService
         }
 
         return new ParsedMessage(outcome, ToParsedTransaction(payload.Transaction), payload.Model);
+    }
+
+    public async Task<ParsedBillEmail> ParseBillEmailAsync(
+        BillEmail email,
+        Currency defaultCurrency,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(email);
+
+        var request = new ParseBillRequest(email.Subject, email.Sender, email.Body, defaultCurrency.ToString());
+
+        using var response = await _httpClient.PostAsJsonAsync("/api/v1/email-parsing/bills", request, cancellationToken);
+
+        response.EnsureSuccessStatusCode();
+
+        ParseBillResponse? payload;
+
+        try
+        {
+            payload = await response.Content.ReadFromJsonAsync<ParseBillResponse>(cancellationToken);
+        }
+        catch (JsonException exception)
+        {
+            throw new HttpRequestException("FinGrow-AI devolvio un JSON invalido al interpretar el mail.", exception);
+        }
+
+        if (payload is null || !BillOutcomes.TryGetValue(payload.Status ?? string.Empty, out var outcome))
+        {
+            throw new HttpRequestException("FinGrow-AI devolvio un status desconocido al interpretar el mail.");
+        }
+
+        return outcome == BillParsingOutcome.Bill
+            ? new ParsedBillEmail(outcome, ToParsedBill(payload.Bill), payload.Model)
+            : ParsedBillEmail.Of(outcome, payload.Model);
+    }
+
+    private static ParsedBill ToParsedBill(ParsedBillPayload? bill)
+    {
+        if (bill is null
+            || string.IsNullOrWhiteSpace(bill.Issuer)
+            || bill.Amount <= 0
+            || !Enum.TryParse<Currency>(bill.Currency, ignoreCase: false, out var currency)
+            || !Enum.IsDefined(currency)
+            || !ExpenseCategoryExtensions.TryFromWireValue(bill.Category, out var category)
+            || !ConfidenceScale.IsValid(bill.Confidence))
+        {
+            throw new HttpRequestException("FinGrow-AI devolvio una factura incompleta.");
+        }
+
+        return new ParsedBill(bill.Issuer.Trim(), bill.Amount, currency, bill.DueDate, category, bill.Confidence);
     }
 
     public async Task<AudioTranscription> TranscribeAudioAsync(
@@ -254,6 +312,25 @@ internal sealed class AiService : IAiService
         [property: JsonPropertyName("income_category")] string? IncomeCategory,
         [property: JsonPropertyName("description")] string? Description,
         [property: JsonPropertyName("payment_method")] string? PaymentMethod,
+        [property: JsonPropertyName("confidence")] double Confidence);
+
+    private sealed record ParseBillRequest(
+        [property: JsonPropertyName("subject")] string Subject,
+        [property: JsonPropertyName("sender")] string Sender,
+        [property: JsonPropertyName("body")] string Body,
+        [property: JsonPropertyName("default_currency")] string DefaultCurrency);
+
+    private sealed record ParseBillResponse(
+        [property: JsonPropertyName("status")] string? Status,
+        [property: JsonPropertyName("bill")] ParsedBillPayload? Bill,
+        [property: JsonPropertyName("model")] string? Model);
+
+    private sealed record ParsedBillPayload(
+        [property: JsonPropertyName("issuer")] string? Issuer,
+        [property: JsonPropertyName("amount"), JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)] decimal Amount,
+        [property: JsonPropertyName("currency")] string? Currency,
+        [property: JsonPropertyName("due_date")] DateOnly? DueDate,
+        [property: JsonPropertyName("category")] string? Category,
         [property: JsonPropertyName("confidence")] double Confidence);
 
     private sealed record CategorizeRequest([property: JsonPropertyName("transactions")] List<TransactionInput> Transactions);

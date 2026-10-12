@@ -29,6 +29,32 @@ public sealed record ParsedMessage(MessageParsingOutcome Outcome, ParsedTransact
     public static ParsedMessage Of(MessageParsingOutcome outcome, string? model = null) => new(outcome, null, model);
 }
 
+public enum BillParsingOutcome
+{
+    Bill,
+    MissingAmount,
+    NotABill
+}
+
+/// <summary>
+/// Un mail para que FinGrow-AI decida si es una factura. <c>Sender</c> es solo el dominio del remitente:
+/// la direccion completa es un dato personal y en un reenvio es la del propio empleado.
+/// </summary>
+public sealed record BillEmail(string Subject, string Sender, string Body);
+
+public sealed record ParsedBill(
+    string Issuer,
+    decimal Amount,
+    Currency Currency,
+    DateOnly? DueDate,
+    ExpenseCategory Category,
+    double Confidence);
+
+public sealed record ParsedBillEmail(BillParsingOutcome Outcome, ParsedBill? Bill, string? Model)
+{
+    public static ParsedBillEmail Of(BillParsingOutcome outcome, string? model = null) => new(outcome, null, model);
+}
+
 public enum AudioTranscriptionOutcome
 {
     Transcribed,
@@ -52,6 +78,11 @@ public interface IAiService
 
     Task<ParsedMessage> ParseTransactionMessageAsync(
         string text,
+        Currency defaultCurrency,
+        CancellationToken cancellationToken = default);
+
+    Task<ParsedBillEmail> ParseBillEmailAsync(
+        BillEmail email,
         Currency defaultCurrency,
         CancellationToken cancellationToken = default);
 
