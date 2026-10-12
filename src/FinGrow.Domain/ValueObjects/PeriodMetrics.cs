@@ -1,6 +1,7 @@
 namespace FinGrow.Domain.ValueObjects;
 
 using FinGrow.Domain.Common;
+using FinGrow.Domain.Enums;
 using FinGrow.Domain.Errors;
 
 public sealed class PeriodMetrics : ValueObject
@@ -16,7 +17,9 @@ public sealed class PeriodMetrics : ValueObject
         int employeesWithBudget,
         int employeesWithActiveGoal,
         int goalsAchieved,
-        int employeesWithIntegration)
+        int employeesWithIntegration,
+        int employeesWithScore,
+        int financialHealthScoreSum)
     {
         ActiveEmployees = activeEmployees;
         ParticipatingEmployees = participatingEmployees;
@@ -25,6 +28,8 @@ public sealed class PeriodMetrics : ValueObject
         EmployeesWithActiveGoal = employeesWithActiveGoal;
         GoalsAchieved = goalsAchieved;
         EmployeesWithIntegration = employeesWithIntegration;
+        EmployeesWithScore = employeesWithScore;
+        FinancialHealthScoreSum = financialHealthScoreSum;
     }
 
     public int ActiveEmployees { get; private set; }
@@ -41,11 +46,19 @@ public sealed class PeriodMetrics : ValueObject
 
     public int EmployeesWithIntegration { get; private set; }
 
+    public int EmployeesWithScore { get; private set; }
+
+    public int FinancialHealthScoreSum { get; private set; }
+
     public decimal? ParticipationRate => ActiveEmployees == 0
         ? null
         : decimal.Round(ParticipatingEmployees * 100m / ActiveEmployees, 2, MidpointRounding.ToEven);
 
-    public static PeriodMetrics Empty => From(0, 0, 0, 0, 0, 0, 0);
+    public decimal? AverageFinancialHealthScore => EmployeesWithScore == 0
+        ? null
+        : decimal.Round((decimal)FinancialHealthScoreSum / EmployeesWithScore, 2, MidpointRounding.ToEven);
+
+    public static PeriodMetrics Empty => From(0, 0, 0, 0, 0, 0, 0, 0, 0);
 
     public static PeriodMetrics From(
         int activeEmployees,
@@ -54,7 +67,9 @@ public sealed class PeriodMetrics : ValueObject
         int employeesWithBudget,
         int employeesWithActiveGoal,
         int goalsAchieved,
-        int employeesWithIntegration)
+        int employeesWithIntegration,
+        int employeesWithScore,
+        int financialHealthScoreSum)
     {
         EnsureNotNegative(activeEmployees, "empleados activos");
         EnsureNotNegative(confirmedTransactions, "movimientos confirmados");
@@ -63,6 +78,13 @@ public sealed class PeriodMetrics : ValueObject
         EnsureEmployeeCount(employeesWithBudget, activeEmployees, "empleados con presupuesto");
         EnsureEmployeeCount(employeesWithActiveGoal, activeEmployees, "empleados con meta activa");
         EnsureEmployeeCount(employeesWithIntegration, activeEmployees, "empleados con integracion");
+        EnsureEmployeeCount(employeesWithScore, activeEmployees, "empleados con puntaje");
+        EnsureNotNegative(financialHealthScoreSum, "puntos de salud financiera");
+
+        if (financialHealthScoreSum > employeesWithScore * FinancialHealthScale.MaxScore)
+        {
+            throw new DomainException("La suma de puntajes no puede superar el maximo de cada empleado con puntaje.");
+        }
 
         return new PeriodMetrics(
             activeEmployees,
@@ -71,7 +93,9 @@ public sealed class PeriodMetrics : ValueObject
             employeesWithBudget,
             employeesWithActiveGoal,
             goalsAchieved,
-            employeesWithIntegration);
+            employeesWithIntegration,
+            employeesWithScore,
+            financialHealthScoreSum);
     }
 
     private static void EnsureNotNegative(int value, string label)
@@ -101,5 +125,7 @@ public sealed class PeriodMetrics : ValueObject
         yield return EmployeesWithActiveGoal;
         yield return GoalsAchieved;
         yield return EmployeesWithIntegration;
+        yield return EmployeesWithScore;
+        yield return FinancialHealthScoreSum;
     }
 }

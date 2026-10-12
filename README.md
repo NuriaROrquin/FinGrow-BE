@@ -329,7 +329,7 @@ siguiente.
 
 | Trabajo | Cron sugerido (UTC) | Qué hace |
 |---|---|---|
-| `metrics-snapshot` | `0 4 1 * *` (el 1 de cada mes, 01:00 de Argentina) | Genera las fotos mensuales de métricas por empresa y por departamento (`company_metrics_snapshots` y `department_metrics_snapshots`) del último mes cerrado, y completa las de los meses anteriores que falten desde el alta de cada empresa. Es idempotente: correrlo de nuevo actualiza la foto del último mes cerrado en lugar de duplicarla |
+| `metrics-snapshot` | `0 4 1 * *` (el 1 de cada mes, 01:00 de Argentina) | Genera las fotos mensuales de métricas por empresa y por departamento (`company_metrics_snapshots` y `department_metrics_snapshots`) del último mes cerrado, y completa las de los meses anteriores que falten desde el alta de cada empresa. En la misma pasada calcula el puntaje de salud financiera de cada empleado (ver más abajo). Es idempotente: correrlo de nuevo actualiza la foto del último mes cerrado en lugar de duplicarla. Si un mes necesita el dólar MEP y DolarApi no responde, esa foto queda pendiente y la corrida, fallida |
 | `mercadopago-sync` | `0 * * * *` (cada hora) | Recorre las cuentas de Mercado Pago vinculadas y trae los movimientos nuevos como pendientes de revisión. Mercado Pago no avisa por webhook lo que un usuario paga, por eso se consulta |
 | `investment-quotes` | `30 21 * * 1-5` (días hábiles, 18:30 de Argentina) | Guarda en `security_prices` el último precio de cada símbolo de BYMA, cada fondo de ArgentinaDatos y cada cripto de CoinGecko (aunque nadie tenga inversiones con símbolo) y cotiza con esos precios las inversiones cargadas con símbolo y cantidad, registrándoles la valuación de mercado del día. Correrlo de nuevo el mismo día actualiza esa valuación en lugar de duplicarla. Si una fuente no responde, cotiza con las otras y la corrida queda fallida con el motivo; si no responde ninguna, no toca nada |
 | `goal-progress-alerts` | `0 12 * * *` (todos los días, 09:00 de Argentina) | Recorre las metas activas y avisa al empleado cuando una lleva 30 días sin aportes (`GoalStalled`, como máximo uno cada 30 días mientras siga quieta) o cuando se acerca su fecha límite con saldo pendiente (`GoalDeadlineApproaching`, una vez a los 30, a los 7 y a 1 día, con cuánto falta y cuántos días quedan). Si la fecha límite está cerca solo manda esa, que ya dice lo mismo. Correrlo de nuevo el mismo día no repite avisos |
@@ -362,6 +362,58 @@ curl -fsS -X POST "https://dev-be.fingrow.com.ar/api/jobs/metrics-snapshot/run" 
 La respuesta es la corrida registrada; si `status` es `Failed`, `error` dice por qué y el log de
 la API tiene el detalle completo. `GET /api/jobs` sirve para verificar de un vistazo que cada
 cron esté corriendo: muestra la última corrida de cada trabajo.
+
+### Puntaje de salud financiera
+
+Cada empleado con actividad suficiente recibe por mes un puntaje de 0 a 100
+(`financial_health_scores`), que calcula `metrics-snapshot` al fotografiar el mes. Es un
+indicador para la empresa, que solo lo ve agregado (promedio de la plantilla y por departamento:
+HU-57, HU-60 y HU-62). El empleado no ve el suyo.
+
+**Quién recibe puntaje.** Solo quien tuvo en el mes al menos 10 movimientos confirmados y algún
+ingreso. Sin eso no se guarda nada, ni siquiera un cero: un mes casi vacío no dice nada de la
+salud financiera de la persona, y un cero es otra cosa (alguien con actividad al que le va mal).
+
+**Factores.** Cada uno va de 0 a 100 y es lineal entre los dos extremos.
+
+| Factor | Peso | Qué mide | 0 | 100 |
+|---|---|---|---|---|
+| Ahorro | 40 % | (ingresos − gastos) / ingresos del mes. Lo gastado en `ahorro_inversion` cuenta como ahorro, no como gasto | ahorro de 0 % o menos | ahorro del 20 % o más |
+| Presupuesto | 25 % | De las categorías con tope en el presupuesto mensual, cuántas no se pasaron. Pasarse es gastar el tope o más; estar en alerta (80 %) no resta | todas pasadas | ninguna pasada |
+| Metas | 20 % | Promedio, entre las metas con cuota ese mes, de lo aportado en el mes sobre la cuota mensual (tope 100 % por meta). La meta que se alcanza ese mes cuenta completa | nada aportado | cuota cubierta |
+| Colchón | 15 % | Saldo acumulado al cierre del mes (ingresos − gastos de toda la historia, sin restar `ahorro_inversion`) sobre el gasto mensual promedio de los últimos 3 meses, o de los que haya desde el primer movimiento | saldo de 0 o negativo | 3 meses de gasto cubiertos |
+
+**Si no hay presupuesto del mes o ninguna meta con cuota, ese factor no cuenta y su peso se
+reparte entre los demás**: el puntaje mide las finanzas, no cuántas pantallas usa la persona.
+Ahorro y colchón están siempre.
+
+```
+puntaje = Σ (factor × peso) / Σ pesos de los factores presentes      (redondeado al entero)
+```
+
+| Banda | Puntaje |
+|---|---|
+| Crítica | 0 a 39 |
+| Frágil | 40 a 59 |
+| Estable | 60 a 79 |
+| Saludable | 80 a 100 |
+
+**Monedas.** Ahorro y colchón suman todo en pesos: lo que está en dólares se convierte al MEP
+de venta de DolarApi del momento del cálculo, y lo que está en EUR o BRL no cuenta (igual que en
+el dashboard). Presupuesto y metas comparan cada tope y cada meta en su propia moneda. Si hace
+falta el MEP y DolarApi no responde, la foto de ese mes de esa empresa no se genera y la corrida
+queda fallida; como la foto falta, la corrida siguiente la genera. Un mes viejo que se fotografía
+por primera vez usa el MEP del día de la corrida, no el de ese mes.
+
+**Cuándo se recalcula.** En cada corrida de `metrics-snapshot` el último mes cerrado se rehace
+entero (factores y puntaje), así que un movimiento confirmado tarde lo actualiza, y si alguien
+deja de tener actividad suficiente su puntaje se borra. Los meses que ya tenían foto antes de
+este cambio quedan sin puntaje.
+
+Las fotos guardan `employees_with_score` y `financial_health_score_sum`; el promedio se deriva
+(`PeriodMetrics.AverageFinancialHealthScore`) y el umbral mínimo de anonimización de T-11 se
+aplica al mostrarlo. La fórmula vive en `FinancialHealthFactors` (`Domain/ValueObjects/`): pesos
+y umbrales son constantes de esa clase.
 
 ### Alertas y notificaciones
 
@@ -513,7 +565,8 @@ Siete entidades y tres value objects. El esquema se crea con la migración `Init
 | `investments` | Investment | Posiciones del portafolio: capital invertido y valuación actual. `symbol` es el ticker (hasta 20 caracteres) o, en un fondo común, su nombre completo (hasta 150); `quantity` admite 10 decimales para fracciones de cripto |
 | `security_prices` | SecurityPrice | El último precio por unidad de cada mercado, símbolo y moneda (BYMA, fondos de ArgentinaDatos y cripto de CoinGecko); una fila por mercado, símbolo y moneda que `investment-quotes` pisa en cada corrida. En los fondos el símbolo es el nombre del fondo. Es lo que cotiza el formulario de inversiones cuando la fuente no publica precios (BYMA los fines de semana y feriados) o no responde |
 | `job_runs` | JobRun | Registro de cada corrida de un trabajo programado: inicio, fin, resultado y error |
-| `company_metrics_snapshots` | CompanyMetricsSnapshot | Foto mensual de métricas agregadas de una empresa: empleados activos, cuántos participaron, movimientos confirmados, presupuestos, metas e integraciones |
+| `company_metrics_snapshots` | CompanyMetricsSnapshot | Foto mensual de métricas agregadas de una empresa: empleados activos, cuántos participaron, movimientos confirmados, presupuestos, metas, integraciones, y cuántos tienen puntaje de salud financiera con la suma de esos puntajes |
+| `financial_health_scores` | FinancialHealthScore | El puntaje de salud financiera de cada empleado por mes, con sus cuatro factores y la fecha de cómputo. Solo existe para los meses con actividad suficiente |
 | `department_metrics_snapshots` | DepartmentMetricsSnapshot | La misma foto, por departamento |
 | `courses` | Course | Cursos del catálogo de educación financiera: nivel, categoría y tipo de activo relacionado; la duración se deriva de las lecciones |
 | `lessons` | (parte de Course) | Lecciones de un curso, ordenadas por `position`, con su duración y el video |

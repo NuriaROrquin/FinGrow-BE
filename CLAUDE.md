@@ -132,11 +132,29 @@ confirma o descarta. Telegram lo muestra con botones (`TelegramTransactionCallba
 `callback_data`, limitado a 64 bytes) y `AnswerTelegramCallback` procesa el toque. Para sumar
 WhatsApp alcanza con una capa propia del canal que use esas dos piezas.
 
+## Aislamiento de datos (T-10)
+
+**Entre empresas, lo garantiza la base de datos de EF**: `FinGrowDbContext.Tenancy.cs` registra un
+filtro global con nombre (`Tenant`) en cada entidad, acotado al `ICurrentUser.CompanyId`. Lo que
+cuelga de un empleado (movimientos, metas, etc.) lo hereda preguntando si el dueño es visible.
+Una entidad nueva tiene que aplicar el filtro o figurar en `GlobalEntityTypes`
+(`TenantIsolationRules` rompe el build si no).
+
+- **Sin sesión no hay empresa**: webhooks, trabajos, login y seeders corren sin filtro. Con sesión
+  siempre aplica: un token sin `company_id` no ve ninguna fila.
+- **Lo que cruza empresas a propósito** usa `IgnoreQueryFilters(new[] { FinGrowDbContext.TenantFilter })`
+  y lo justifica con un comentario (el email único de `GetByEmailAsync`, el promedio de votos de un curso).
+- **Un recurso de otra empresa responde `NotFound`**: el filtro hace que ni se vea.
+
+**Entre empleados de la misma empresa el filtro no alcanza**: cada caso de uso compara el dueño con
+`ICurrentUser.UserId`. `Ownership.Require` (`Application/Common/`) resuelve el par: inexistente →
+`NotFound`, de otro empleado → `Forbidden` (403). Usalo en los handlers que cargan un recurso por id.
+
 ## Panel de la empresa
 
 `api/company/departments` y `api/company/employees` (`[Authorize(Roles = Rol.Empresa)]`)
-administran la plantilla de la empresa del token. Hasta que exista el filtro global de T-10,
-**cada handler filtra por `ICurrentUser.CompanyId`** y responde `NotFound` (no `Forbidden`)
+administran la plantilla de la empresa del token. El filtro global de T-10 ya acota las consultas a
+esa empresa, pero **cada handler sigue filtrando por `ICurrentUser.CompanyId`** como segunda barrera y responde `NotFound` (no `Forbidden`)
 ante un recurso de otra empresa, para no confirmar que existe.
 
 - **El alta de un empleado devuelve una contraseña temporal una sola vez**
@@ -221,6 +239,28 @@ siguiente corre igual. Un mismo trabajo no corre dos veces a la vez (`RunningJob
   cerrado (por si se confirmaron movimientos tarde) y genera las de los meses anteriores que
   falten desde el alta de la empresa. Las fotos guardan conteos, no porcentajes: la tasa de
   participación se deriva (`PeriodMetrics.ParticipationRate`), fiel a "un total no se persiste".
+
+## Puntaje de salud financiera
+
+La fórmula está en `FinancialHealthFactors` (`Domain/ValueObjects/`) y explicada en el README;
+la aplica `FinancialHealthScorer` (`Application/Features/Metrics/FinancialHealth/`) dentro de
+`metrics-snapshot`. Lo que no se deduce leyendo:
+
+- **Sin actividad suficiente no hay puntaje, y eso no es un cero** (`HasEnoughActivity`: 10
+  movimientos confirmados y algún ingreso en el mes). Un cero es alguien con actividad al que le
+  va mal; la ausencia de fila es "no se puede medir". No completes con ceros.
+- **El puntaje sí se persiste**, a diferencia de los totales: es el resultado de una fórmula en
+  una fecha (`computed_at`), no la suma de partes editables. Factores y puntaje se escriben
+  juntos (`Compute`/`Refresh`), nunca uno sin el otro.
+- **El empleado nunca ve su puntaje y la empresa solo lo ve agregado.** Las fotos guardan cuántos
+  empleados tienen puntaje y la suma, y el promedio se deriva. No expongas
+  `financial_health_scores` por empleado en ningún endpoint.
+- **`ahorro_inversion` es ahorro, no gasto**, en el factor de ahorro y en el colchón.
+- **Un factor que falta no vale cero:** sin presupuesto del mes o sin metas con cuota, su peso se
+  reparte entre los demás.
+- **Sin MEP no se fotografía el mes** de una empresa con movimientos en dólares: la corrida queda
+  fallida y la siguiente genera la foto que falta. No conviertas con una cotización inventada ni
+  guardes una foto con parte de la plantilla sin puntuar.
 
 ## Correos
 

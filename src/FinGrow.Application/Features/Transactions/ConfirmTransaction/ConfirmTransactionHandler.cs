@@ -25,17 +25,19 @@ internal sealed class ConfirmTransactionHandler(
             return Result.Failure<TransactionResponse>(TransactionReviewErrors.Unauthenticated);
         }
 
-        var transaction = await transactionRepository.GetByIdAsync(request.Id, cancellationToken);
+        var owned = Ownership.Require(
+            await transactionRepository.GetByIdAsync(request.Id, cancellationToken),
+            transaction => transaction.EmployeeId,
+            employeeId,
+            TransactionReviewErrors.NotFound(request.Id),
+            TransactionReviewErrors.NotOwned);
 
-        if (transaction is null)
+        if (owned.IsFailure)
         {
-            return Result.Failure<TransactionResponse>(TransactionReviewErrors.NotFound(request.Id));
+            return Result.Failure<TransactionResponse>(owned.Error);
         }
 
-        if (transaction.EmployeeId != employeeId)
-        {
-            return Result.Failure<TransactionResponse>(TransactionReviewErrors.NotOwned);
-        }
+        var transaction = owned.Value;
 
         if (!transaction.IsPending)
         {

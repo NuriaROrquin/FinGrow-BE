@@ -14,8 +14,12 @@ internal sealed class EmployeeRepository : IEmployeeRepository
     public Task<Employee?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         _dbContext.Employees.FirstOrDefaultAsync(employee => employee.Id == id, cancellationToken);
 
+    // El email es la credencial de login y es unico en toda la plataforma: tanto el login como el
+    // chequeo de unicidad al dar de alta o editar tienen que ver a los empleados de todas las empresas.
     public Task<Employee?> GetByEmailAsync(Email email, CancellationToken cancellationToken) =>
-        _dbContext.Set<Employee>().SingleOrDefaultAsync(employee => employee.Email == email, cancellationToken);
+        _dbContext.Set<Employee>()
+            .IgnoreQueryFilters(new[] { FinGrowDbContext.TenantFilter })
+            .SingleOrDefaultAsync(employee => employee.Email == email, cancellationToken);
 
     public async Task<IReadOnlyDictionary<Guid, int>> CountByDepartmentAsync(
         Guid companyId,

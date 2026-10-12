@@ -10,5 +10,7 @@ public interface IGoalRepository
 
     Task<IReadOnlyList<Goal>> ListByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<Goal>> ListByEmployeesAsync(IReadOnlyCollection<Guid> employeeIds, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<Guid>> ListEmployeesWithActiveGoalsAsync(CancellationToken cancellationToken = default);
 }

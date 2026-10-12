@@ -5,9 +5,13 @@ using FinGrow.Domain.ValueObjects;
 
 internal static class PeriodMetricsCalculator
 {
-    public static PeriodMetrics Aggregate(IEnumerable<EmployeePeriodActivity> activity)
+    public static PeriodMetrics Aggregate(IEnumerable<EmployeePeriodActivity> activity, IReadOnlyDictionary<Guid, int> scores)
     {
         var employees = activity.ToList();
+        var employeeScores = employees
+            .Select(employee => scores.TryGetValue(employee.EmployeeId, out var score) ? score : (int?)null)
+            .OfType<int>()
+            .ToList();
 
         return PeriodMetrics.From(
             activeEmployees: employees.Count,
@@ -16,6 +20,8 @@ internal static class PeriodMetricsCalculator
             employeesWithBudget: employees.Count(employee => employee.HasBudget),
             employeesWithActiveGoal: employees.Count(employee => employee.HasActiveGoal),
             goalsAchieved: employees.Sum(employee => employee.GoalsAchieved),
-            employeesWithIntegration: employees.Count(employee => employee.HasIntegration));
+            employeesWithIntegration: employees.Count(employee => employee.HasIntegration),
+            employeesWithScore: employeeScores.Count,
+            financialHealthScoreSum: employeeScores.Sum());
     }
 }
