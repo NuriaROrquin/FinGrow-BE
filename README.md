@@ -332,6 +332,12 @@ uno confirma con ese medio; si el empleado no contesta, queda pendiente en la ba
 con Efectivo. Si falta el monto, el bot repregunta y no registra nada. Los toques de botón llegan
 como `callback_query`, por eso el webhook tiene que registrarse con ese tipo en `allowed_updates`.
 
+Una nota de voz (HU-71) sigue el mismo camino: la API la baja con `getFile` del Bot API, la
+transcribe con FinGrow-AI (`POST /api/v1/transcription/audio`, que necesita
+`TRANSCRIPTION_PROVIDER=openai` en ese servicio) y propone el movimiento con los mismos botones,
+precedido de «🎙️ Entendí: …». El audio no se guarda. Las notas de voz llegan como `message`,
+así que no hace falta tocar `allowed_updates`.
+
 ### Trabajos programados (Dokploy)
 
 La API no tiene un scheduler propio. Lo que corre "solo cada tanto" son **trabajos** registrados
