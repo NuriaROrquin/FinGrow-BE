@@ -494,6 +494,56 @@ public sealed class FakeMercadoPagoPaymentsClient : IMercadoPagoPaymentsClient
     }
 }
 
+public sealed class FakeIolPortfolioClient : IIolPortfolioClient
+{
+    public Dictionary<IolCountry, List<IolPosition>> Portfolios { get; } = new()
+    {
+        [IolCountry.Argentina] = new(),
+        [IolCountry.UnitedStates] = new(),
+    };
+
+    public List<IolOperation> Operations { get; } = new();
+
+    public Exception? PortfolioFailure { get; set; }
+
+    public IolCountry? FailingCountry { get; set; }
+
+    public string? UnavailableAccessToken { get; set; }
+
+    public Exception? OperationsFailure { get; set; }
+
+    public List<(string AccessToken, IolCountry Country)> PortfolioRequests { get; } = new();
+
+    public List<DateOnly> OperationRequests { get; } = new();
+
+    public Task<IReadOnlyList<IolPosition>> GetPortfolioAsync(string accessToken, IolCountry country, CancellationToken cancellationToken = default)
+    {
+        PortfolioRequests.Add((accessToken, country));
+
+        if (accessToken == UnavailableAccessToken)
+        {
+            return Task.FromException<IReadOnlyList<IolPosition>>(
+                new HttpRequestException("Response status code does not indicate success: 502 (Bad Gateway).", null, System.Net.HttpStatusCode.BadGateway));
+        }
+
+        if (PortfolioFailure is not null && (FailingCountry is null || FailingCountry == country))
+        {
+            return Task.FromException<IReadOnlyList<IolPosition>>(PortfolioFailure);
+        }
+
+        return Task.FromResult<IReadOnlyList<IolPosition>>(Portfolios[country].ToList());
+    }
+
+    public Task<IReadOnlyList<IolOperation>> ListCompletedOperationsAsync(string accessToken, DateOnly from, CancellationToken cancellationToken = default)
+    {
+        OperationRequests.Add(from);
+
+        return OperationsFailure is null
+            ? Task.FromResult<IReadOnlyList<IolOperation>>(Operations.ToList())
+            : Task.FromException<IReadOnlyList<IolOperation>>(OperationsFailure);
+    }
+}
+
 public sealed class FakeAiService : IAiService
 {
     public Dictionary<string, ExpenseCategory> CategoriesByDescription { get; } = new(StringComparer.Ordinal);
@@ -770,14 +820,21 @@ public sealed class FakeInvestmentRepository : IInvestmentRepository
 
     public Task<IReadOnlyList<Guid>> ListEmployeesWithTrackedInvestmentsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Guid>>(Investments
-            .Where(investment => investment.Symbol is not null)
+            .Where(investment => investment.Source == InvestmentSource.Manual && investment.Symbol is not null)
             .Select(investment => investment.EmployeeId)
             .Distinct()
             .ToList());
 
     public Task<IReadOnlyList<Investment>> ListTrackedByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Investment>>(Investments
-            .Where(investment => investment.EmployeeId == employeeId && investment.Symbol is not null)
+            .Where(investment => investment.EmployeeId == employeeId
+                && investment.Source == InvestmentSource.Manual
+                && investment.Symbol is not null)
+            .ToList());
+
+    public Task<IReadOnlyList<Investment>> ListImportedAsync(Guid employeeId, InvestmentSource source, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Investment>>(Investments
+            .Where(investment => investment.EmployeeId == employeeId && investment.Source == source)
             .ToList());
 }
 

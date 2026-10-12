@@ -6,6 +6,8 @@ using Events;
 using Features.Integrations.ChatTransactions;
 using Features.Integrations.Gmail.Sync;
 using Features.Integrations.Iol;
+using Features.Integrations.Iol.KeepAlive;
+using Features.Integrations.Iol.Sync;
 using Features.Integrations.Linking;
 using Features.Integrations.MercadoPago.Sync;
 using Features.Integrations.WhatsApp;
@@ -45,6 +47,7 @@ public static class DependencyInjection
         services.AddScoped<MercadoPagoSynchronizer>();
         services.AddScoped<GmailSynchronizer>();
         services.AddScoped<IolAccessTokenProvider>();
+        services.AddScoped<IolSynchronizer>();
         services.AddScoped<SessionIssuer>();
         services.AddScoped<TwoFactorAccountFinder>();
         services.AddScoped<DepartmentResponseBuilder>();
@@ -62,6 +65,8 @@ public static class DependencyInjection
         services.AddScoped<JobRunner>();
         services.AddScoped<IScheduledJob, MetricsSnapshotJob>();
         services.AddScoped<IScheduledJob, MercadoPagoSyncJob>();
+        services.AddScoped<IScheduledJob, IolSyncJob>();
+        services.AddScoped<IScheduledJob, IolTokenRefreshJob>();
         services.AddScoped<IScheduledJob, GmailSyncJob>();
         services.AddScoped<IScheduledJob, InvestmentQuotesJob>();
         services.AddScoped<IScheduledJob, GoalProgressAlertsJob>();

@@ -11,6 +11,10 @@ internal sealed partial class IolAccessTokenProvider
 {
     internal static readonly TimeSpan RefreshWindow = TimeSpan.FromMinutes(2);
 
+    // El refresh token muere 20 minutos despues de emitido. Con 10 minutos de margen, iol-token-refresh (cada 5
+    // minutos) todavia tiene dos corridas para reintentar si IOL falla antes de que se pierda la vinculacion.
+    internal static readonly TimeSpan KeepAliveWindow = TimeSpan.FromMinutes(10);
+
     private readonly IIolAuthClient _iol;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _clock;
@@ -28,7 +32,23 @@ internal sealed partial class IolAccessTokenProvider
         _logger = logger;
     }
 
-    public async Task<Result<string>> GetAccessTokenAsync(EmployeeIntegration integration, CancellationToken cancellationToken)
+    public Task<Result<string>> GetAccessTokenAsync(EmployeeIntegration integration, CancellationToken cancellationToken) =>
+        EnsureFreshAsync(integration, RefreshWindow, cancellationToken);
+
+    public async Task<Result<bool>> KeepAliveAsync(EmployeeIntegration integration, CancellationToken cancellationToken)
+    {
+        var accessToken = integration.Grant?.AccessToken;
+        var result = await EnsureFreshAsync(integration, KeepAliveWindow, cancellationToken);
+
+        return result.IsSuccess
+            ? Result.Success(result.Value != accessToken)
+            : Result.Failure<bool>(result.Error);
+    }
+
+    private async Task<Result<string>> EnsureFreshAsync(
+        EmployeeIntegration integration,
+        TimeSpan window,
+        CancellationToken cancellationToken)
     {
         if (integration.Provider != IntegrationProvider.Iol || integration.Grant is not { } grant)
         {
@@ -42,7 +62,7 @@ internal sealed partial class IolAccessTokenProvider
 
         var now = _clock.UtcNow;
 
-        if (!grant.ExpiresWithin(RefreshWindow, now))
+        if (!grant.ExpiresWithin(window, now))
         {
             return Result.Success(grant.AccessToken);
         }

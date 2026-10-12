@@ -59,6 +59,38 @@ public class IolAuthClientTests
     }
 
     [Fact]
+    public async Task The_bearer_lasts_what_its_dates_say_and_not_the_declared_expires_in()
+    {
+        using var handler = new RecordingHandler("""
+            {
+              "access_token": "iol-access",
+              "token_type": "bearer",
+              "expires_in": 1200,
+              "refresh_token": "iol-refresh",
+              ".issued": "Mon, 12 Oct 2026 20:39:41 GMT",
+              ".expires": "Mon, 12 Oct 2026 20:54:41 GMT",
+              ".refreshexpires": "Mon, 12 Oct 2026 20:59:41 GMT"
+            }
+            """);
+
+        var tokens = await Client(handler).LoginAsync("juan.perez", Password);
+
+        tokens.ExpiresIn.ShouldBe(TimeSpan.FromMinutes(15));
+    }
+
+    [Fact]
+    public async Task Without_readable_dates_the_bearer_lasts_the_declared_expires_in()
+    {
+        using var handler = new RecordingHandler("""
+            {"access_token": "iol-access", "expires_in": 1200, "refresh_token": "iol-refresh", ".issued": "ayer", ".expires": "hoy"}
+            """);
+
+        var tokens = await Client(handler).LoginAsync("juan.perez", Password);
+
+        tokens.ExpiresIn.ShouldBe(TimeSpan.FromMinutes(20));
+    }
+
+    [Fact]
     public async Task A_response_without_refresh_token_is_rejected_as_incomplete()
     {
         using var handler = new RecordingHandler("""{"access_token": "iol-access", "expires_in": 899}""");
@@ -135,6 +167,9 @@ public class IolAuthClientTests
                     ["Email:ResendApiKey"] = "re_unit_test_key",
                     ["MercadoPago:ClientId"] = "unit-test-mp-client-id",
                     ["MercadoPago:ClientSecret"] = "unit-test-mp-client-secret",
+                    ["Gmail:ClientId"] = "unit-test-gmail-client-id",
+                    ["Gmail:ClientSecret"] = "unit-test-gmail-client-secret",
+                    ["Gmail:RedirectUri"] = "https://api.test/api/integrations/gmail/oauth/callback",
                     ["MercadoPago:RedirectUri"] = "https://api.test/api/integrations/mercadopago/oauth/callback",
                     ["TokenEncryption:Key"] = "dW5pdC10ZXN0LXRva2VuLWVuY3J5cHRpb24ta2V5ISE=",
                     ["Jobs:ApiKey"] = "unit-test-jobs-api-key-1234",

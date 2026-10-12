@@ -255,15 +255,20 @@ public static class DependencyInjection
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
-        services.AddHttpClient<IIolAuthClient, IolAuthClient>((provider, client) =>
-        {
-            var options = provider.GetRequiredService<IOptions<IolOptions>>().Value;
+        services.AddHttpClient<IIolAuthClient, IolAuthClient>(ConfigureIolClient);
 
-            client.BaseAddress = new Uri(options.ApiBaseUrl);
-            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
-        });
+        // Tampoco reintenta: si IOL no responde, la sincronizacion no toca nada y la siguiente corrida lo vuelve a pedir.
+        services.AddHttpClient<IIolPortfolioClient, IolPortfolioClient>(ConfigureIolClient);
 
         return services;
+    }
+
+    private static void ConfigureIolClient(IServiceProvider provider, HttpClient client)
+    {
+        var options = provider.GetRequiredService<IOptions<IolOptions>>().Value;
+
+        client.BaseAddress = new Uri(options.ApiBaseUrl);
+        client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
     }
 
     private static IServiceCollection AddDolarApi(this IServiceCollection services, IConfiguration configuration)

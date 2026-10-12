@@ -16,6 +16,8 @@ public sealed class Investment : AggregateRoot
 
     public const int MaxFundNameLength = 150;
 
+    public const int MaxExternalReferenceLength = 200;
+
     public const string NotQuotedMessage =
         "Solo se cotizan por simbolo las acciones, los CEDEAR, los ETF, los bonos, las obligaciones negociables, "
         + "las letras, los fondos comunes y las criptomonedas.";
@@ -41,6 +43,7 @@ public sealed class Investment : AggregateRoot
         Type = type;
         InvestedAmount = investedAmount;
         PurchasedOn = purchasedOn;
+        Source = InvestmentSource.Manual;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
     }
@@ -61,6 +64,10 @@ public sealed class Investment : AggregateRoot
 
     public decimal? Quantity { get; private set; }
 
+    public InvestmentSource Source { get; private set; }
+
+    public string? ExternalReference { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -77,17 +84,7 @@ public sealed class Investment : AggregateRoot
         DateOnly purchasedOn,
         DateTimeOffset createdAt)
     {
-        ArgumentNullException.ThrowIfNull(investedAmount);
-
-        if (employeeId == Guid.Empty)
-        {
-            throw new DomainException("Una inversion siempre pertenece a un empleado.");
-        }
-
-        if (investedAmount.IsZero)
-        {
-            throw new DomainException("El capital invertido tiene que ser mayor a cero.");
-        }
+        EnsureCanBeCreated(employeeId, investedAmount);
 
         var investment = new Investment(
             Guid.CreateVersion7(),
@@ -107,6 +104,97 @@ public sealed class Investment : AggregateRoot
             createdAt));
 
         return investment;
+    }
+
+
+    public static Investment Import(
+        Guid employeeId,
+        InvestmentSource source,
+        string externalReference,
+        string assetName,
+        InvestmentType type,
+        string symbol,
+        decimal quantity,
+        Money investedAmount,
+        DateOnly purchasedOn,
+        Money marketValue,
+        DateOnly valuedOn,
+        DateTimeOffset createdAt)
+    {
+        ArgumentNullException.ThrowIfNull(marketValue);
+        EnsureCanBeCreated(employeeId, investedAmount);
+
+        if (source == InvestmentSource.Manual)
+        {
+            throw new DomainException("Una inversion importada tiene que venir de una integracion.");
+        }
+
+        var reference = EnsureValidExternalReference(externalReference);
+        var investment = new Investment(
+            Guid.CreateVersion7(),
+            employeeId,
+            EnsureValidAssetName(assetName),
+            type,
+            investedAmount,
+            purchasedOn,
+            createdAt);
+
+        investment.Track(symbol, quantity, createdAt);
+        investment.Source = source;
+        investment.ExternalReference = reference;
+        investment.RecordValuation(marketValue, valuedOn, ValuationSource.Feed, createdAt);
+
+        return investment;
+    }
+
+    public bool UpdatePosition(
+        decimal quantity,
+        Money investedAmount,
+        Money marketValue,
+        DateOnly valuedOn,
+        DateTimeOffset updatedAt)
+    {
+        ArgumentNullException.ThrowIfNull(investedAmount);
+        ArgumentNullException.ThrowIfNull(marketValue);
+
+        if (Source == InvestmentSource.Manual)
+        {
+            throw new DomainException("Una inversion cargada a mano no se actualiza con la posicion de una integracion.");
+        }
+
+        if (quantity <= 0m)
+        {
+            throw new DomainException("La cantidad tiene que ser mayor a cero.");
+        }
+
+        if (investedAmount.IsZero)
+        {
+            throw new DomainException("El capital invertido tiene que ser mayor a cero.");
+        }
+
+        if (investedAmount.Currency != InvestedAmount.Currency)
+        {
+            throw new DomainException("El capital invertido tiene que seguir en la misma moneda.");
+        }
+
+        var changed = false;
+
+        // El broker informa el capital con su precio promedio de compra: solo una compra o una venta lo mueve.
+        if (quantity != Quantity)
+        {
+            Quantity = quantity;
+            InvestedAmount = investedAmount;
+            UpdatedAt = updatedAt;
+            changed = true;
+        }
+
+        if (marketValue != CurrentValue)
+        {
+            RecordMarketValuation(marketValue, valuedOn, updatedAt);
+            changed = true;
+        }
+
+        return changed;
     }
 
     public InvestmentValuation LatestValuation => _valuations
@@ -195,6 +283,13 @@ public sealed class Investment : AggregateRoot
 
         var validAssetName = EnsureValidAssetName(assetName);
 
+        if (Source != InvestmentSource.Manual
+            && (type != Type || investedAmount != InvestedAmount || purchasedOn != PurchasedOn))
+        {
+            throw new DomainException(
+                "De una inversion importada solo se puede cambiar el nombre: el resto lo informa la integracion.");
+        }
+
         if (investedAmount != InvestedAmount || purchasedOn != PurchasedOn)
         {
             if (_valuations.Count > 1)
@@ -240,6 +335,12 @@ public sealed class Investment : AggregateRoot
             throw new DomainException("La cantidad tiene que ser mayor a cero.");
         }
 
+        if (Source != InvestmentSource.Manual && (normalizedSymbol != Symbol || quantity != Quantity))
+        {
+            throw new DomainException(
+                "El simbolo y la cantidad de una inversion importada los informa la integracion: no se cambian a mano.");
+        }
+
         Symbol = normalizedSymbol;
         Quantity = quantity;
         UpdatedAt = updatedAt;
@@ -272,6 +373,34 @@ public sealed class Investment : AggregateRoot
     {
         AssetName = EnsureValidAssetName(assetName);
         UpdatedAt = updatedAt;
+    }
+
+    private static void EnsureCanBeCreated(Guid employeeId, Money investedAmount)
+    {
+        ArgumentNullException.ThrowIfNull(investedAmount);
+
+        if (employeeId == Guid.Empty)
+        {
+            throw new DomainException("Una inversion siempre pertenece a un empleado.");
+        }
+
+        if (investedAmount.IsZero)
+        {
+            throw new DomainException("El capital invertido tiene que ser mayor a cero.");
+        }
+    }
+
+    private static string EnsureValidExternalReference(string externalReference)
+    {
+        var trimmed = (externalReference ?? string.Empty).Trim();
+
+        return trimmed.Length switch
+        {
+            0 => throw new DomainException("Una inversion importada necesita la referencia de la integracion."),
+            > MaxExternalReferenceLength => throw new DomainException(
+                $"La referencia externa no puede superar los {MaxExternalReferenceLength} caracteres."),
+            _ => trimmed
+        };
     }
 
     private static string EnsureValidAssetName(string assetName)
