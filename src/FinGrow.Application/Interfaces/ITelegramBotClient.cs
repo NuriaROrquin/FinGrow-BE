@@ -15,4 +15,6 @@ public interface ITelegramBotClient
     Task EditMessageAsync(long chatId, long messageId, string text, CancellationToken cancellationToken = default);
 
     Task AnswerCallbackAsync(string callbackQueryId, string? text = null, CancellationToken cancellationToken = default);
+
+    Task<ReadOnlyMemory<byte>> DownloadFileAsync(string fileId, CancellationToken cancellationToken = default);
 }

@@ -7,11 +7,16 @@ internal sealed class TwiMlResult : ContentResult
 {
     public const string MediaType = "application/xml";
 
-    public TwiMlResult(string message)
+    public TwiMlResult(string? message)
     {
-        var document = new XDocument(
-            new XDeclaration("1.0", "UTF-8", null),
-            new XElement("Response", new XElement("Message", message)));
+        var response = new XElement("Response");
+
+        if (!string.IsNullOrEmpty(message))
+        {
+            response.Add(new XElement("Message", message));
+        }
+
+        var document = new XDocument(new XDeclaration("1.0", "UTF-8", null), response);
 
         Content = document.Declaration + document.ToString(SaveOptions.DisableFormatting);
         ContentType = MediaType;

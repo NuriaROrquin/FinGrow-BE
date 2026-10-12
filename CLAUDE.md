@@ -129,8 +129,14 @@ sabe de qué canal viene el texto: `ChatTransactionProposer` le pide a FinGrow-A
 interprete y crea el movimiento como `Pending` (con `external_reference` = canal + id del
 mensaje, para que un reintento del webhook no lo duplique), y `ChatTransactionReviewer` lo
 confirma o descarta. Telegram lo muestra con botones (`TelegramTransactionCallback` arma y lee el
-`callback_data`, limitado a 64 bytes) y `AnswerTelegramCallback` procesa el toque. Para sumar
-WhatsApp alcanza con una capa propia del canal que use esas dos piezas.
+`callback_data`, limitado a 64 bytes) y `AnswerTelegramCallback` procesa el toque. WhatsApp
+(HU-14) no tiene botones en TwiML: `WhatsAppProposalReviewer` aplica un SÍ, un NO o el número
+del medio de pago (`WhatsAppReviewReply`) a la última propuesta de WhatsApp pendiente de las
+últimas 24 horas, y cualquier otro texto es un movimiento nuevo. Las notas de voz de los dos
+canales (HU-14 y HU-71) las transcribe `ChatVoiceNoteTranscriber`; cada canal le pasa cómo
+bajar el audio (Twilio o `getFile` del Bot API). Todo el procesamiento de un mensaje de WhatsApp
+corre con un tope de 12 segundos (`ProcessingBudget`) porque la respuesta va en el cuerpo del webhook
+y Twilio corta a los 15: no lo subas ni lo saques sin mirar ese límite.
 
 **IOL (T-34) es la única integración que recibe una contraseña.** `POST /api/integrations/iol/link`
 la canjea por tokens en el momento y la descarta. `LinkIolCommand` redefine `PrintMembers` para
@@ -216,8 +222,10 @@ Un archivo nunca se guarda en PostgreSQL: va a `IFileStorage` (`Infrastructure/S
 protocolo S3: Cloudflare R2 desplegado, S3Mock en compose) y la base guarda solo la clave. Los
 comprobantes son `TransactionReceipt` (`Application/Features/Receipts`): nacen sin movimiento
 para que un OCR fallido no pierda la imagen, y la clave la arma el dominio a partir del empleado
-y del id del comprobante. Lo que sume otro tipo de archivo (los audios de HU-14) reutiliza
-`IFileStorage`. Un almacenamiento que no responde llega como `FileStorageUnavailableException`
+y del id del comprobante. Lo que sume otro tipo de archivo reutiliza `IFileStorage`. Las notas
+de voz de WhatsApp y Telegram (HU-14 y HU-71) no se guardan, por decisión de producto: se
+transcriben y se descartan. Un almacenamiento que no responde llega como
+`FileStorageUnavailableException`
 y el caso de uso lo traduce a `Unavailable` (503). Los handlers la atrapan; no dejes que
 escape como 500. Un movimiento tiene un solo comprobante, y lo que deja de usar uno lo suelta
 con `Detach()`, no lo borra: el borrado real es exclusivo de `receipts-cleanup`
@@ -253,6 +261,40 @@ siguiente corre igual. Un mismo trabajo no corre dos veces a la vez (`RunningJob
   cerrado (por si se confirmaron movimientos tarde) y genera las de los meses anteriores que
   falten desde el alta de la empresa. Las fotos guardan conteos, no porcentajes: la tasa de
   participación se deriva (`PeriodMetrics.ParticipationRate`), fiel a "un total no se persiste".
+
+## Panel empresarial y anonimización
+
+La empresa nunca ve datos de una persona identificable. La anonimización se garantiza en
+Application, antes de serializar la respuesta, y no escondiendo columnas en el frontend.
+
+- **Las métricas empresariales siempre son agregadas.** Los endpoints
+  `GET /api/company/metrics` y `GET /api/company/departments/{departmentId}/metrics` leen
+  `CompanyMetricsSnapshot` o `DepartmentMetricsSnapshot`; no consultan ni proyectan empleados,
+  movimientos, metas o inversiones individuales.
+- **El umbral mínimo es configurable por alcance y por defecto es de tres empleados activos.**
+  `MetricsAnonymizationPolicy` (`Application/Features/Metrics/`) lee
+  `Metrics:CompanyMinimumEmployees` para métricas de empresa y
+  `Metrics:DepartmentMinimumEmployees` para métricas de departamento. Se configuran por
+  variables de entorno como `Metrics__CompanyMinimumEmployees` y
+  `Metrics__DepartmentMinimumEmployees`. En Docker Compose se pasan desde
+  `METRICS_COMPANY_MINIMUM_EMPLOYEES` y `METRICS_DEPARTMENT_MINIMUM_EMPLOYEES`, ambos con
+  valor predeterminado 3. Cada handler rechaza la métrica si el período tiene menos empleados
+  que su umbral. No devuelvas el dato parcialmente ni completes el resultado con ceros para
+  ocultarlo.
+- **Las respuestas usan DTOs exclusivos del panel.** `CompanyMetricsResponse` y
+  `DepartmentMetricsResponse` solo pueden contener períodos, conteos, tasas y promedios
+  agregados. No agregues `EmployeeId`, `UserId`, nombres, emails, `TransactionId`, `GoalId`,
+  `InvestmentId` ni colecciones de entidades personales.
+- **El mapeo al DTO es explícito.** No serialices snapshots, entidades ni `PeriodMetrics`
+  directamente desde un controller o handler. Si se agrega un campo al modelo, debe evaluarse
+  expresamente si puede formar parte del contrato anonimizado.
+- **El alcance de empresa se verifica siempre.** El handler usa el `CompanyId` de
+  `ICurrentUser`; el acceso a un departamento de otra empresa se trata como inexistente y no
+  confirma que el recurso existe.
+- **Toda modificación del contrato debe tener una prueba.** Los tests deben comprobar el umbral
+  de tres empleados, el aislamiento entre empresas y que la respuesta serializada no expone
+  identificadores, montos, saldos ni movimientos individuales. Un test arquitectónico debe
+  fallar si los DTOs incorporan propiedades identificables.
 
 ## Puntaje de salud financiera
 

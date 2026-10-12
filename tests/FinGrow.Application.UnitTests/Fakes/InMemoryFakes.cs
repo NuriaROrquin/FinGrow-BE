@@ -189,6 +189,23 @@ public sealed class FakeTelegramBotClient : ITelegramBotClient
         return Task.CompletedTask;
     }
 
+    public List<string> DownloadedFiles { get; } = new();
+
+    public bool FilesUnavailable { get; set; }
+
+    public Task<ReadOnlyMemory<byte>> DownloadFileAsync(string fileId, CancellationToken cancellationToken = default)
+    {
+        ThrowIfUnreachable();
+
+        if (FilesUnavailable)
+        {
+            throw new HttpRequestException("api.telegram.org no devuelve el archivo");
+        }
+
+        DownloadedFiles.Add(fileId);
+        return Task.FromResult<ReadOnlyMemory<byte>>(new byte[] { 1, 2, 3 });
+    }
+
     private void ThrowIfUnreachable()
     {
         if (Unreachable)
@@ -202,8 +219,15 @@ public sealed class FakeTwilioMediaClient : ITwilioMediaClient
 {
     public List<Uri> Downloaded { get; } = new();
 
+    public bool Unreachable { get; set; }
+
     public Task<TwilioMedia> DownloadAsync(Uri url, CancellationToken cancellationToken = default)
     {
+        if (Unreachable)
+        {
+            throw new HttpRequestException("Twilio unreachable");
+        }
+
         Downloaded.Add(url);
         return Task.FromResult(new TwilioMedia(new byte[] { 1, 2, 3 }, "audio/ogg"));
     }
@@ -410,6 +434,30 @@ public sealed class FakeAiService : IAiService
 
         return Task.FromResult(ParseResult);
     }
+
+    public AudioTranscription TranscriptionResult { get; set; } =
+        new(AudioTranscriptionOutcome.Transcribed, "Gasté 500 en el super", "fake-transcribe");
+
+    public List<(byte[] Audio, string ContentType)> TranscribedAudios { get; } = new();
+
+    public bool TranscriptionHangs { get; set; }
+
+    public async Task<AudioTranscription> TranscribeAudioAsync(ReadOnlyMemory<byte> audio, string contentType, CancellationToken cancellationToken = default)
+    {
+        if (Unreachable)
+        {
+            throw new HttpRequestException("FinGrow-AI unreachable");
+        }
+
+        if (TranscriptionHangs)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }
+
+        TranscribedAudios.Add((audio.ToArray(), contentType));
+
+        return TranscriptionResult;
+    }
 }
 
 public sealed class FakeRefreshTokenRepository : IRefreshTokenRepository
@@ -495,6 +543,32 @@ public sealed class FakeMetricsSnapshotRepository : IMetricsSnapshotRepository
 
     public Task<DepartmentMetricsSnapshot?> FindDepartmentAsync(Guid departmentId, DateOnly periodStart, CancellationToken cancellationToken = default) =>
         Task.FromResult(DepartmentSnapshots.SingleOrDefault(snapshot => snapshot.DepartmentId == departmentId && snapshot.PeriodStart == periodStart));
+
+    public Task<IReadOnlyList<CompanyMetricsSnapshot>> ListCompanyAsync(
+        Guid companyId,
+        DateOnly? from,
+        DateOnly? to,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<CompanyMetricsSnapshot>>(CompanySnapshots
+            .Where(snapshot => snapshot.CompanyId == companyId
+                && (from == null || snapshot.PeriodStart >= from)
+                && (to == null || snapshot.PeriodStart <= to))
+            .OrderBy(snapshot => snapshot.PeriodStart)
+            .ToList());
+
+    public Task<IReadOnlyList<DepartmentMetricsSnapshot>> ListDepartmentAsync(
+        Guid companyId,
+        Guid departmentId,
+        DateOnly? from,
+        DateOnly? to,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<DepartmentMetricsSnapshot>>(DepartmentSnapshots
+            .Where(snapshot => snapshot.CompanyId == companyId
+                && snapshot.DepartmentId == departmentId
+                && (from == null || snapshot.PeriodStart >= from)
+                && (to == null || snapshot.PeriodStart <= to))
+            .OrderBy(snapshot => snapshot.PeriodStart)
+            .ToList());
 
     public void Add(CompanyMetricsSnapshot snapshot) => CompanySnapshots.Add(snapshot);
 

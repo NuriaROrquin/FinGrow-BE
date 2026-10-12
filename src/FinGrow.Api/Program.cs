@@ -5,6 +5,7 @@ using FinGrow.Api.Jobs;
 using FinGrow.Api.MercadoPago;
 using FinGrow.Api.Notifications;
 using FinGrow.Application;
+using FinGrow.Application.Features.Metrics;
 using FinGrow.Infrastructure;
 using FinGrow.Infrastructure.Persistence;
 using Serilog;
@@ -16,6 +17,10 @@ builder.Host.UseSerilog((context, configuration) =>
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddOptions<MetricsAnonymizationOptions>()
+    .Bind(builder.Configuration.GetSection(MetricsAnonymizationOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 builder.Services.AddSessionCookieAuthentication();
 builder.Services.AddNotificationsHub();
 builder.Services.AddOptions<MercadoPagoReturnOptions>()

@@ -286,6 +286,18 @@ código con `POST /api/integrations/whatsapp/link-code`, lo manda por el chat de
 minutos y la API le contesta que quedó vinculado. Desde ahí cada mensaje de ese número se
 resuelve a ese empleado. Un número sin vincular solo recibe las instrucciones para hacerlo.
 
+Con el número vinculado, el empleado registra movimientos escribiendo o mandando una nota de voz
+(HU-14). Una nota de voz se descarga de Twilio, se transcribe con FinGrow-AI
+(`POST /api/v1/transcription/audio`, que necesita `TRANSCRIPTION_PROVIDER=openai` en ese
+servicio) y se descarta: el audio no se guarda. El texto, escrito o transcripto, sigue el mismo
+camino que en Telegram: queda pendiente con fuente `WhatsApp` y la respuesta muestra la propuesta,
+precedida de «🎙️ Entendí: …» si fue un audio. Como TwiML no tiene botones, el empleado contesta
+**SÍ** o **NO**, o el **número** del medio de pago cuando el mensaje no lo dijo (elegir uno
+confirma). La respuesta aplica a la última propuesta de WhatsApp pendiente de las últimas 24
+horas; si no hay ninguna, el mensaje se interpreta como un movimiento nuevo. Twilio espera la
+respuesta del webhook 15 segundos como mucho: si la descarga, la transcripción y la
+interpretación no terminan en 12, el empleado recibe el aviso de que lo intente de nuevo.
+
 ### Telegram (Bot API)
 
 Los mensajes de Telegram entran por `POST /api/webhooks/telegram`. También es público y rechaza
@@ -322,6 +334,12 @@ descartarlo. Si el mensaje no dice el medio de pago, los botones son los medios 
 uno confirma con ese medio; si el empleado no contesta, queda pendiente en la bandeja de la app
 con Efectivo. Si falta el monto, el bot repregunta y no registra nada. Los toques de botón llegan
 como `callback_query`, por eso el webhook tiene que registrarse con ese tipo en `allowed_updates`.
+
+Una nota de voz (HU-71) sigue el mismo camino: la API la baja con `getFile` del Bot API, la
+transcribe con FinGrow-AI (`POST /api/v1/transcription/audio`, que necesita
+`TRANSCRIPTION_PROVIDER=openai` en ese servicio) y propone el movimiento con los mismos botones,
+precedido de «🎙️ Entendí: …». El audio no se guarda. Las notas de voz llegan como `message`,
+así que no hace falta tocar `allowed_updates`.
 
 ### InvertirOnline (IOL)
 

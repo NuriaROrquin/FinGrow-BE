@@ -7,8 +7,10 @@ using Features.Integrations.ChatTransactions;
 using Features.Integrations.Iol;
 using Features.Integrations.Linking;
 using Features.Integrations.MercadoPago.Sync;
+using Features.Integrations.WhatsApp;
 using Features.Investments.QuoteInvestments;
 using Features.Metrics.FinancialHealth;
+using Features.Metrics;
 using Features.Metrics.SnapshotMetrics;
 using Features.Notifications;
 using Features.Notifications.Alerts.GoalProgress;
@@ -37,6 +39,8 @@ public static class DependencyInjection
         services.AddScoped<LinkCodeRedeemer>();
         services.AddScoped<ChatTransactionProposer>();
         services.AddScoped<ChatTransactionReviewer>();
+        services.AddScoped<ChatVoiceNoteTranscriber>();
+        services.AddScoped<WhatsAppProposalReviewer>();
         services.AddScoped<MercadoPagoSynchronizer>();
         services.AddScoped<IolAccessTokenProvider>();
         services.AddScoped<SessionIssuer>();
@@ -44,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<DepartmentResponseBuilder>();
         services.AddScoped<DepartmentManagerEligibility>();
         services.AddScoped<FinancialHealthScorer>();
+        services.AddSingleton<MetricsAnonymizationPolicy>();
 
         services.AddSingleton<IDomainEventDispatcher, DomainEventDispatcher>();
         services.AddScoped<Notifier>();

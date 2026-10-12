@@ -10,6 +10,19 @@ public interface IMetricsSnapshotRepository
 
     Task<DepartmentMetricsSnapshot?> FindDepartmentAsync(Guid departmentId, DateOnly periodStart, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<CompanyMetricsSnapshot>> ListCompanyAsync(
+        Guid companyId,
+        DateOnly? from,
+        DateOnly? to,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<DepartmentMetricsSnapshot>> ListDepartmentAsync(
+        Guid companyId,
+        Guid departmentId,
+        DateOnly? from,
+        DateOnly? to,
+        CancellationToken cancellationToken = default);
+
     void Add(CompanyMetricsSnapshot snapshot);
 
     void Add(DepartmentMetricsSnapshot snapshot);
