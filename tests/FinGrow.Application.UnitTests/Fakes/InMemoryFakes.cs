@@ -199,8 +199,15 @@ public sealed class FakeTwilioMediaClient : ITwilioMediaClient
 {
     public List<Uri> Downloaded { get; } = new();
 
+    public bool Unreachable { get; set; }
+
     public Task<TwilioMedia> DownloadAsync(Uri url, CancellationToken cancellationToken = default)
     {
+        if (Unreachable)
+        {
+            throw new HttpRequestException("Twilio unreachable");
+        }
+
         Downloaded.Add(url);
         return Task.FromResult(new TwilioMedia(new byte[] { 1, 2, 3 }, "audio/ogg"));
     }
@@ -388,16 +395,23 @@ public sealed class FakeAiService : IAiService
 
     public List<(byte[] Audio, string ContentType)> TranscribedAudios { get; } = new();
 
-    public Task<AudioTranscription> TranscribeAudioAsync(ReadOnlyMemory<byte> audio, string contentType, CancellationToken cancellationToken = default)
+    public bool TranscriptionHangs { get; set; }
+
+    public async Task<AudioTranscription> TranscribeAudioAsync(ReadOnlyMemory<byte> audio, string contentType, CancellationToken cancellationToken = default)
     {
         if (Unreachable)
         {
             throw new HttpRequestException("FinGrow-AI unreachable");
         }
 
+        if (TranscriptionHangs)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }
+
         TranscribedAudios.Add((audio.ToArray(), contentType));
 
-        return Task.FromResult(TranscriptionResult);
+        return TranscriptionResult;
     }
 }
 

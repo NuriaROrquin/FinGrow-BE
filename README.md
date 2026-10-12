@@ -283,6 +283,18 @@ código con `POST /api/integrations/whatsapp/link-code`, lo manda por el chat de
 minutos y la API le contesta que quedó vinculado. Desde ahí cada mensaje de ese número se
 resuelve a ese empleado. Un número sin vincular solo recibe las instrucciones para hacerlo.
 
+Con el número vinculado, el empleado registra movimientos escribiendo o mandando una nota de voz
+(HU-14). Una nota de voz se descarga de Twilio, se transcribe con FinGrow-AI
+(`POST /api/v1/transcription/audio`, que necesita `TRANSCRIPTION_PROVIDER=openai` en ese
+servicio) y se descarta: el audio no se guarda. El texto, escrito o transcripto, sigue el mismo
+camino que en Telegram: queda pendiente con fuente `WhatsApp` y la respuesta muestra la propuesta,
+precedida de «🎙️ Entendí: …» si fue un audio. Como TwiML no tiene botones, el empleado contesta
+**SÍ** o **NO**, o el **número** del medio de pago cuando el mensaje no lo dijo (elegir uno
+confirma). La respuesta aplica a la última propuesta de WhatsApp pendiente de las últimas 24
+horas; si no hay ninguna, el mensaje se interpreta como un movimiento nuevo. Twilio espera la
+respuesta del webhook 15 segundos como mucho: si la descarga, la transcripción y la
+interpretación no terminan en 12, el empleado recibe el aviso de que lo intente de nuevo.
+
 ### Telegram (Bot API)
 
 Los mensajes de Telegram entran por `POST /api/webhooks/telegram`. También es público y rechaza
