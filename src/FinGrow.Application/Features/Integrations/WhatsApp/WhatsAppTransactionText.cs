@@ -6,15 +6,6 @@ using FinGrow.Domain.Entities;
 
 internal static class WhatsAppTransactionText
 {
-    public const string HelpReply =
-        "Para registrar un movimiento escribime o mandame un audio contando qué fue y cuánto. Por ejemplo:\n" +
-        "• Gasté $500 en el súper\n" +
-        "• Pagué $1500 el almuerzo con débito\n" +
-        "• Cobré $10000 por un freelance";
-
-    public const string AudioNotUnderstoodReply =
-        "No pude entender el audio. ¿Me lo mandás de nuevo o me lo escribís? Por ejemplo: Gasté $500 en el súper.";
-
     public static string Proposal(Transaction transaction, bool asksPaymentMethod)
     {
         ArgumentNullException.ThrowIfNull(transaction);
@@ -35,6 +26,4 @@ internal static class WhatsAppTransactionText
             string.Join('\n', options) + "\n\n" +
             "O respondé NO para descartarlo.";
     }
-
-    public static string Heard(string transcript) => "🎙️ Entendí: «" + transcript + "»";
 }

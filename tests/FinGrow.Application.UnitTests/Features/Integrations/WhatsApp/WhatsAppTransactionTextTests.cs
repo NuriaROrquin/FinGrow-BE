@@ -60,12 +60,6 @@ public class WhatsAppTransactionTextTests
         proposal.ShouldContain("¿Cómo lo cobraste? Respondé con el número:\n1. Efectivo\n2. Transferencia\n3. Billetera virtual");
     }
 
-    [Fact]
-    public void What_was_heard_is_quoted()
-    {
-        WhatsAppTransactionText.Heard("Gasté 2500 en el súper").ShouldBe("🎙️ Entendí: «Gasté 2500 en el súper»");
-    }
-
     private static Transaction Expense(PaymentMethod paymentMethod) => Transaction.RegisterExpense(
         Guid.CreateVersion7(),
         Money.From(2500m, Currency.ARS),

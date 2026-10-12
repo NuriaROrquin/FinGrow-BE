@@ -186,6 +186,23 @@ public sealed class FakeTelegramBotClient : ITelegramBotClient
         return Task.CompletedTask;
     }
 
+    public List<string> DownloadedFiles { get; } = new();
+
+    public bool FilesUnavailable { get; set; }
+
+    public Task<ReadOnlyMemory<byte>> DownloadFileAsync(string fileId, CancellationToken cancellationToken = default)
+    {
+        ThrowIfUnreachable();
+
+        if (FilesUnavailable)
+        {
+            throw new HttpRequestException("api.telegram.org no devuelve el archivo");
+        }
+
+        DownloadedFiles.Add(fileId);
+        return Task.FromResult<ReadOnlyMemory<byte>>(new byte[] { 1, 2, 3 });
+    }
+
     private void ThrowIfUnreachable()
     {
         if (Unreachable)

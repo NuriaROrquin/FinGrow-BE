@@ -8,5 +8,6 @@ public sealed class ReceiveTelegramMessageValidator : AbstractValidator<ReceiveT
     {
         RuleFor(command => command.ChatId).NotEqual(0);
         RuleFor(command => command.Text).NotNull();
+        RuleFor(command => command.VoiceNote!.FileId).NotEmpty().When(command => command.VoiceNote is not null);
     }
 }

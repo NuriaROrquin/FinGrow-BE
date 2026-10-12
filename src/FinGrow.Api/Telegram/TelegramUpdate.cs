@@ -10,7 +10,12 @@ public sealed record TelegramUpdate(
 public sealed record TelegramMessage(
     [property: JsonPropertyName("message_id")] long MessageId,
     [property: JsonPropertyName("chat")] TelegramChat Chat,
-    [property: JsonPropertyName("text")] string? Text);
+    [property: JsonPropertyName("text")] string? Text,
+    [property: JsonPropertyName("voice")] TelegramVoice? Voice = null);
+
+public sealed record TelegramVoice(
+    [property: JsonPropertyName("file_id")] string FileId,
+    [property: JsonPropertyName("mime_type")] string? MimeType);
 
 public sealed record TelegramChat(
     [property: JsonPropertyName("id")] long Id,

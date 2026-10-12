@@ -230,7 +230,7 @@ public class ReceiveWhatsAppMessageHandlerTests
 
         var result = await HandleMessage(Phone, "sí", "SM124");
 
-        result.Value.Text.ShouldBe(WhatsAppTransactionText.HelpReply);
+        result.Value.Text.ShouldBe(ChatTransactionText.HelpReply);
         _transactions.Transactions.ShouldHaveSingleItem().Status.ShouldBe(TransactionStatus.Pending);
         _ai.ParsedMessages.Last().Text.ShouldBe("sí");
     }
@@ -273,7 +273,7 @@ public class ReceiveWhatsAppMessageHandlerTests
     [Theory]
     [InlineData(MessageParsingOutcome.MissingAmount, ChatTransactionText.MissingAmountReply)]
     [InlineData(MessageParsingOutcome.MultipleTransactions, ChatTransactionText.MultipleTransactionsReply)]
-    [InlineData(MessageParsingOutcome.NotATransaction, WhatsAppTransactionText.HelpReply)]
+    [InlineData(MessageParsingOutcome.NotATransaction, ChatTransactionText.HelpReply)]
     public async Task A_message_that_cannot_be_registered_is_answered_without_creating_a_transaction(
         MessageParsingOutcome outcome,
         string expectedReply)
@@ -308,7 +308,7 @@ public class ReceiveWhatsAppMessageHandlerTests
 
         var result = await Handle(Phone, string.Empty, image);
 
-        result.Value.Text.ShouldBe(WhatsAppTransactionText.HelpReply);
+        result.Value.Text.ShouldBe(ChatTransactionText.HelpReply);
         _media.Downloaded.ShouldBeEmpty();
         _ai.ParsedMessages.ShouldBeEmpty();
     }
@@ -321,7 +321,7 @@ public class ReceiveWhatsAppMessageHandlerTests
 
         var result = await Handle(Phone, Code);
 
-        result.Value.Text.ShouldBe(WhatsAppTransactionText.HelpReply);
+        result.Value.Text.ShouldBe(ChatTransactionText.HelpReply);
         _linkCodes.LinkCodes.Single().UsedAt.ShouldBeNull();
     }
 
@@ -369,7 +369,7 @@ public class ReceiveWhatsAppMessageHandlerTests
 
         var result = await Handle(Phone, string.Empty, VoiceNote);
 
-        result.Value.Text.ShouldBe(WhatsAppTransactionText.AudioNotUnderstoodReply);
+        result.Value.Text.ShouldBe(ChatTransactionText.AudioNotUnderstoodReply);
         _ai.ParsedMessages.ShouldBeEmpty();
         _transactions.Transactions.ShouldBeEmpty();
     }
@@ -436,13 +436,13 @@ public class ReceiveWhatsAppMessageHandlerTests
     {
         var linker = new LinkCodeRedeemer(
             _integrations, _linkCodes, _employees, _unitOfWork, _clock, NullLogger<LinkCodeRedeemer>.Instance);
-        var voiceNotes = new WhatsAppVoiceNoteTranscriber(_media, _ai, NullLogger<WhatsAppVoiceNoteTranscriber>.Instance);
+        var voiceNotes = new ChatVoiceNoteTranscriber(_ai, NullLogger<ChatVoiceNoteTranscriber>.Instance);
         var proposer = new ChatTransactionProposer(
             _ai, _transactions, _unitOfWork, _clock, NullLogger<ChatTransactionProposer>.Instance);
         var reviewer = new WhatsAppProposalReviewer(
             _transactions, new ChatTransactionReviewer(_transactions, _unitOfWork, _clock), _clock);
         var handler = new ReceiveWhatsAppMessageHandler(
-            _integrations, linker, voiceNotes, proposer, reviewer, NullLogger<ReceiveWhatsAppMessageHandler>.Instance)
+            _integrations, linker, _media, voiceNotes, proposer, reviewer, NullLogger<ReceiveWhatsAppMessageHandler>.Instance)
         {
             ProcessingBudget = TimeSpan.FromMilliseconds(200)
         };

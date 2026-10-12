@@ -36,6 +36,27 @@ internal sealed class TelegramBotClient : ITelegramBotClient
     public Task AnswerCallbackAsync(string callbackQueryId, string? text = null, CancellationToken cancellationToken = default) =>
         PostAsync("answerCallbackQuery", new AnswerCallbackQueryRequest(callbackQueryId, text), cancellationToken);
 
+    public async Task<ReadOnlyMemory<byte>> DownloadFileAsync(string fileId, CancellationToken cancellationToken = default)
+    {
+        var address = _httpClient.BaseAddress
+            ?? throw new InvalidOperationException("El cliente de Telegram no tiene configurada la URL del Bot API.");
+
+        using var response = await _httpClient.GetAsync(
+            new Uri("getFile?file_id=" + Uri.EscapeDataString(fileId), UriKind.Relative), cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        var file = await response.Content.ReadFromJsonAsync<GetFileResponse>(cancellationToken);
+
+        if (file is not { Ok: true, Result.FilePath: { } filePath })
+        {
+            throw new HttpRequestException("Telegram no devolvio la ruta del archivo.");
+        }
+
+        var fileAddress = new Uri(address, "/file" + address.AbsolutePath + filePath);
+
+        return await _httpClient.GetByteArrayAsync(fileAddress, cancellationToken);
+    }
+
     private async Task PostAsync<TRequest>(string method, TRequest request, CancellationToken cancellationToken)
     {
         using var response = await _httpClient.PostAsJsonAsync(method, request, cancellationToken);
@@ -59,6 +80,12 @@ internal sealed class TelegramBotClient : ITelegramBotClient
         [property: JsonPropertyName("chat_id")] long ChatId,
         [property: JsonPropertyName("message_id")] long MessageId,
         [property: JsonPropertyName("text")] string Text);
+
+    private sealed record GetFileResponse(
+        [property: JsonPropertyName("ok")] bool Ok,
+        [property: JsonPropertyName("result")] TelegramFile? Result);
+
+    private sealed record TelegramFile([property: JsonPropertyName("file_path")] string? FilePath);
 
     private sealed record AnswerCallbackQueryRequest(
         [property: JsonPropertyName("callback_query_id")] string CallbackQueryId,
