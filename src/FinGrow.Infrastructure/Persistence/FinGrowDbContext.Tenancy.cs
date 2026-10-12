@@ -84,6 +84,9 @@ public sealed partial class FinGrowDbContext
         modelBuilder.Entity<NotificationChannelSetting>().HasQueryFilter(
             TenantFilter, setting => IsUnscoped || Employees.Any(employee => employee.Id == setting.EmployeeId));
 
+        modelBuilder.Entity<FinancialHealthScore>().HasQueryFilter(
+            TenantFilter, score => IsUnscoped || Employees.Any(employee => employee.Id == score.EmployeeId));
+
         // El destinatario es polimórfico y no tiene FK, así que se resuelve según su tipo.
         modelBuilder.Entity<Notification>().HasQueryFilter(
             TenantFilter,
