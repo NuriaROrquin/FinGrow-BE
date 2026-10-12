@@ -91,6 +91,51 @@ public class WhatsAppWebhookTests
         body.ShouldContain("todavía no está vinculado");
     }
 
+    [Fact]
+    public async Task A_voice_note_from_a_linked_number_is_answered_with_what_was_heard_and_the_proposal()
+    {
+        using var factory = new WebhookWebApplicationFactory();
+        var client = factory.CreateClient();
+        factory.LinkPhone();
+        var form = InboundVoiceNote();
+
+        var response = await PostSignedAsync(client, form);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var body = await response.Content.ReadAsStringAsync();
+        body.ShouldContain("<Response><Message>🎙️ Entendí: «Gasté 500 pesos en el súper con débito»");
+        body.ShouldContain("¿Lo registro? Respondé SÍ o NO.");
+        var transaction = factory.Transactions.ShouldHaveSingleItem();
+        transaction.Source.ShouldBe(TransactionSource.WhatsApp);
+        transaction.IsPending.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task A_message_twilio_delivers_again_is_answered_with_an_empty_response()
+    {
+        using var factory = new WebhookWebApplicationFactory();
+        var client = factory.CreateClient();
+        factory.LinkPhone();
+        await PostSignedAsync(client, InboundVoiceNote());
+
+        var retry = await PostSignedAsync(client, InboundVoiceNote());
+
+        retry.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var body = await retry.Content.ReadAsStringAsync();
+        body.ShouldEndWith("<Response />");
+        factory.Transactions.ShouldHaveSingleItem();
+    }
+
+    private static Dictionary<string, string> InboundVoiceNote()
+    {
+        var form = InboundMessage(string.Empty);
+        form["NumMedia"] = "1";
+        form["MediaUrl0"] = "https://api.twilio.com/2010-04-01/Accounts/ACunit-test/Messages/MM1/Media/ME1";
+        form["MediaContentType0"] = "audio/ogg";
+
+        return form;
+    }
+
     private static Dictionary<string, string> InboundMessage(string body) => new(StringComparer.Ordinal)
     {
         ["MessageSid"] = "SM0123456789abcdef",
@@ -140,6 +185,11 @@ public class WhatsAppWebhookTests
 
         public List<IntegrationLinkCode> LinkCodes { get; } = new();
 
+        public List<Transaction> Transactions { get; } = new();
+
+        public void LinkPhone() =>
+            Integrations.Add(EmployeeIntegration.Create(Employee.Id, IntegrationProvider.WhatsApp, Phone, DateTimeOffset.UtcNow));
+
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.ConfigureAppConfiguration((_, configuration) =>
@@ -166,6 +216,9 @@ public class WhatsAppWebhookTests
                 services.AddScoped<IEmployeeIntegrationRepository>(_ => new InMemoryEmployeeIntegrationRepository(Integrations));
                 services.AddScoped<IIntegrationLinkCodeRepository>(_ => new InMemoryIntegrationLinkCodeRepository(LinkCodes));
                 services.AddScoped<IUnitOfWork, NoOpUnitOfWork>();
+                services.AddScoped<ITransactionRepository>(_ => new InMemoryTransactionRepository(Transactions));
+                services.AddSingleton<IAiService, SupermarketAiService>();
+                services.AddSingleton<ITwilioMediaClient, VoiceNoteMediaClient>();
             });
         }
     }
@@ -229,6 +282,68 @@ public class WhatsAppWebhookTests
             Task.FromResult(_linkCodes.FirstOrDefault(linkCode => linkCode.Provider == provider && linkCode.CodeHash == codeHash));
 
         public void Add(IntegrationLinkCode linkCode) => _linkCodes.Add(linkCode);
+    }
+
+    private sealed class InMemoryTransactionRepository : ITransactionRepository
+    {
+        private readonly List<Transaction> _transactions;
+
+        public InMemoryTransactionRepository(List<Transaction> transactions) => _transactions = transactions;
+
+        public void Add(Transaction transaction) => _transactions.Add(transaction);
+
+        public Task<Transaction?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+            Task.FromResult(_transactions.FirstOrDefault(transaction => transaction.Id == id));
+
+        public Task<IReadOnlyList<Transaction>> ListByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Transaction>>(_transactions.Where(transaction => transaction.EmployeeId == employeeId).ToList());
+
+        public Task<IReadOnlyList<Transaction>> ListPendingByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Transaction>>(_transactions.Where(transaction => transaction.EmployeeId == employeeId && transaction.IsPending).ToList());
+
+        public Task<IReadOnlySet<string>> ListExistingExternalReferencesAsync(
+            Guid employeeId,
+            TransactionSource source,
+            IReadOnlyCollection<string> externalReferences,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlySet<string>>(_transactions
+                .Where(transaction => transaction.EmployeeId == employeeId && transaction.Source == source)
+                .Select(transaction => transaction.ExternalReference)
+                .OfType<string>()
+                .Where(externalReferences.Contains)
+                .ToHashSet(StringComparer.Ordinal));
+    }
+
+    private sealed class SupermarketAiService : IAiService
+    {
+        public Task<bool> IsHealthyAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
+
+        public Task<IReadOnlyList<CategorizedExpense>> CategorizeExpensesAsync(
+            IReadOnlyList<ExpenseToCategorize> expenses,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<ParsedMessage> ParseTransactionMessageAsync(
+            string text,
+            Currency defaultCurrency,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new ParsedMessage(
+                MessageParsingOutcome.Parsed,
+                new ParsedTransaction(TransactionType.Expense, 500m, defaultCurrency, ExpenseCategory.Alimentos, null, "Supermercado", PaymentMethod.DebitCard, 0.9),
+                "fake-model"));
+
+        public Task<AudioTranscription> TranscribeAudioAsync(
+            ReadOnlyMemory<byte> audio,
+            string contentType,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new AudioTranscription(
+                AudioTranscriptionOutcome.Transcribed, "Gasté 500 pesos en el súper con débito", "fake-transcribe"));
+    }
+
+    private sealed class VoiceNoteMediaClient : ITwilioMediaClient
+    {
+        public Task<TwilioMedia> DownloadAsync(Uri url, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new TwilioMedia(new byte[] { 1, 2, 3 }, "audio/ogg"));
     }
 
     private sealed class NoOpUnitOfWork : IUnitOfWork
