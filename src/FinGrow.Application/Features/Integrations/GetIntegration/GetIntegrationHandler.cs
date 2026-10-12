@@ -28,6 +28,6 @@ internal sealed class GetIntegrationHandler : IRequestHandler<GetIntegrationQuer
 
         return Result.Success(integration is null
             ? IntegrationResponse.NotLinked
-            : new IntegrationResponse(true, integration.ExternalAccountId, integration.LinkedAt));
+            : IntegrationResponse.From(integration));
     }
 }

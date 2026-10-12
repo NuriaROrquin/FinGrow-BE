@@ -81,7 +81,10 @@ public sealed class FakeEmployeeIntegrationRepository : IEmployeeIntegrationRepo
 
     public Task<IReadOnlyList<EmployeeIntegration>> ListAuthorizedAsync(IntegrationProvider provider, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<EmployeeIntegration>>(
-            Integrations.Where(integration => integration.Provider == provider && integration.Grant is not null).ToList());
+            Integrations.Where(integration =>
+                integration.Provider == provider
+                && integration.Grant is not null
+                && integration.Status == IntegrationStatus.Active).ToList());
 
     public void Add(EmployeeIntegration integration) => Integrations.Add(integration);
 
@@ -330,6 +333,31 @@ public sealed class FakeMercadoPagoOAuthClient : IMercadoPagoOAuthClient
 
     public Task<MercadoPagoTokens> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default) =>
         Task.FromResult(Tokens);
+}
+
+public sealed class FakeIolAuthClient : IIolAuthClient
+{
+    public IolTokens Tokens { get; set; } = new("iol-access", "iol-refresh", TimeSpan.FromMinutes(15));
+
+    public Exception? Failure { get; set; }
+
+    public List<(string Username, string Password)> Logins { get; } = new();
+
+    public List<string> Refreshes { get; } = new();
+
+    public Task<IolTokens> LoginAsync(string username, string password, CancellationToken cancellationToken = default)
+    {
+        Logins.Add((username, password));
+
+        return Failure is null ? Task.FromResult(Tokens) : Task.FromException<IolTokens>(Failure);
+    }
+
+    public Task<IolTokens> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default)
+    {
+        Refreshes.Add(refreshToken);
+
+        return Failure is null ? Task.FromResult(Tokens) : Task.FromException<IolTokens>(Failure);
+    }
 }
 
 public sealed class FakeMercadoPagoPaymentsClient : IMercadoPagoPaymentsClient
