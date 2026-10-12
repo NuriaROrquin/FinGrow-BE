@@ -6,8 +6,8 @@ using FinGrow.Domain.Enums;
 public sealed record TransactionConfirmed(
     Guid TransactionId,
     Guid EmployeeId,
-    ExpenseCategory? ExpenseCategory,
     decimal Amount,
     Currency Currency,
+    ExpenseCategory? ExpenseCategory,
     DateOnly OccurredOn,
     DateTimeOffset OccurredAt) : IDomainEvent;

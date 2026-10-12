@@ -454,7 +454,7 @@ public class TransactionTests
     }
 
     [Fact]
-    public void A_transaction_registered_as_confirmed_has_nothing_to_announce()
+    public void A_transaction_registered_as_confirmed_announces_its_confirmation()
     {
         var transaction = Transaction.RegisterIncome(
             EmployeeId,
@@ -467,7 +467,14 @@ public class TransactionTests
             TransactionStatus.Confirmed,
             Now);
 
-        transaction.DequeueDomainEvents().ShouldBeEmpty();
+        var confirmed = transaction.DequeueDomainEvents().ShouldHaveSingleItem().ShouldBeOfType<TransactionConfirmed>();
+        confirmed.TransactionId.ShouldBe(transaction.Id);
+        confirmed.EmployeeId.ShouldBe(EmployeeId);
+        confirmed.ExpenseCategory.ShouldBeNull();
+        confirmed.Amount.ShouldBe(850000m);
+        confirmed.Currency.ShouldBe(Currency.ARS);
+        confirmed.OccurredOn.ShouldBe(Today);
+        confirmed.OccurredAt.ShouldBe(Now);
     }
 
     private static Transaction RegisterExpense(Money amount) => Transaction.RegisterExpense(

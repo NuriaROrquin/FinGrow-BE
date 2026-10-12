@@ -57,7 +57,7 @@ public sealed class Transaction : AggregateRoot
         }
         else if (status == TransactionStatus.Confirmed)
         {
-            RaiseConfirmationEvent(createdAt);
+            RaiseConfirmed(createdAt);
         }
     }
 
@@ -197,7 +197,7 @@ public sealed class Transaction : AggregateRoot
 
         Status = TransactionStatus.Confirmed;
         UpdatedAt = confirmedAt;
-        RaiseConfirmationEvent(confirmedAt);
+        RaiseConfirmed(confirmedAt);
     }
 
     public void Discard(DateTimeOffset discardedAt)
@@ -294,8 +294,6 @@ public sealed class Transaction : AggregateRoot
             throw new DomainException($"El estado del movimiento '{status}' no existe.");
         }
 
-        var wasPending = Status == TransactionStatus.Pending;
-
         if (Status == TransactionStatus.Confirmed && status == TransactionStatus.Pending)
         {
             throw new DomainException("Una transaccion confirmada no puede volver a pendiente.");
@@ -336,6 +334,7 @@ public sealed class Transaction : AggregateRoot
             }
         }
 
+        var wasPending = Status == TransactionStatus.Pending;
         Type = type;
         Amount = amount;
         ExpenseCategory = type == TransactionType.Expense ? expenseCategory : null;
@@ -348,7 +347,7 @@ public sealed class Transaction : AggregateRoot
 
         if (wasPending && status == TransactionStatus.Confirmed)
         {
-            RaiseConfirmationEvent(updatedAt);
+            RaiseConfirmed(updatedAt);
         }
     }
 
@@ -391,17 +390,15 @@ public sealed class Transaction : AggregateRoot
             ? throw new DomainException("Un movimiento siempre pertenece a un empleado.")
             : employeeId;
 
-    private void RaiseConfirmationEvent(DateTimeOffset confirmedAt)
-    {
+    private void RaiseConfirmed(DateTimeOffset confirmedAt) =>
         Raise(new TransactionConfirmed(
             Id,
             EmployeeId,
-            ExpenseCategory,
             Amount.Amount,
             Amount.Currency,
+            ExpenseCategory,
             OccurredOn,
             confirmedAt));
-    }
 
     private static void EnsureValidAmount(Money amount)
     {

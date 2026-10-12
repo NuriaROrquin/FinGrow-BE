@@ -2,6 +2,7 @@ namespace FinGrow.Application.Features.Notifications.Alerts.BudgetThreshold;
 
 using FinGrow.Application.Events;
 using FinGrow.Application.Interfaces;
+using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.Events;
 using FinGrow.Domain.Repositories;
@@ -79,7 +80,7 @@ internal sealed class NotifyBudgetThresholdHandler(
     private async Task NotifyAsync(
         TransactionConfirmed confirmed,
         ExpenseCategory category,
-        Domain.Entities.Budget budget,
+        Budget budget,
         NotificationType type,
         string title,
         string body,
