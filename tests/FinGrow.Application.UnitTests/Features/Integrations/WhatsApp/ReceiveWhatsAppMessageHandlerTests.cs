@@ -17,6 +17,8 @@ public class ReceiveWhatsAppMessageHandlerTests
     private const string Phone = "+5491112345678";
     private const string Code = "ABCD2345";
     private static readonly DateTimeOffset Now = new(2026, 3, 15, 10, 0, 0, TimeSpan.Zero);
+    private static readonly WhatsAppInboundMedia VoiceNote =
+        new(new Uri("https://api.twilio.com/2010-04-01/Accounts/AC1/Messages/MM1/Media/ME1"), "audio/ogg");
 
     private readonly FakeEmployeeRepository _employees = new();
     private readonly FakeEmployeeIntegrationRepository _integrations = new();
@@ -323,6 +325,106 @@ public class ReceiveWhatsAppMessageHandlerTests
         _linkCodes.LinkCodes.Single().UsedAt.ShouldBeNull();
     }
 
+    [Fact]
+    public async Task A_voice_note_is_transcribed_and_proposed_like_a_written_message()
+    {
+        LinkPhone();
+        _ai.TranscriptionResult = Transcribed("Gasté 2500 pesos en el súper con débito");
+        _ai.ParseResult = Parsed(Expense(PaymentMethod.DebitCard));
+
+        var result = await Handle(Phone, string.Empty, VoiceNote);
+
+        _media.Downloaded.ShouldBe(new[] { VoiceNote.Url });
+        _ai.TranscribedAudios.ShouldHaveSingleItem().ContentType.ShouldBe("audio/ogg");
+        _ai.ParsedMessages.ShouldHaveSingleItem().Text.ShouldBe("Gasté 2500 pesos en el súper con débito");
+        var transaction = _transactions.Transactions.ShouldHaveSingleItem();
+        transaction.Status.ShouldBe(TransactionStatus.Pending);
+        transaction.ExternalReference.ShouldBe("whatsapp:+5491112345678:SM123");
+        result.Value.Text.ShouldBe(
+            "🎙️ Entendí: «Gasté 2500 pesos en el súper con débito»\n\n" +
+            WhatsAppTransactionText.Proposal(transaction, asksPaymentMethod: false));
+    }
+
+    [Fact]
+    public async Task A_voice_note_without_an_amount_shows_what_was_heard_and_asks_again()
+    {
+        LinkPhone();
+        _ai.TranscriptionResult = Transcribed("Gasté en el súper");
+        _ai.ParseResult = ParsedMessage.Of(MessageParsingOutcome.MissingAmount);
+
+        var result = await Handle(Phone, string.Empty, VoiceNote);
+
+        result.Value.Text.ShouldBe("🎙️ Entendí: «Gasté en el súper»\n\n" + ChatTransactionText.MissingAmountReply);
+        _transactions.Transactions.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(AudioTranscriptionOutcome.NotUnderstood)]
+    [InlineData(AudioTranscriptionOutcome.UnsupportedFormat)]
+    [InlineData(AudioTranscriptionOutcome.TooLarge)]
+    public async Task A_voice_note_that_cannot_be_transcribed_asks_to_repeat_it_or_write_it(AudioTranscriptionOutcome outcome)
+    {
+        LinkPhone();
+        _ai.TranscriptionResult = AudioTranscription.Of(outcome);
+
+        var result = await Handle(Phone, string.Empty, VoiceNote);
+
+        result.Value.Text.ShouldBe(WhatsAppTransactionText.AudioNotUnderstoodReply);
+        _ai.ParsedMessages.ShouldBeEmpty();
+        _transactions.Transactions.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task When_the_voice_note_cannot_be_downloaded_the_employee_is_told_to_try_again()
+    {
+        LinkPhone();
+        _media.Unreachable = true;
+
+        var result = await Handle(Phone, string.Empty, VoiceNote);
+
+        result.Value.Text.ShouldBe(ChatTransactionText.AiUnavailableReply);
+        _ai.TranscribedAudios.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task When_the_transcription_service_is_down_the_employee_is_told_to_try_again()
+    {
+        LinkPhone();
+        _ai.Unreachable = true;
+
+        var result = await Handle(Phone, string.Empty, VoiceNote);
+
+        result.Value.Text.ShouldBe(ChatTransactionText.AiUnavailableReply);
+        _transactions.Transactions.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_voice_note_saying_yes_confirms_the_pending_proposal()
+    {
+        LinkPhone();
+        _ai.ParseResult = Parsed(Expense(PaymentMethod.Cash));
+        await Handle(Phone, "Gasté $500 en el super");
+        _ai.TranscriptionResult = Transcribed("Sí.");
+
+        var result = await HandleMessage(Phone, string.Empty, "SM124", VoiceNote);
+
+        var transaction = _transactions.Transactions.ShouldHaveSingleItem();
+        transaction.Status.ShouldBe(TransactionStatus.Confirmed);
+        result.Value.Text.ShouldBe("🎙️ Entendí: «Sí.»\n\n" + ChatTransactionText.Confirmed(transaction));
+    }
+
+    [Fact]
+    public async Task When_processing_takes_longer_than_twilio_waits_the_employee_is_told_to_try_again()
+    {
+        LinkPhone();
+        _ai.TranscriptionHangs = true;
+
+        var result = await Handle(Phone, string.Empty, VoiceNote);
+
+        result.Value.Text.ShouldBe(ChatTransactionText.AiUnavailableReply);
+        _transactions.Transactions.ShouldBeEmpty();
+    }
+
     private Task<Result<WhatsAppReply>> Handle(string phoneNumber, string body, params WhatsAppInboundMedia[] media) =>
         HandleMessage(phoneNumber, body, "SM123", media);
 
@@ -334,15 +436,22 @@ public class ReceiveWhatsAppMessageHandlerTests
     {
         var linker = new LinkCodeRedeemer(
             _integrations, _linkCodes, _employees, _unitOfWork, _clock, NullLogger<LinkCodeRedeemer>.Instance);
+        var voiceNotes = new WhatsAppVoiceNoteTranscriber(_media, _ai, NullLogger<WhatsAppVoiceNoteTranscriber>.Instance);
         var proposer = new ChatTransactionProposer(
             _ai, _transactions, _unitOfWork, _clock, NullLogger<ChatTransactionProposer>.Instance);
         var reviewer = new WhatsAppProposalReviewer(
             _transactions, new ChatTransactionReviewer(_transactions, _unitOfWork, _clock), _clock);
         var handler = new ReceiveWhatsAppMessageHandler(
-            _integrations, linker, proposer, reviewer, NullLogger<ReceiveWhatsAppMessageHandler>.Instance);
+            _integrations, linker, voiceNotes, proposer, reviewer, NullLogger<ReceiveWhatsAppMessageHandler>.Instance)
+        {
+            ProcessingBudget = TimeSpan.FromMilliseconds(200)
+        };
 
         return handler.Handle(new ReceiveWhatsAppMessageCommand(phoneNumber, body, messageSid, media), CancellationToken.None);
     }
+
+    private static AudioTranscription Transcribed(string text) =>
+        new(AudioTranscriptionOutcome.Transcribed, text, "fake-transcribe");
 
     private void LinkPhone() =>
         _integrations.Add(EmployeeIntegration.Create(_employee.Id, IntegrationProvider.WhatsApp, Phone, Now));

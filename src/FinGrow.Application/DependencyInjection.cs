@@ -38,6 +38,7 @@ public static class DependencyInjection
         services.AddScoped<ChatTransactionProposer>();
         services.AddScoped<ChatTransactionReviewer>();
         services.AddScoped<WhatsAppProposalReviewer>();
+        services.AddScoped<WhatsAppVoiceNoteTranscriber>();
         services.AddScoped<MercadoPagoSynchronizer>();
         services.AddScoped<SessionIssuer>();
         services.AddScoped<TwoFactorAccountFinder>();

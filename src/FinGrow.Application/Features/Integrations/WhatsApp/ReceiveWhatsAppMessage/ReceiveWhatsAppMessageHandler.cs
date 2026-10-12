@@ -22,8 +22,11 @@ internal sealed partial class ReceiveWhatsAppMessageHandler
 
     internal const string LinkedReplySuffix = ": este WhatsApp quedó vinculado a tu cuenta de FinGrow.";
 
+    internal static readonly TimeSpan DefaultProcessingBudget = TimeSpan.FromSeconds(12);
+
     private readonly IEmployeeIntegrationRepository _integrations;
     private readonly LinkCodeRedeemer _linker;
+    private readonly WhatsAppVoiceNoteTranscriber _voiceNotes;
     private readonly ChatTransactionProposer _proposer;
     private readonly WhatsAppProposalReviewer _reviewer;
     private readonly ILogger<ReceiveWhatsAppMessageHandler> _logger;
@@ -31,16 +34,20 @@ internal sealed partial class ReceiveWhatsAppMessageHandler
     public ReceiveWhatsAppMessageHandler(
         IEmployeeIntegrationRepository integrations,
         LinkCodeRedeemer linker,
+        WhatsAppVoiceNoteTranscriber voiceNotes,
         ChatTransactionProposer proposer,
         WhatsAppProposalReviewer reviewer,
         ILogger<ReceiveWhatsAppMessageHandler> logger)
     {
         _integrations = integrations;
         _linker = linker;
+        _voiceNotes = voiceNotes;
         _proposer = proposer;
         _reviewer = reviewer;
         _logger = logger;
     }
+
+    internal TimeSpan ProcessingBudget { get; init; } = DefaultProcessingBudget;
 
     public async Task<Result<WhatsAppReply>> Handle(
         ReceiveWhatsAppMessageCommand request,
@@ -76,9 +83,34 @@ internal sealed partial class ReceiveWhatsAppMessageHandler
         ReceiveWhatsAppMessageCommand request,
         CancellationToken cancellationToken)
     {
-        LogMessage(_logger, integration.EmployeeId, request.Body.Length, request.Media.Count, request.MessageSid);
+        var employeeId = integration.EmployeeId;
+        var voiceNote = request.Media.FirstOrDefault(WhatsAppVoiceNoteTranscriber.IsVoiceNote);
 
-        if (await _reviewer.TryReviewAsync(integration.EmployeeId, request.Body, cancellationToken) is { } review)
+        LogMessage(_logger, employeeId, request.Body.Length, request.Media.Count, request.MessageSid);
+
+        using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        budget.CancelAfter(ProcessingBudget);
+
+        try
+        {
+            return voiceNote is null
+                ? await HandleTextAsync(employeeId, request, budget.Token)
+                : await HandleVoiceNoteAsync(employeeId, request, voiceNote, budget.Token);
+        }
+        catch (OperationCanceledException) when (budget.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            LogOutOfTime(_logger, employeeId, request.MessageSid);
+
+            return new WhatsAppReply(ChatTransactionText.AiUnavailableReply);
+        }
+    }
+
+    private async Task<WhatsAppReply> HandleTextAsync(
+        Guid employeeId,
+        ReceiveWhatsAppMessageCommand request,
+        CancellationToken cancellationToken)
+    {
+        if (await _reviewer.TryReviewAsync(employeeId, request.Body, cancellationToken) is { } review)
         {
             return new WhatsAppReply(ReviewReply(review));
         }
@@ -88,7 +120,32 @@ internal sealed partial class ReceiveWhatsAppMessageHandler
             return new WhatsAppReply(WhatsAppTransactionText.HelpReply);
         }
 
-        return await ProposeAsync(integration.EmployeeId, request, request.Body, heard: null, cancellationToken);
+        return await ProposeAsync(employeeId, request, request.Body, heard: null, cancellationToken);
+    }
+
+    private async Task<WhatsAppReply> HandleVoiceNoteAsync(
+        Guid employeeId,
+        ReceiveWhatsAppMessageCommand request,
+        WhatsAppInboundMedia attachment,
+        CancellationToken cancellationToken)
+    {
+        var voiceNote = await _voiceNotes.TranscribeAsync(employeeId, attachment, cancellationToken);
+
+        if (voiceNote is not { Outcome: VoiceNoteOutcome.Transcribed, Text: { } text })
+        {
+            return new WhatsAppReply(voiceNote.Outcome == VoiceNoteOutcome.NotUnderstood
+                ? WhatsAppTransactionText.AudioNotUnderstoodReply
+                : ChatTransactionText.AiUnavailableReply);
+        }
+
+        var heard = WhatsAppTransactionText.Heard(text);
+
+        if (await _reviewer.TryReviewAsync(employeeId, text, cancellationToken) is { } review)
+        {
+            return new WhatsAppReply(heard + "\n\n" + ReviewReply(review));
+        }
+
+        return await ProposeAsync(employeeId, request, text, heard, cancellationToken);
     }
 
     private async Task<WhatsAppReply> ProposeAsync(
@@ -133,4 +190,7 @@ internal sealed partial class ReceiveWhatsAppMessageHandler
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Mensaje de WhatsApp del empleado {EmployeeId}: {Characters} caracteres, {Attachments} adjuntos (mensaje {MessageSid}).")]
     private static partial void LogMessage(ILogger logger, Guid employeeId, int characters, int attachments, string messageSid);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "El mensaje de WhatsApp {MessageSid} del empleado {EmployeeId} no se proceso a tiempo para responderle a Twilio.")]
+    private static partial void LogOutOfTime(ILogger logger, Guid employeeId, string messageSid);
 }
