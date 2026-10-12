@@ -76,7 +76,7 @@ public class NotificationsEndpointsTests
     }
 
     [Fact]
-    public async Task Reading_a_notification_marks_it_and_someone_else_one_responds_404()
+    public async Task Reading_a_notification_marks_it_and_someone_else_one_responds_403()
     {
         using var factory = new NotificationsWebApplicationFactory();
         var own = factory.Store(NotificationRecipient.Employee(factory.UserId));
@@ -84,12 +84,12 @@ public class NotificationsEndpointsTests
         var client = CreateClient(factory, Rol.Empleado);
 
         var read = await client.PostAsync(new Uri($"{NotificationsPath}/{own.Id}/read", UriKind.Relative), content: null);
-        var notFound = await client.PostAsync(new Uri($"{NotificationsPath}/{foreign.Id}/read", UriKind.Relative), content: null);
+        var forbidden = await client.PostAsync(new Uri($"{NotificationsPath}/{foreign.Id}/read", UriKind.Relative), content: null);
 
         read.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await read.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("isRead").GetBoolean().ShouldBeTrue();
         own.IsRead.ShouldBeTrue();
-        notFound.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        forbidden.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
         foreign.IsRead.ShouldBeFalse();
     }
 
@@ -203,6 +203,7 @@ public class NotificationsEndpointsTests
                     ["Twilio:AuthToken"] = "unit-test-twilio-auth-token",
                     ["Telegram:BotToken"] = "unit-test-telegram-bot-token",
                     ["Telegram:WebhookSecret"] = "unit-test-telegram-secret",
+                    ["Email:ResendApiKey"] = "re_unit_test_key",
                     ["MercadoPago:ClientId"] = "unit-test-mp-client-id",
                     ["MercadoPago:ClientSecret"] = "unit-test-mp-client-secret",
                     ["MercadoPago:RedirectUri"] = "https://api.test/api/integrations/mercadopago/oauth/callback",
@@ -249,6 +250,9 @@ public class NotificationsEndpointsTests
 
         public Task<IReadOnlyList<Notification>> ListUnreadAsync(NotificationRecipient recipient, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<Notification>>(Filtered(recipient, unreadOnly: true).ToList());
+
+        public Task RemoveAllForAsync(NotificationRecipient recipient, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
 
         private IEnumerable<Notification> Filtered(NotificationRecipient recipient, bool unreadOnly) =>
             notifications.Where(notification => notification.IsAddressedTo(recipient) && (!unreadOnly || !notification.IsRead));

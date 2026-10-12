@@ -1,9 +1,11 @@
 namespace FinGrow.Application.Features.Transactions.GetHistory;
 
 using FinGrow.Application.Common;
+using FinGrow.Application.Features.Receipts;
 using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
+using FinGrow.Domain.Repositories;
 using MediatR;
 
 public sealed record GetTransactionHistoryQuery(TransactionFilters Filters)
@@ -19,7 +21,8 @@ public sealed record TransactionHistoryItem(
     string PaymentMethod,
     string Type,
     string Source,
-    string Status);
+    string Status,
+    Guid? ReceiptId);
 
 public sealed record TransactionHistoryResponse(
     IReadOnlyList<TransactionHistoryItem> Items,
@@ -30,6 +33,7 @@ public sealed record TransactionHistoryResponse(
 
 internal sealed class GetTransactionHistoryQueryHandler(
     ITransactionReadRepository transactionReadRepository,
+    ITransactionReceiptRepository receiptRepository,
     ICurrentUser currentUser)
     : IRequestHandler<GetTransactionHistoryQuery, Result<TransactionHistoryResponse>>
 {
@@ -58,6 +62,9 @@ internal sealed class GetTransactionHistoryQueryHandler(
             filters.DateTo,
             cancellationToken);
 
+        var receiptIds = await receiptRepository.GetIdsByTransactionAsync(
+            page.Items.Select(transaction => transaction.Id).ToList(), cancellationToken);
+
         var items = page.Items
             .OrderByDescending(transaction => transaction.OccurredOn)
             .ThenByDescending(transaction => transaction.Id)
@@ -70,8 +77,9 @@ internal sealed class GetTransactionHistoryQueryHandler(
                 transaction.Description,
                 transaction.PaymentMethod.ToString(),
                 transaction.Type.ToString(),
-                    transaction.Source.ToString(),
-                    transaction.Status.ToString()))
+                transaction.Source.ToString(),
+                transaction.Status.ToString(),
+                receiptIds.ReceiptOf(transaction.Id)))
             .ToList();
 
         return Result.Success(new TransactionHistoryResponse(

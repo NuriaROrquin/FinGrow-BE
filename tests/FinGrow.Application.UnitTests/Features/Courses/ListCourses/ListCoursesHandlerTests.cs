@@ -21,7 +21,18 @@ public class ListCoursesHandlerTests
     private Course StoreCourse(string slug, CourseLevel level = CourseLevel.Beginner, params int[] lessonMinutes) =>
         StoreCourse(slug, level, published: true, lessonMinutes);
 
-    private Course StoreCourse(string slug, CourseLevel level, bool published, params int[] lessonMinutes)
+    private Course StoreCourse(string slug, InvestmentType relatedInvestmentType) =>
+        StoreCourse(slug, CourseLevel.Beginner, published: true, relatedInvestmentType);
+
+    private Course StoreCourse(string slug, CourseLevel level, bool published, params int[] lessonMinutes) =>
+        StoreCourse(slug, level, published, relatedInvestmentType: null, lessonMinutes);
+
+    private Course StoreCourse(
+        string slug,
+        CourseLevel level,
+        bool published,
+        InvestmentType? relatedInvestmentType,
+        params int[] lessonMinutes)
     {
         var course = Course.Create(
             slug,
@@ -29,7 +40,7 @@ public class ListCoursesHandlerTests
             "Una descripcion corta.",
             level,
             EducationCategory.Basics,
-            relatedInvestmentType: null,
+            relatedInvestmentType,
             Now);
 
         var position = 0;
@@ -50,9 +61,10 @@ public class ListCoursesHandlerTests
     private Task<Result<IReadOnlyList<CourseSummaryResponse>>> ListAsync(
         CourseLevel? level = null,
         int? maxDuration = null,
-        CourseProgressStatus? status = null) =>
+        CourseProgressStatus? status = null,
+        InvestmentType? investmentType = null) =>
         new ListCoursesHandler(_courses, _ratings).Handle(
-            new ListCoursesQuery(EmployeeId, level, maxDuration, status),
+            new ListCoursesQuery(EmployeeId, level, maxDuration, status, investmentType),
             CancellationToken.None);
 
     [Fact]
@@ -155,6 +167,17 @@ public class ListCoursesHandlerTests
             .ShouldHaveSingleItem().Slug.ShouldBe("empezado");
         (await ListAsync(status: CourseProgressStatus.NotStarted)).Value
             .ShouldHaveSingleItem().Slug.ShouldBe("nuevo");
+    }
+
+    [Fact]
+    public async Task Courses_can_be_filtered_by_the_investment_type_they_are_about()
+    {
+        StoreCourse("etfs", InvestmentType.Etf);
+        StoreCourse("cripto", InvestmentType.Crypto);
+        StoreCourse("basico");
+
+        (await ListAsync(investmentType: InvestmentType.Crypto)).Value
+            .ShouldHaveSingleItem().Slug.ShouldBe("cripto");
     }
 
     [Fact]

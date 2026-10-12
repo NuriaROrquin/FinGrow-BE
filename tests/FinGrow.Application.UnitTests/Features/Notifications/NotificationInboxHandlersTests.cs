@@ -95,14 +95,14 @@ public class NotificationInboxHandlersTests
     }
 
     [Fact]
-    public async Task Someone_else_notification_does_not_exist_for_the_recipient()
+    public async Task Someone_else_notification_is_forbidden_for_the_recipient()
     {
         var notification = Store(NotificationRecipient.Employee(Guid.CreateVersion7()), "ajena", Now);
 
         var result = await MarkAsRead(Employee, notification.Id);
 
         result.IsFailure.ShouldBeTrue();
-        result.Error.Type.ShouldBe(ErrorType.NotFound);
+        result.Error.Type.ShouldBe(ErrorType.Forbidden);
         notification.IsRead.ShouldBeFalse();
         _unitOfWork.SaveCount.ShouldBe(0);
     }

@@ -1,7 +1,11 @@
 namespace FinGrow.Infrastructure;
 
+using System.ComponentModel.DataAnnotations;
 using System.Net.Http.Headers;
 using System.Text;
+using Amazon.Runtime;
+using Amazon.S3;
+using FinGrow.Application.Features.Receipts.Cleanup;
 using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Repositories;
 using FinGrow.Infrastructure.Ai;
@@ -11,14 +15,17 @@ using FinGrow.Infrastructure.Integrations.ArgentinaDatos;
 using FinGrow.Infrastructure.Integrations.Byma;
 using FinGrow.Infrastructure.Integrations.CoinGecko;
 using FinGrow.Infrastructure.Integrations.DolarApi;
+using FinGrow.Infrastructure.Integrations.Iol;
 using FinGrow.Infrastructure.Integrations.MercadoPago;
 using FinGrow.Infrastructure.Integrations.Telegram;
 using FinGrow.Infrastructure.Integrations.Twilio;
+using FinGrow.Infrastructure.Mailing;
 using FinGrow.Infrastructure.Persistence;
 using FinGrow.Infrastructure.Persistence.Protection;
 using FinGrow.Infrastructure.Persistence.Repositories;
 using FinGrow.Infrastructure.Persistence.Seeding;
 using FinGrow.Infrastructure.Services;
+using FinGrow.Infrastructure.Storage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -43,10 +50,13 @@ public static class DependencyInjection
         services.AddTwilio(configuration);
         services.AddTelegram(configuration);
         services.AddMercadoPago(configuration);
+        services.AddIol(configuration);
         services.AddDolarApi(configuration);
         services.AddByma(configuration);
         services.AddArgentinaDatos(configuration);
         services.AddCoinGecko(configuration);
+        services.AddFileStorage(configuration);
+        services.AddEmail(configuration);
 
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, CurrentUser>();
@@ -87,6 +97,7 @@ public static class DependencyInjection
 
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<FinGrowDbContext>());
         services.AddScoped<ITransactionRepository, TransactionRepository>();
+        services.AddScoped<ITransactionReceiptRepository, TransactionReceiptRepository>();
         services.AddScoped<ITransactionReadRepository, TransactionReadRepository>();
         services.AddScoped<ITransactionExcelExporter, TransactionExcelExporter>();
         services.AddScoped<IGoalRepository, GoalRepository>();
@@ -98,6 +109,8 @@ public static class DependencyInjection
         services.AddScoped<ICourseRatingReadRepository, CourseRatingReadRepository>();
         services.AddScoped<IJobRunRepository, JobRunRepository>();
         services.AddScoped<IMetricsSnapshotRepository, MetricsSnapshotRepository>();
+        services.AddScoped<IFinancialHealthScoreRepository, FinancialHealthScoreRepository>();
+        services.AddScoped<IFinancialHealthReadRepository, FinancialHealthReadRepository>();
         services.AddScoped<IPeriodActivityReadRepository, PeriodActivityReadRepository>();
         services.AddScoped<IGoalRepository, GoalRepository>();
         services.AddScoped<IBudgetRepository, BudgetRepository>();
@@ -105,6 +118,7 @@ public static class DependencyInjection
         services.AddScoped<IArticleRepository, ArticleRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<INotificationChannelSettingRepository, NotificationChannelSettingRepository>();
+        services.AddScoped<IOutboundEmailRepository, OutboundEmailRepository>();
 
         services.AddScoped<DatabaseSeeder>();
         services.AddScoped<EducationCatalogSeeder>();
@@ -203,6 +217,25 @@ public static class DependencyInjection
         return services;
     }
 
+    // Sin la politica de reintentos: repetir un refresh que IOL ya proceso puede invalidar el refresh token nuevo.
+    private static IServiceCollection AddIol(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<IolOptions>()
+            .Bind(configuration.GetSection(IolOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddHttpClient<IIolAuthClient, IolAuthClient>((provider, client) =>
+        {
+            var options = provider.GetRequiredService<IOptions<IolOptions>>().Value;
+
+            client.BaseAddress = new Uri(options.ApiBaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        });
+
+        return services;
+    }
+
     private static IServiceCollection AddDolarApi(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddMemoryCache();
@@ -290,6 +323,64 @@ public static class DependencyInjection
                     client.DefaultRequestHeaders.Add(CoinGeckoOptions.ApiKeyHeader, options.ApiKey);
                 }
             });
+
+        return services;
+    }
+
+    private static IServiceCollection AddFileStorage(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<S3StorageOptions>()
+            .Bind(configuration.GetSection(S3StorageOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddSingleton<IAmazonS3>(provider =>
+        {
+            var options = provider.GetRequiredService<IOptions<S3StorageOptions>>().Value;
+
+            return new AmazonS3Client(
+                new BasicAWSCredentials(options.AccessKey, options.SecretKey),
+                new AmazonS3Config
+                {
+                    ServiceURL = options.ServiceUrl,
+                    AuthenticationRegion = options.Region,
+                    ForcePathStyle = options.ForcePathStyle,
+                    Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds),
+                    // R2 y S3Mock no aceptan los checksums que el SDK v4 agrega por defecto.
+                    RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED,
+                    ResponseChecksumValidation = ResponseChecksumValidation.WHEN_REQUIRED,
+                });
+        });
+
+        services.AddSingleton<IFileStorage, S3FileStorage>();
+
+        services.AddOptions<ReceiptsCleanupOptions>()
+            .Bind(configuration.GetSection(ReceiptsCleanupOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddSingleton(provider => provider.GetRequiredService<IOptions<ReceiptsCleanupOptions>>().Value);
+
+        return services;
+    }
+
+    private static IServiceCollection AddEmail(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<EmailOptions>()
+            .Bind(configuration.GetSection(EmailOptions.SectionName))
+            .ValidateDataAnnotations()
+            .Validate(
+                options => string.IsNullOrWhiteSpace(options.RedirectAllTo) || new EmailAddressAttribute().IsValid(options.RedirectAllTo),
+                "Email:RedirectAllTo tiene que ser una direccion de correo valida.")
+            .ValidateOnStart();
+
+        services.AddHttpClient<IEmailSender, ResendEmailSender>((provider, client) =>
+        {
+            var options = provider.GetRequiredService<IOptions<EmailOptions>>().Value;
+
+            client.BaseAddress = new Uri("https://api.resend.com/");
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", options.ResendApiKey);
+        });
 
         return services;
     }

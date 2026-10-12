@@ -17,9 +17,14 @@ internal sealed class MarkNotificationAsReadHandler(
     {
         var notification = await notifications.GetByIdAsync(request.NotificationId, cancellationToken);
 
-        if (notification is null || !notification.IsAddressedTo(request.Recipient))
+        if (notification is null)
         {
             return Result.Failure<NotificationResponse>(NotificationErrors.NotFound(request.NotificationId));
+        }
+
+        if (!notification.IsAddressedTo(request.Recipient))
+        {
+            return Result.Failure<NotificationResponse>(NotificationErrors.NotOwned());
         }
 
         if (!notification.IsRead)

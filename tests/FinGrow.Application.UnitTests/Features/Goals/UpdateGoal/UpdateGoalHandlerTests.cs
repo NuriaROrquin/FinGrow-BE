@@ -84,13 +84,13 @@ public class UpdateGoalHandlerTests
     }
 
     [Fact]
-    public async Task A_goal_of_another_employee_is_reported_as_not_found()
+    public async Task A_goal_of_another_employee_is_reported_as_forbidden()
     {
         var goal = StoreGoal(employeeId: Guid.CreateVersion7());
 
         var result = await _handler.Handle(Command(goal), CancellationToken.None);
 
-        result.Error.Type.ShouldBe(ErrorType.NotFound);
+        result.Error.Type.ShouldBe(ErrorType.Forbidden);
         goal.Name.ShouldBe("Vacaciones");
         _unitOfWork.SaveCount.ShouldBe(0);
     }

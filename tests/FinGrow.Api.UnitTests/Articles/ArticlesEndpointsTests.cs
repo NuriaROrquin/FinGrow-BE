@@ -26,12 +26,15 @@ public class ArticlesEndpointsTests
         using var factory = new ArticlesWebApplicationFactory();
         var client = AuthenticatedClient(factory, Rol.Empleado);
 
-        var response = await client.GetAsync(new Uri("/api/articles?category=Savings&maxReadingTime=5", UriKind.Relative));
+        var response = await client.GetAsync(new Uri(
+            "/api/articles?category=Savings&maxReadingTime=5&investmentType=Cedear",
+            UriKind.Relative));
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         factory.Articles.WasQueried.ShouldBeTrue();
         factory.Articles.RequestedCategory.ShouldBe(EducationCategory.Savings);
         factory.Articles.RequestedMaxReadingTimeMinutes.ShouldBe(5);
+        factory.Articles.RequestedInvestmentType.ShouldBe(InvestmentType.Cedear);
     }
 
     [Fact]
@@ -50,7 +53,24 @@ public class ArticlesEndpointsTests
         item.GetProperty("slug").GetString().ShouldBe("fondo-de-emergencia");
         item.GetProperty("category").GetString().ShouldBe("Savings");
         item.GetProperty("readingTimeMinutes").GetInt32().ShouldBe(4);
+        item.GetProperty("isInvestmentContent").GetBoolean().ShouldBeFalse();
         item.TryGetProperty("content", out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task An_article_about_an_investment_type_is_marked_as_investment_content()
+    {
+        using var factory = new ArticlesWebApplicationFactory();
+        factory.Articles.Articles.Add(PublishedArticle("cedears-para-principiantes", InvestmentType.Cedear));
+        var client = AuthenticatedClient(factory, Rol.Empleado);
+
+        var list = await client.GetFromJsonAsync<JsonElement>(new Uri("/api/articles", UriKind.Relative));
+        var detail = await client.GetFromJsonAsync<JsonElement>(
+            new Uri("/api/articles/cedears-para-principiantes", UriKind.Relative));
+
+        list[0].GetProperty("relatedInvestmentType").GetString().ShouldBe("Cedear");
+        list[0].GetProperty("isInvestmentContent").GetBoolean().ShouldBeTrue();
+        detail.GetProperty("isInvestmentContent").GetBoolean().ShouldBeTrue();
     }
 
     [Fact]
@@ -84,6 +104,7 @@ public class ArticlesEndpointsTests
     [Theory]
     [InlineData("maxReadingTime=0")]
     [InlineData("category=Astrologia")]
+    [InlineData("investmentType=Oro")]
     public async Task An_invalid_filter_is_rejected_with_400_without_querying_the_database(string query)
     {
         using var factory = new ArticlesWebApplicationFactory();
@@ -118,7 +139,7 @@ public class ArticlesEndpointsTests
         factory.Articles.WasQueried.ShouldBeFalse();
     }
 
-    private static Article PublishedArticle(string slug)
+    private static Article PublishedArticle(string slug, InvestmentType? relatedInvestmentType = null)
     {
         var article = Article.Create(
             slug,
@@ -127,7 +148,7 @@ public class ArticlesEndpointsTests
             "## Por qué\n\nCubre **tres meses** de gastos.",
             EducationCategory.Savings,
             readingTimeMinutes: 4,
-            relatedInvestmentType: null,
+            relatedInvestmentType,
             Now);
         article.Publish(Now);
 
@@ -156,14 +177,18 @@ public class ArticlesEndpointsTests
 
         public int? RequestedMaxReadingTimeMinutes { get; private set; }
 
+        public InvestmentType? RequestedInvestmentType { get; private set; }
+
         public Task<IReadOnlyList<Article>> ListPublishedAsync(
             EducationCategory? category,
             int? maxReadingTimeMinutes,
+            InvestmentType? relatedInvestmentType,
             CancellationToken cancellationToken = default)
         {
             WasQueried = true;
             RequestedCategory = category;
             RequestedMaxReadingTimeMinutes = maxReadingTimeMinutes;
+            RequestedInvestmentType = relatedInvestmentType;
 
             return Task.FromResult<IReadOnlyList<Article>>(Articles.ToList());
         }
@@ -188,6 +213,7 @@ public class ArticlesEndpointsTests
                     ["Twilio:AuthToken"] = "unit-test-twilio-auth-token",
                     ["Telegram:BotToken"] = "unit-test-telegram-bot-token",
                     ["Telegram:WebhookSecret"] = "unit-test-telegram-secret",
+                    ["Email:ResendApiKey"] = "re_unit_test_key",
                     ["MercadoPago:ClientId"] = "unit-test-mp-client-id",
                     ["MercadoPago:ClientSecret"] = "unit-test-mp-client-secret",
                     ["MercadoPago:RedirectUri"] = "https://api.test/api/integrations/mercadopago/oauth/callback",

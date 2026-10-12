@@ -34,13 +34,13 @@ public class ListGoalContributionsHandlerTests
     }
 
     [Fact]
-    public async Task The_history_of_another_employee_is_not_visible()
+    public async Task The_history_of_another_employee_is_forbidden()
     {
         var goal = Goal.Create(Guid.CreateVersion7(), "Auto", Money.From(1000m, Currency.ARS), Today.AddMonths(6), Now);
         _goals.Add(goal);
 
         var result = await _handler.Handle(new ListGoalContributionsQuery(_employeeId, goal.Id), CancellationToken.None);
 
-        result.Error.Type.ShouldBe(ErrorType.NotFound);
+        result.Error.Type.ShouldBe(ErrorType.Forbidden);
     }
 }

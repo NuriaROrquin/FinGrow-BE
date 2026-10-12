@@ -258,6 +258,7 @@ public class PendingTransactionsEndpointsTests
                     ["Twilio:AuthToken"] = "unit-test-twilio-auth-token",
                     ["Telegram:BotToken"] = "unit-test-telegram-bot-token",
                     ["Telegram:WebhookSecret"] = "unit-test-telegram-secret",
+                    ["Email:ResendApiKey"] = "re_unit_test_key",
                     ["MercadoPago:ClientId"] = "unit-test-mp-client-id",
                     ["MercadoPago:ClientSecret"] = "unit-test-mp-client-secret",
                     ["MercadoPago:RedirectUri"] = "https://api.test/api/integrations/mercadopago/oauth/callback",
@@ -268,6 +269,7 @@ public class PendingTransactionsEndpointsTests
             builder.ConfigureTestServices(services =>
             {
                 services.AddScoped<ITransactionRepository>(_ => new InMemoryTransactionRepository(Transactions));
+                services.AddScoped<ITransactionReceiptRepository, EmptyReceiptRepository>();
                 services.AddScoped<IUnitOfWork, NoOpUnitOfWork>();
             });
         }
@@ -313,6 +315,32 @@ public class PendingTransactionsEndpointsTests
                     && externalReferences.Contains(transaction.ExternalReference))
                 .Select(transaction => transaction.ExternalReference!)
                 .ToHashSet(StringComparer.Ordinal));
+    }
+
+    private sealed class EmptyReceiptRepository : ITransactionReceiptRepository
+    {
+        public void Add(TransactionReceipt receipt)
+        {
+        }
+
+        public Task<TransactionReceipt?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+            Task.FromResult<TransactionReceipt?>(null);
+
+        public Task<TransactionReceipt?> GetByTransactionIdAsync(Guid transactionId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<TransactionReceipt?>(null);
+
+        public Task<IReadOnlyDictionary<Guid, Guid>> GetIdsByTransactionAsync(
+            IReadOnlyCollection<Guid> transactionIds,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyDictionary<Guid, Guid>>(new Dictionary<Guid, Guid>());
+
+        public Task<IReadOnlyList<string>> ListStorageKeysByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
+
+        public void Remove(TransactionReceipt receipt) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<TransactionReceipt>> ListDetachedUploadedBeforeAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class NoOpUnitOfWork : IUnitOfWork

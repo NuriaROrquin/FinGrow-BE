@@ -5,5 +5,8 @@ using DTOs;
 using Domain.Enums;
 using MediatR;
 
-public sealed record ListArticlesQuery(EducationCategory? Category, int? MaxReadingTimeMinutes)
+public sealed record ListArticlesQuery(
+    EducationCategory? Category,
+    int? MaxReadingTimeMinutes,
+    InvestmentType? RelatedInvestmentType)
     : IRequest<Result<IReadOnlyList<ArticleSummaryResponse>>>;

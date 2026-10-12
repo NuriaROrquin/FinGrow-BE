@@ -11,13 +11,19 @@ internal sealed class DeleteInvestmentHandler(
 {
     public async Task<Result> Handle(DeleteInvestmentCommand request, CancellationToken cancellationToken)
     {
-        var investment = await investmentRepository.GetByIdAsync(request.Id, cancellationToken);
+        var owned = Ownership.Require(
+            await investmentRepository.GetByIdAsync(request.Id, cancellationToken),
+            investment => investment.EmployeeId,
+            request.EmployeeId,
+            InvestmentErrors.NotFound(request.Id),
+            InvestmentErrors.NotOwned());
 
-        if (investment is null || investment.EmployeeId != request.EmployeeId)
+        if (owned.IsFailure)
         {
-            return Result.Failure(
-                Error.NotFound("Investment.NotFound", $"No existe una inversion con id '{request.Id}'."));
+            return Result.Failure(owned.Error);
         }
+
+        var investment = owned.Value;
 
         investmentRepository.Remove(investment);
         await unitOfWork.SaveChangesAsync(cancellationToken);

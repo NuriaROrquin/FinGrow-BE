@@ -112,7 +112,7 @@ public class ListPendingTransactionsHandlerTests
     [Fact]
     public async Task Returns_forbidden_when_the_user_is_not_authenticated()
     {
-        var handler = new ListPendingTransactionsHandler(_transactions, new FakeCurrentUser());
+        var handler = new ListPendingTransactionsHandler(_transactions, new FakeTransactionReceiptRepository(), new FakeCurrentUser());
 
         var result = await handler.Handle(new ListPendingTransactionsQuery(), CancellationToken.None);
 
@@ -121,6 +121,6 @@ public class ListPendingTransactionsHandlerTests
     }
 
     private Task<Result<PendingTransactionsResponse>> Handle() =>
-        new ListPendingTransactionsHandler(_transactions, _user)
+        new ListPendingTransactionsHandler(_transactions, new FakeTransactionReceiptRepository(), _user)
             .Handle(new ListPendingTransactionsQuery(), CancellationToken.None);
 }

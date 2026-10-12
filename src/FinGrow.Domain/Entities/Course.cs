@@ -59,6 +59,9 @@ public sealed class Course : AggregateRoot
 
     public bool IsPublished => PublishedAt is not null;
 
+    public bool IsInvestmentContent =>
+        Category == EducationCategory.Investments || RelatedInvestmentType is not null;
+
     public int DurationMinutes => _lessons.Sum(lesson => lesson.DurationMinutes);
 
     public static Course Create(

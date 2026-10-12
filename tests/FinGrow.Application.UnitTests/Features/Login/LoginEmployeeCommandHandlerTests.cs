@@ -1,5 +1,6 @@
 namespace FinGrow.Application.UnitTests.Features.Login;
 
+using FinGrow.Application.Common;
 using FinGrow.Application.Features.Login;
 using FinGrow.Application.Features.Session;
 using FinGrow.Application.UnitTests.Fakes;
@@ -138,7 +139,7 @@ public class LoginEmployeeCommandHandlerTests
     }
 
     [Fact]
-    public async Task Deactivated_employee_is_rejected_even_with_correct_credentials()
+    public async Task Deactivated_employee_is_told_that_the_access_is_disabled_after_the_password_matches()
     {
         var employee = CreateEmployee(plainPassword: "1234", isActive: false);
         var employeeRepository = new FakeEmployeeRepository();
@@ -149,6 +150,21 @@ public class LoginEmployeeCommandHandlerTests
             CancellationToken.None);
 
         result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("Auth.AccesoDesactivado");
+        result.Error.Type.ShouldBe(ErrorType.Forbidden);
+    }
+
+    [Fact]
+    public async Task Deactivated_employee_with_a_wrong_password_gets_the_generic_error()
+    {
+        var employee = CreateEmployee(plainPassword: "1234", isActive: false);
+        var employeeRepository = new FakeEmployeeRepository();
+        employeeRepository.Employees.Add(employee);
+
+        var result = await CreateHandler(employeeRepository).Handle(
+            new LoginEmployeeCommand("empleado@empresa.com", "otra"),
+            CancellationToken.None);
+
         result.Error.Code.ShouldBe("Auth.CredencialesInvalidas");
     }
 }

@@ -101,6 +101,19 @@ public class TelegramWebhookTests
     }
 
     [Fact]
+    public async Task A_voice_note_from_an_unlinked_chat_gets_the_linking_instructions()
+    {
+        using var factory = new WebhookWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var response = await PostAsync(client, PrivateVoiceNote());
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        factory.Bot.Sent.ShouldHaveSingleItem().Text.ShouldContain("todavía no está vinculado");
+        factory.Bot.DownloadedFiles.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task A_linked_chat_writing_an_expense_gets_a_proposal_with_buttons()
     {
         using var factory = new WebhookWebApplicationFactory();
@@ -115,6 +128,25 @@ public class TelegramWebhookTests
         transaction.Status.ShouldBe(TransactionStatus.Pending);
         var sent = factory.Bot.SentWithButtons.ShouldHaveSingleItem();
         sent.ChatId.ShouldBe(ChatId);
+        sent.Text.ShouldContain("Alimentos");
+    }
+
+    [Fact]
+    public async Task A_voice_note_from_a_linked_chat_is_transcribed_and_proposed_with_buttons()
+    {
+        using var factory = new WebhookWebApplicationFactory();
+        var client = factory.CreateClient();
+        factory.LinkChat();
+
+        var response = await PostAsync(client, PrivateVoiceNote());
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        factory.Bot.DownloadedFiles.ShouldHaveSingleItem().ShouldBe("AwACAgEAAxkBAAIB");
+        var transaction = factory.Transactions.ShouldHaveSingleItem();
+        transaction.Source.ShouldBe(TransactionSource.Telegram);
+        transaction.Status.ShouldBe(TransactionStatus.Pending);
+        var sent = factory.Bot.SentWithButtons.ShouldHaveSingleItem();
+        sent.Text.ShouldStartWith("🎙️ Entendí: «Gasté 500 pesos en el súper»");
         sent.Text.ShouldContain("Alimentos");
     }
 
@@ -176,6 +208,17 @@ public class TelegramWebhookTests
         },
     };
 
+    private static object PrivateVoiceNote() => new
+    {
+        update_id = 102,
+        message = new
+        {
+            message_id = 9,
+            chat = new { id = ChatId, type = "private" },
+            voice = new { file_id = "AwACAgEAAxkBAAIB", file_unique_id = "AgADBQ", duration = 4, mime_type = "audio/ogg", file_size = 10137 },
+        },
+    };
+
     private static async Task<HttpResponseMessage> PostAsync(HttpClient client, object update, string secret = Secret)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(WebhookPath, UriKind.Relative))
@@ -223,6 +266,7 @@ public class TelegramWebhookTests
                     ["Twilio:AuthToken"] = "unit-test-twilio-auth-token",
                     ["Telegram:BotToken"] = "unit-test-telegram-bot-token",
                     ["Telegram:WebhookSecret"] = Secret,
+                    ["Email:ResendApiKey"] = "re_unit_test_key",
                     ["MercadoPago:ClientId"] = "unit-test-mp-client-id",
                     ["MercadoPago:ClientSecret"] = "unit-test-mp-client-secret",
                     ["MercadoPago:RedirectUri"] = "https://api.test/api/integrations/mercadopago/oauth/callback",
@@ -280,6 +324,14 @@ public class TelegramWebhookTests
             AnsweredCallbacks.Add(callbackQueryId);
             return Task.CompletedTask;
         }
+
+        public List<string> DownloadedFiles { get; } = new();
+
+        public Task<ReadOnlyMemory<byte>> DownloadFileAsync(string fileId, CancellationToken cancellationToken = default)
+        {
+            DownloadedFiles.Add(fileId);
+            return Task.FromResult<ReadOnlyMemory<byte>>(new byte[] { 1, 2, 3 });
+        }
     }
 
     private sealed class SupermarketAiService : IAiService
@@ -299,6 +351,13 @@ public class TelegramWebhookTests
                 MessageParsingOutcome.Parsed,
                 new ParsedTransaction(TransactionType.Expense, 500m, defaultCurrency, ExpenseCategory.Alimentos, null, "Supermercado", null, 0.9),
                 "fake-model"));
+
+        public Task<AudioTranscription> TranscribeAudioAsync(
+            ReadOnlyMemory<byte> audio,
+            string contentType,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new AudioTranscription(
+                AudioTranscriptionOutcome.Transcribed, "Gasté 500 pesos en el súper", "fake-transcribe"));
     }
 
     private sealed class InMemoryTransactionRepository : ITransactionRepository
@@ -340,6 +399,22 @@ public class TelegramWebhookTests
 
         public Task<Employee?> GetByEmailAsync(Email email, CancellationToken cancellationToken) =>
             Task.FromResult(_employee.Email == email ? _employee : null);
+
+        public Task<IReadOnlyDictionary<Guid, int>> CountByDepartmentAsync(Guid companyId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<Employee>> ListByCompanyAsync(Guid companyId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<Employee>> ListByDepartmentAsync(Guid departmentId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<Employee>> ListByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public void Add(Employee employee) => throw new NotSupportedException();
+
+        public void Remove(Employee employee) => throw new NotSupportedException();
     }
 
     private sealed class InMemoryEmployeeIntegrationRepository : IEmployeeIntegrationRepository

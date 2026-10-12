@@ -158,7 +158,7 @@ public class ConfirmTransactionHandlerTests
     {
         var proposal = AddPendingExpense();
         var handler = new ConfirmTransactionHandler(
-            _transactions, _unitOfWork, new FakeCurrentUser(), new FakeDateTimeProvider(Now));
+            _transactions, new FakeTransactionReceiptRepository(), _unitOfWork, new FakeCurrentUser(), new FakeDateTimeProvider(Now));
 
         var result = await handler.Handle(CommandFrom(proposal), CancellationToken.None);
 
@@ -176,7 +176,7 @@ public class ConfirmTransactionHandlerTests
     }
 
     private Task<Result<TransactionResponse>> Handle(ConfirmTransactionCommand command) =>
-        new ConfirmTransactionHandler(_transactions, _unitOfWork, _user, new FakeDateTimeProvider(Now))
+        new ConfirmTransactionHandler(_transactions, new FakeTransactionReceiptRepository(), _unitOfWork, _user, new FakeDateTimeProvider(Now))
             .Handle(command, CancellationToken.None);
 
     private static ConfirmTransactionCommand CommandFrom(Transaction transaction) => new(

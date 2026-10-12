@@ -11,6 +11,7 @@ internal sealed class DepartmentConfiguration : IEntityTypeConfiguration<Departm
         builder.ToTable("departments");
 
         builder.HasKey(department => department.Id);
+        builder.Property(department => department.Id).ValueGeneratedNever();
 
         builder.Property(department => department.Name)
             .HasMaxLength(Department.MaxNameLength)
@@ -19,18 +20,22 @@ internal sealed class DepartmentConfiguration : IEntityTypeConfiguration<Departm
         builder.Property(department => department.Description)
             .HasMaxLength(Department.MaxDescriptionLength);
 
-        builder.Property(department => department.ManagerName)
-            .HasMaxLength(Department.MaxManagerNameLength);
 
         builder.Property(department => department.IsActive).IsRequired();
         builder.Property(department => department.CreatedAt).IsRequired();
         builder.Property(department => department.UpdatedAt).IsRequired();
+        builder.Property(department => department.DeactivatedAt);
 
         // Un departamento no sobrevive a su empresa: forma parte del agregado Company.
         builder.HasOne<Company>()
             .WithMany(company => company.Departments)
             .HasForeignKey(department => department.CompanyId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne<Employee>()
+            .WithMany()
+            .HasForeignKey(department => department.ManagerId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasIndex(department => new { department.CompanyId, department.Name }).IsUnique();
     }

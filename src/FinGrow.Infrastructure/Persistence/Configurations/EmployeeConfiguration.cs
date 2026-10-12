@@ -84,6 +84,15 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
             .HasForeignKey(employee => employee.DepartmentId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasMany(employee => employee.DepartmentAssignments)
+            .WithOne()
+            .HasForeignKey(assignment => assignment.EmployeeId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Navigation(employee => employee.DepartmentAssignments)
+            .UsePropertyAccessMode(PropertyAccessMode.Field)
+            .AutoInclude();
+
         builder.HasIndex(employee => employee.Email).IsUnique();
         builder.HasIndex(employee => employee.CompanyId);
         builder.HasIndex(employee => employee.DepartmentId);

@@ -91,6 +91,7 @@ public class MercadoPagoOAuthCallbackTests
                     ["Twilio:AuthToken"] = "unit-test-twilio-auth-token",
                     ["Telegram:BotToken"] = "unit-test-telegram-bot-token",
                     ["Telegram:WebhookSecret"] = "unit-test-telegram-secret",
+                    ["Email:ResendApiKey"] = "re_unit_test_key",
                     ["MercadoPago:ClientId"] = "unit-test-mp-client-id",
                     ["MercadoPago:ClientSecret"] = "unit-test-mp-client-secret",
                     ["MercadoPago:RedirectUri"] = "https://api.test/api/integrations/mercadopago/oauth/callback",
@@ -138,6 +139,22 @@ public class MercadoPagoOAuthCallbackTests
 
         public Task<Employee?> GetByEmailAsync(Email email, CancellationToken cancellationToken) =>
             Task.FromResult(_employee.Email == email ? _employee : null);
+
+        public Task<IReadOnlyDictionary<Guid, int>> CountByDepartmentAsync(Guid companyId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<Employee>> ListByCompanyAsync(Guid companyId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<Employee>> ListByDepartmentAsync(Guid departmentId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<Employee>> ListByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public void Add(Employee employee) => throw new NotSupportedException();
+
+        public void Remove(Employee employee) => throw new NotSupportedException();
     }
 
     private sealed class InMemoryEmployeeIntegrationRepository : IEmployeeIntegrationRepository
