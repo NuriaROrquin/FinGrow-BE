@@ -15,6 +15,7 @@ using FinGrow.Infrastructure.Integrations.ArgentinaDatos;
 using FinGrow.Infrastructure.Integrations.Byma;
 using FinGrow.Infrastructure.Integrations.CoinGecko;
 using FinGrow.Infrastructure.Integrations.DolarApi;
+using FinGrow.Infrastructure.Integrations.Iol;
 using FinGrow.Infrastructure.Integrations.MercadoPago;
 using FinGrow.Infrastructure.Integrations.Telegram;
 using FinGrow.Infrastructure.Integrations.Twilio;
@@ -49,6 +50,7 @@ public static class DependencyInjection
         services.AddTwilio(configuration);
         services.AddTelegram(configuration);
         services.AddMercadoPago(configuration);
+        services.AddIol(configuration);
         services.AddDolarApi(configuration);
         services.AddByma(configuration);
         services.AddArgentinaDatos(configuration);
@@ -211,6 +213,25 @@ public static class DependencyInjection
 
         services.AddHttpClient<IMercadoPagoPaymentsClient, MercadoPagoPaymentsClient>(ConfigureMercadoPagoClient)
             .AddPolicyHandler(GetRetryPolicy());
+
+        return services;
+    }
+
+    // Sin la politica de reintentos: repetir un refresh que IOL ya proceso puede invalidar el refresh token nuevo.
+    private static IServiceCollection AddIol(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<IolOptions>()
+            .Bind(configuration.GetSection(IolOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddHttpClient<IIolAuthClient, IolAuthClient>((provider, client) =>
+        {
+            var options = provider.GetRequiredService<IOptions<IolOptions>>().Value;
+
+            client.BaseAddress = new Uri(options.ApiBaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        });
 
         return services;
     }
