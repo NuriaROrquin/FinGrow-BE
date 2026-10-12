@@ -206,6 +206,9 @@ public class WhatsAppWebhookTests
                     ["MercadoPago:ClientId"] = "unit-test-mp-client-id",
                     ["MercadoPago:ClientSecret"] = "unit-test-mp-client-secret",
                     ["MercadoPago:RedirectUri"] = "https://api.test/api/integrations/mercadopago/oauth/callback",
+                    ["Gmail:ClientId"] = "unit-test-gmail-client-id",
+                    ["Gmail:ClientSecret"] = "unit-test-gmail-client-secret",
+                    ["Gmail:RedirectUri"] = "https://api.test/api/integrations/gmail/oauth/callback",
                     ["TokenEncryption:Key"] = "dW5pdC10ZXN0LXRva2VuLWVuY3J5cHRpb24ta2V5ISE=",
                     ["Jobs:ApiKey"] = "unit-test-jobs-api-key-1234",
                 }));
@@ -331,6 +334,12 @@ public class WhatsAppWebhookTests
                 MessageParsingOutcome.Parsed,
                 new ParsedTransaction(TransactionType.Expense, 500m, defaultCurrency, ExpenseCategory.Alimentos, null, "Supermercado", PaymentMethod.DebitCard, 0.9),
                 "fake-model"));
+
+        public Task<ParsedBillEmail> ParseBillEmailAsync(
+            BillEmail email,
+            Currency defaultCurrency,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
 
         public Task<AudioTranscription> TranscribeAudioAsync(
             ReadOnlyMemory<byte> audio,

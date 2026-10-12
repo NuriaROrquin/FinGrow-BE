@@ -5,6 +5,7 @@ using FinGrow.Application.Features.Integrations.UnlinkIntegration;
 using FinGrow.Application.UnitTests.Fakes;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
+using FinGrow.Domain.ValueObjects;
 using Microsoft.Extensions.Logging.Abstractions;
 
 public class UnlinkIntegrationHandlerTests
@@ -14,6 +15,7 @@ public class UnlinkIntegrationHandlerTests
     private readonly FakeEmployeeIntegrationRepository _integrations = new();
     private readonly FakeUnitOfWork _unitOfWork = new();
     private readonly FakeCurrentUser _currentUser = new();
+    private readonly FakeGmailOAuthClient _gmail = new();
     private readonly Guid _employeeId = Guid.CreateVersion7();
 
     [Fact]
@@ -82,8 +84,55 @@ public class UnlinkIntegrationHandlerTests
         _integrations.Integrations.ShouldHaveSingleItem();
     }
 
+    [Fact]
+    public async Task Unlinking_gmail_revokes_the_refresh_token_in_google()
+    {
+        _currentUser.UserId = _employeeId;
+        _integrations.Integrations.Add(AuthorizedGmail());
+
+        var result = await Handle(IntegrationProvider.Gmail);
+
+        result.IsSuccess.ShouldBeTrue();
+        _gmail.RevokedTokens.ShouldHaveSingleItem().ShouldBe("refresh-token");
+        _integrations.Integrations.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Gmail_is_unlinked_even_if_google_does_not_answer_the_revocation()
+    {
+        _currentUser.UserId = _employeeId;
+        _integrations.Integrations.Add(AuthorizedGmail());
+        _gmail.Unreachable = true;
+
+        var result = await Handle(IntegrationProvider.Gmail);
+
+        result.IsSuccess.ShouldBeTrue();
+        _integrations.Integrations.ShouldBeEmpty();
+        _unitOfWork.SaveCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Unlinking_another_provider_does_not_talk_to_google()
+    {
+        _currentUser.UserId = _employeeId;
+        _integrations.Integrations.Add(
+            EmployeeIntegration.Create(_employeeId, IntegrationProvider.WhatsApp, "+5491161972627", Now));
+
+        await Handle(IntegrationProvider.WhatsApp);
+
+        _gmail.RevokedTokens.ShouldBeEmpty();
+    }
+
+    private EmployeeIntegration AuthorizedGmail()
+    {
+        var gmail = EmployeeIntegration.Create(_employeeId, IntegrationProvider.Gmail, "juan.perez@gmail.com", Now);
+        gmail.Authorize(OAuthGrant.From("access-token", "refresh-token", Now.AddHours(1)), Now);
+
+        return gmail;
+    }
+
     private Task<Result> Handle(IntegrationProvider provider) =>
         new UnlinkIntegrationHandler(
-                _currentUser, _integrations, _unitOfWork, NullLogger<UnlinkIntegrationHandler>.Instance)
+                _currentUser, _integrations, _gmail, _unitOfWork, NullLogger<UnlinkIntegrationHandler>.Instance)
             .Handle(new UnlinkIntegrationCommand(provider), CancellationToken.None);
 }

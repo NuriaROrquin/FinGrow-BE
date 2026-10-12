@@ -6,5 +6,6 @@ public enum NotificationType
     GoalStalled = 2,
     GoalDeadlineApproaching = 3,
     BudgetWarning = 4,
-    BudgetExceeded = 5
+    BudgetExceeded = 5,
+    IntegrationAccessLost = 6
 }

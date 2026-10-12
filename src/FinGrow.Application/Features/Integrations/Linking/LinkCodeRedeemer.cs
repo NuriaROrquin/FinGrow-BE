@@ -11,6 +11,7 @@ internal enum LinkOutcome
 {
     NotACode,
     InvalidCode,
+    AccountTaken,
     Linked
 }
 
@@ -19,6 +20,8 @@ internal sealed record LinkAttempt(LinkOutcome Outcome, Employee? Employee = nul
     public static readonly LinkAttempt NotACode = new(LinkOutcome.NotACode);
 
     public static readonly LinkAttempt InvalidCode = new(LinkOutcome.InvalidCode);
+
+    public static readonly LinkAttempt AccountTaken = new(LinkOutcome.AccountTaken);
 
     public static LinkAttempt Linked(Employee employee) => new(LinkOutcome.Linked, employee);
 }
@@ -92,6 +95,15 @@ internal sealed partial class LinkCodeRedeemer
         if (employee is null || !employee.IsActive)
         {
             return LinkAttempt.InvalidCode;
+        }
+
+        // La cuenta externa identifica a un solo empleado (indice unico): si ya es de otro, guardarla
+        // terminaria en una excepcion de la base. El codigo no se canjea para que pueda reintentar con otra.
+        var owner = await _integrations.FindByExternalAccountAsync(provider, externalAccountId, cancellationToken);
+
+        if (owner is not null && owner.EmployeeId != employee.Id)
+        {
+            return LinkAttempt.AccountTaken;
         }
 
         linkCode.Redeem(now);

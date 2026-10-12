@@ -3,6 +3,7 @@ namespace FinGrow.Domain.Entities;
 using FinGrow.Domain.Common;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.Errors;
+using FinGrow.Domain.Events;
 using FinGrow.Domain.ValueObjects;
 
 public sealed class EmployeeIntegration : AggregateRoot
@@ -102,8 +103,14 @@ public sealed class EmployeeIntegration : AggregateRoot
                 $"El motivo del error no puede superar los {MaxErrorReasonLength} caracteres."),
             _ => trimmed
         };
-        Status = IntegrationStatus.Error;
         UpdatedAt = now;
+
+        // Se avisa al pasar a error, no en cada sincronizacion que lo vuelva a encontrar asi.
+        if (Status != IntegrationStatus.Error)
+        {
+            Status = IntegrationStatus.Error;
+            Raise(new IntegrationAccessLost(Id, EmployeeId, Provider, now));
+        }
     }
 
     public void MarkSynced(DateTimeOffset syncedAt)

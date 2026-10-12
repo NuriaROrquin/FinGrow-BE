@@ -118,6 +118,55 @@ public class IolAccessTokenProviderTests
         result.Error.ShouldBe(IolErrors.NotLinked);
     }
 
+    [Fact]
+    public async Task Keeping_alive_renews_a_bearer_that_is_halfway_through_its_life()
+    {
+        var integration = LinkedIntegration(expiresAt: Now.AddMinutes(8));
+
+        var result = await KeepAlive(integration);
+
+        result.Value.ShouldBeTrue();
+        _iol.Refreshes.ShouldHaveSingleItem().ShouldBe("refresh");
+        integration.Grant!.RefreshToken.ShouldBe("new-refresh");
+        _unitOfWork.SaveCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Keeping_alive_leaves_a_recently_renewed_bearer_alone()
+    {
+        var integration = LinkedIntegration(expiresAt: Now.AddMinutes(12));
+
+        var result = await KeepAlive(integration);
+
+        result.Value.ShouldBeFalse();
+        _iol.Refreshes.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Keeping_alive_a_revoked_authorization_leaves_it_in_error()
+    {
+        var integration = LinkedIntegration(expiresAt: Now.AddMinutes(5));
+        _iol.Failure = new HttpRequestException("invalid_grant", null, HttpStatusCode.BadRequest);
+
+        var result = await KeepAlive(integration);
+
+        result.Error.ShouldBe(IolErrors.GrantExpired);
+        integration.Status.ShouldBe(IntegrationStatus.Error);
+    }
+
+    [Fact]
+    public async Task Keeping_alive_during_an_outage_keeps_the_integration_active_to_retry_on_the_next_run()
+    {
+        var integration = LinkedIntegration(expiresAt: Now.AddMinutes(5));
+        _iol.Failure = new HttpRequestException("bad gateway", null, HttpStatusCode.BadGateway);
+
+        var result = await KeepAlive(integration);
+
+        result.IsSuccess.ShouldBeTrue();
+        integration.Status.ShouldBe(IntegrationStatus.Active);
+        integration.Grant!.RefreshToken.ShouldBe("refresh");
+    }
+
     private static EmployeeIntegration LinkedIntegration(DateTimeOffset expiresAt)
     {
         var integration = EmployeeIntegration.Create(Guid.CreateVersion7(), IntegrationProvider.Iol, "juan.perez", Now.AddDays(-1));
@@ -125,6 +174,10 @@ public class IolAccessTokenProviderTests
 
         return integration;
     }
+
+    private Task<Result<bool>> KeepAlive(EmployeeIntegration integration) =>
+        new IolAccessTokenProvider(_iol, _unitOfWork, _clock, NullLogger<IolAccessTokenProvider>.Instance)
+            .KeepAliveAsync(integration, CancellationToken.None);
 
     private Task<Result<string>> GetAccessToken(EmployeeIntegration integration) =>
         new IolAccessTokenProvider(_iol, _unitOfWork, _clock, NullLogger<IolAccessTokenProvider>.Instance)

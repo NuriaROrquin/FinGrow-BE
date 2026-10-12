@@ -147,6 +147,26 @@ ya procesó puede invalidar el refresh token nuevo. Quien llame a IOL pide el be
 en `IntegrationStatus.Error` con `ErrorReason`. `ListAuthorizedAsync` excluye las integraciones
 en error, así que un trabajo de sincronización no las vuelve a intentar.
 
+**El refresh token de IOL vence a los 20 minutos de emitido**, y vencido no se recupera sin la
+contraseña. Lo mantiene vivo `iol-token-refresh` (cada 5 minutos, todo el día, con
+`IolAccessTokenProvider.KeepAliveAsync`): no lo pases a horario de mercado ni le alargues el
+intervalo más allá del margen de `KeepAliveWindow`. El bearer dura 15 minutos aunque `expires_in`
+diga 1200: la duración sale de `.issued` y `.expires`.
+
+**El portafolio de IOL entra como inversiones (T-35)** por `IolSynchronizer`
+(`Integrations/Iol/Sync`), que corre en el trabajo `iol-sync` y en `POST /api/integrations/iol/sync`.
+Una inversión importada tiene `Source = Iol` y `ExternalReference` (mercado + símbolo, único por
+empleado): eso es lo que evita duplicarla, no el símbolo, así que una manual con el mismo símbolo
+convive con la importada. Tres cosas a propósito:
+
+- **Las importadas no las cotiza `investment-quotes`**: el precio lo pone IOL. Los métodos
+  "tracked" de `IInvestmentRepository` filtran `Source == Manual`; si agregás otro origen, decidí
+  quién lo valúa.
+- **Una posición que deja de venir no se borra ni se valúa**: conserva su última valuación. No
+  "limpies" las importadas que IOL ya no informa.
+- **Los dos portafolios se piden antes de tocar nada**: si IOL falla con uno, la corrida no guarda
+  una foto a medias. Las operaciones (para la fecha de compra) sí pueden fallar: se usa el día de hoy.
+
 ## Aislamiento de datos (T-10)
 
 **Entre empresas, lo garantiza la base de datos de EF**: `FinGrowDbContext.Tenancy.cs` registra un

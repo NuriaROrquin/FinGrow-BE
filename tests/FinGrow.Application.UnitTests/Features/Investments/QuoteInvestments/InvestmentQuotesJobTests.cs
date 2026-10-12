@@ -172,6 +172,24 @@ public class InvestmentQuotesJobTests
     }
 
     [Fact]
+    public async Task Investments_imported_from_iol_are_valued_by_iol_and_not_by_the_closing_prices()
+    {
+        var tracked = Tracked("YPF", InvestmentType.Stock, 90000m, Currency.ARS, "YPFD", 10m);
+        var imported = Investment.Import(
+            tracked.EmployeeId, InvestmentSource.Iol, "bcba:YPFD", "YPFD - YPF", InvestmentType.Stock, "YPFD", 10m,
+            Money.From(90000m, Currency.ARS), Today.AddDays(-30), Money.From(80000m, Currency.ARS), Today.AddDays(-1), Now.AddDays(-1));
+        _investments.Add(imported);
+        _prices.Prices.Add(new MarketPrice("YPFD", Currency.ARS, 8305m));
+
+        var result = await Job().ExecuteAsync(CancellationToken.None);
+
+        result.Summary!.ShouldContain("1 inversion(es) cotizada(s)");
+        tracked.CurrentValue.ShouldBe(Money.From(83050m, Currency.ARS));
+        imported.Valuations.ShouldHaveSingleItem();
+        imported.CurrentValue.ShouldBe(Money.From(80000m, Currency.ARS));
+    }
+
+    [Fact]
     public async Task Funds_and_cryptos_are_valued_with_the_price_of_their_own_source()
     {
         var fund = Tracked("Money market", InvestmentType.MutualFund, 100000m, Currency.ARS, "1810 ahorro", 500m);

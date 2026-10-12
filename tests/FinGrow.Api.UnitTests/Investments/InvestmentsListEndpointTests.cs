@@ -78,6 +78,27 @@ public class InvestmentsListEndpointTests
         body.GetProperty("totalPages").GetInt32().ShouldBe(1);
     }
 
+    [Fact]
+    public async Task Each_investment_says_where_it_came_from()
+    {
+        using var factory = new InvestmentsWebApplicationFactory();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        factory.Investments.Investments.Add(Investment.Create(
+            EmployeeId, "Galicia", InvestmentType.Stock, Money.From(20_000m, Currency.ARS), new DateOnly(2026, 9, 1), DateTimeOffset.UtcNow));
+        factory.Investments.Investments.Add(Investment.Import(
+            EmployeeId, InvestmentSource.Iol, "bcba:GGAL", "GGAL - Grupo Financiero Galicia", InvestmentType.Stock, "GGAL", 10m,
+            Money.From(50_000m, Currency.ARS), today, Money.From(56_000m, Currency.ARS), today, DateTimeOffset.UtcNow));
+
+        var response = await AuthenticatedClient(factory).GetAsync(new Uri("/api/investments", UriKind.Relative));
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var sources = body.GetProperty("items").EnumerateArray()
+            .Select(item => item.GetProperty("source").GetString())
+            .ToList();
+        sources.ShouldContain("Manual");
+        sources.ShouldContain("Iol");
+    }
+
     [Theory]
     [InlineData("types=Inmueble")]
     [InlineData("purchasedFrom=2026-09-30&purchasedTo=2026-01-01")]
@@ -156,6 +177,9 @@ public class InvestmentsListEndpointTests
                     ["MercadoPago:ClientId"] = "unit-test-mp-client-id",
                     ["MercadoPago:ClientSecret"] = "unit-test-mp-client-secret",
                     ["MercadoPago:RedirectUri"] = "https://api.test/api/integrations/mercadopago/oauth/callback",
+                    ["Gmail:ClientId"] = "unit-test-gmail-client-id",
+                    ["Gmail:ClientSecret"] = "unit-test-gmail-client-secret",
+                    ["Gmail:RedirectUri"] = "https://api.test/api/integrations/gmail/oauth/callback",
                     ["TokenEncryption:Key"] = "dW5pdC10ZXN0LXRva2VuLWVuY3J5cHRpb24ta2V5ISE=",
                     ["Jobs:ApiKey"] = "unit-test-jobs-api-key-1234",
                 }));

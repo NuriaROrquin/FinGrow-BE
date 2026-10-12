@@ -3,6 +3,7 @@ namespace FinGrow.Domain.UnitTests.Entities;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.Errors;
+using FinGrow.Domain.Events;
 using FinGrow.Domain.ValueObjects;
 
 public class EmployeeIntegrationTests
@@ -56,6 +57,49 @@ public class EmployeeIntegrationTests
 
         integration.Grant.ShouldBe(grant);
         integration.UpdatedAt.ShouldBe(Now.AddMinutes(1));
+    }
+
+    [Fact]
+    public void A_new_integration_starts_active()
+    {
+        var integration = EmployeeIntegration.Create(EmployeeId, IntegrationProvider.Gmail, "juan.perez@gmail.com", Now);
+
+        integration.Status.ShouldBe(IntegrationStatus.Active);
+    }
+
+    [Fact]
+    public void A_failed_integration_becomes_active_again_when_reauthorized()
+    {
+        var integration = EmployeeIntegration.Create(EmployeeId, IntegrationProvider.Gmail, "juan.perez@gmail.com", Now);
+        integration.MarkFailed("Sin acceso", Now.AddDays(1));
+
+        integration.Status.ShouldBe(IntegrationStatus.Error);
+        integration.UpdatedAt.ShouldBe(Now.AddDays(1));
+
+        integration.Authorize(OAuthGrant.From("access", "refresh", Now.AddDays(2)), Now.AddDays(2));
+
+        integration.Status.ShouldBe(IntegrationStatus.Active);
+    }
+
+    [Fact]
+    public void Losing_access_is_announced_once_until_the_employee_reauthorizes()
+    {
+        var integration = EmployeeIntegration.Create(EmployeeId, IntegrationProvider.Gmail, "juan.perez@gmail.com", Now);
+        integration.DequeueDomainEvents();
+
+        integration.MarkFailed("Sin acceso", Now.AddDays(1));
+        integration.MarkFailed("Sin acceso", Now.AddDays(2));
+
+        var lost = integration.DequeueDomainEvents().ShouldHaveSingleItem().ShouldBeOfType<IntegrationAccessLost>();
+        lost.IntegrationId.ShouldBe(integration.Id);
+        lost.EmployeeId.ShouldBe(EmployeeId);
+        lost.Provider.ShouldBe(IntegrationProvider.Gmail);
+        lost.OccurredAt.ShouldBe(Now.AddDays(1));
+
+        integration.Authorize(OAuthGrant.From("access", "refresh", Now.AddDays(3)), Now.AddDays(3));
+        integration.MarkFailed("Sin acceso", Now.AddDays(4));
+
+        integration.DequeueDomainEvents().ShouldHaveSingleItem().ShouldBeOfType<IntegrationAccessLost>();
     }
 
     [Fact]
