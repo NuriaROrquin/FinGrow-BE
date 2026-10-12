@@ -10,6 +10,9 @@ internal static class ChatTransactionText
     public const string MissingAmountReply =
         "No encontré el monto. ¿Me lo mandás de nuevo con el importe? Por ejemplo: Gasté $500 en el súper.";
 
+    public const string TooLongReply =
+        "Es demasiado largo para mí. Mandame un movimiento por mensaje, corto. Por ejemplo: Gasté $500 en el súper.";
+
     public const string MultipleTransactionsReply =
         "Mandame un movimiento por mensaje así no se mezclan. Por ejemplo: Gasté $500 en el súper.";
 

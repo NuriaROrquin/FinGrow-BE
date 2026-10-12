@@ -117,6 +117,9 @@ internal sealed partial class ReceiveTelegramMessageHandler : IRequestHandler<Re
                 break;
             case ProposalOutcome.AlreadyProposed:
                 break;
+            case ProposalOutcome.TooLong:
+                await ReplyAsync(request.ChatId, ChatTransactionText.TooLongReply, cancellationToken);
+                break;
             case ProposalOutcome.MissingAmount:
                 await ReplyAsync(request.ChatId, ChatTransactionText.MissingAmountReply, cancellationToken);
                 break;

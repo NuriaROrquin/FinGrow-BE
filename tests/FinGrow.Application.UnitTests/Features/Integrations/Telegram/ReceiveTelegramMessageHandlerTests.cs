@@ -246,6 +246,19 @@ public class ReceiveTelegramMessageHandlerTests
     }
 
     [Fact]
+    public async Task A_message_longer_than_the_AI_accepts_is_answered_without_calling_the_AI()
+    {
+        LinkChat();
+
+        var result = await Handle(new string('a', ChatTransactionProposer.MaxTextLength + 1));
+
+        result.IsSuccess.ShouldBeTrue();
+        _bot.Sent.ShouldHaveSingleItem().Text.ShouldBe(ChatTransactionText.TooLongReply);
+        _ai.ParsedMessages.ShouldBeEmpty();
+        _transactions.Transactions.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task When_the_AI_is_down_the_employee_is_told_to_try_again_and_nothing_is_registered()
     {
         LinkChat();
