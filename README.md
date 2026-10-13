@@ -417,6 +417,7 @@ siguiente.
 | `receipts-cleanup` | `0 7 * * *` (todos los días, 04:00 de Argentina) | Borra los comprobantes sueltos (sin movimiento) subidos hace más de `ReceiptsCleanup:GraceDays` días (default 7): primero el archivo de R2 y después la fila de `transaction_receipts`. Si R2 falla para uno, sigue con el resto, la corrida queda fallida con el motivo y ese comprobante se reintenta en la siguiente. Nunca toca un comprobante asociado a un movimiento |
 | `goal-progress-alerts` | `0 12 * * *` (todos los días, 09:00 de Argentina) | Recorre las metas activas y avisa al empleado cuando una lleva 30 días sin aportes (`GoalStalled`, como máximo uno cada 30 días mientras siga quieta) o cuando se acerca su fecha límite con saldo pendiente (`GoalDeadlineApproaching`, una vez a los 30, a los 7 y a 1 día, con cuánto falta y cuántos días quedan). Si la fecha límite está cerca solo manda esa, que ya dice lo mismo. Correrlo de nuevo el mismo día no repite avisos |
 | `email-delivery` | `*/5 * * * *` (cada 5 minutos) | Reintenta los correos de `outbound_emails` que no salieron en el momento (`Failed`, o `Pending` que su primer intento dejó colgado hace más de un minuto), hasta 50 por corrida. Cada fallo espera más para el siguiente intento (5 min, 15 min, 1 h, 4 h) y al quinto el correo queda `Abandoned`. Si alguno no sale, la corrida queda fallida con el motivo de cada uno |
+| `achievements-evaluation` | `0 9 * * *` (todos los días, 06:00 de Argentina) | Otorga los logros de mes cerrado (`ConsistentThreeMonths`, `BudgetKept`, `Saver`) del último mes cerrado y avisa al empleado. Además es la red de seguridad de los logros instantáneos: la primera corrida exitosa otorga los que ya se cumplían antes de que existieran los logros (el front los celebra juntos), y las siguientes registran sin celebrar los que no se pudieron otorgar en el momento. Corre todos los días aunque el mes no cambie: un movimiento confirmado tarde puede completar el mes cerrado. Si falta el dólar MEP para medir el ahorro de alguien con movimientos en dólares, la corrida queda fallida y la siguiente lo reintenta (ver *Logros*) |
 
 Los endpoints viven bajo `/api/jobs` y se protegen con la cabecera `X-Jobs-Key`, que tiene que
 coincidir con `Jobs:ApiKey`. No usan JWT: los llama un cron, no una persona logueada.
@@ -497,6 +498,53 @@ Las fotos guardan `employees_with_score` y `financial_health_score_sum`; el prom
 (`PeriodMetrics.AverageFinancialHealthScore`) y el umbral mínimo de anonimización de T-11 se
 aplica al mostrarlo. La fórmula vive en `FinancialHealthFactors` (`Domain/ValueObjects/`): pesos
 y umbrales son constantes de esa clase.
+
+### Logros
+
+El catálogo (`achievements`) es fijo: lo define `AchievementCatalog` (`Domain/Entities/`) y lo
+carga la migración. Nadie lo edita desde la aplicación; cambiar un texto o sumar un logro es
+cambiar el catálogo y generar la migración. Cada logro tiene su condición de otorgamiento escrita
+(`condition`) y se otorga una sola vez por empleado (`employee_achievements`, índice único por
+empleado y código). **Un logro no se revoca**, aunque después se borre lo que lo originó.
+
+| Código | Logro | Se otorga | Celebración |
+|---|---|---|---|
+| `FirstTransaction` | Primer paso | Al confirmar el primer movimiento | Toast |
+| `ReceiptScanned` | Sin papeles | Al confirmar un movimiento que entró por foto del comprobante | Toast |
+| `ChannelLinked` | Conectado | Al vincular la primera integración | Toast |
+| `FirstBudget` | Con plan | Al poner el primer tope por categoría | Toast |
+| `FirstGoal` | Con objetivo | Al crear la primera meta | Toast |
+| `GoalAchieved` | Meta cumplida | Al alcanzar una meta | Central |
+| `ThreeGoalsAchieved` | Imparable | Al alcanzar la tercera meta | Central |
+| `FirstInvestment` | Inversor | Al registrar o importar la primera inversión | Toast |
+| `FirstCourse` | Aprendiz | Al completar todas las lecciones de un curso | Toast |
+| `ConsistentThreeMonths` | Constancia | Tres meses cerrados seguidos con actividad suficiente | Central |
+| `BudgetKept` | Dentro del plan | Un mes cerrado con actividad suficiente sin ninguna categoría por encima del tope | Central |
+| `Saver` | Ahorrador | Un mes cerrado con actividad suficiente ahorrando el 10 % o más de los ingresos | Central |
+
+"Actividad suficiente" es el mismo umbral del puntaje de salud financiera: 10 movimientos
+confirmados y algún ingreso en el mes. Ningún logro usa un monto fijo, porque un umbral en pesos
+queda viejo con la inflación y no se puede comparar entre monedas.
+
+**Cómo se otorgan.** Los instantáneos los otorga `UnlockInstantAchievementsHandler` al escuchar los
+eventos de dominio (`TransactionConfirmed`, `GoalCreated`, `GoalAchieved`, `BudgetLimitSet`,
+`IntegrationLinked`, `InvestmentAdded`, `LessonCompleted`); el evento solo dice qué logros pudo
+destrabar, y si se cumplen lo decide lo que hay en la base. Los de mes cerrado los otorga
+`achievements-evaluation`. En los dos casos se levanta `AchievementUnlocked`, que manda la
+notificación `AchievementUnlocked` (bandeja, tiempo real y Telegram).
+
+**Cómo los celebra el front.** La notificación es solo la señal: el front pide
+`GET /api/achievements/uncelebrated`, muestra lo que haya (un logro chico como toast, uno
+importante en el centro, varios juntos en un solo toast con todas sus medallas) y después
+confirma con `POST /api/achievements/celebrate` qué códigos mostró. Lo mismo hace al abrir la app,
+así que un logro ganado desde Telegram o WhatsApp se celebra la próxima vez que el empleado entra.
+La empresa no ve logros, ni siquiera agregados.
+
+| Método y ruta | Quién | Qué hace |
+|---|---|---|
+| `GET /api/achievements` | Empleado | El catálogo completo, con `achievedAt` en los que ya ganó (null en el resto). `code` es lo que elige la medalla |
+| `GET /api/achievements/uncelebrated` | Empleado | Los ganados que el front todavía no celebró, del más viejo al más nuevo |
+| `POST /api/achievements/celebrate` | Empleado | Marca como celebrados los códigos indicados: `{ "codes": ["FirstGoal"] }`. Ignora los que ya estaban celebrados o no son del empleado |
 
 ### Alertas y notificaciones
 
