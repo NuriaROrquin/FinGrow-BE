@@ -109,16 +109,6 @@ public sealed class Budget : AggregateRoot
         UpdatedAt = updatedAt;
     }
 
-    public void ChangeCurrency(Currency currency, DateTimeOffset updatedAt)
-    {
-        foreach (var limit in _limits)
-        {
-            limit.Change(Money.From(limit.Limit.Amount, currency), updatedAt);
-        }
-
-        UpdatedAt = updatedAt;
-    }
-
     public BudgetHealth Evaluate(ExpenseCategory category, Money spent)
     {
         ArgumentNullException.ThrowIfNull(spent);
