@@ -1,6 +1,7 @@
 namespace FinGrow.Infrastructure.Persistence.Repositories;
 
 using FinGrow.Domain.Entities;
+using FinGrow.Domain.Enums;
 using FinGrow.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,6 +15,9 @@ internal sealed class JobRunRepository : IJobRunRepository
 
     public Task<JobRun?> FindLastAsync(string jobName, CancellationToken cancellationToken = default) =>
         MostRecentFirst(jobName).FirstOrDefaultAsync(cancellationToken);
+
+    public Task<bool> HasSucceededAsync(string jobName, CancellationToken cancellationToken = default) =>
+        _dbContext.JobRuns.AnyAsync(run => run.JobName == jobName && run.Status == JobRunStatus.Succeeded, cancellationToken);
 
     public async Task<IReadOnlyList<JobRun>> ListRecentAsync(string jobName, int take, CancellationToken cancellationToken = default) =>
         await MostRecentFirst(jobName).Take(take).ToListAsync(cancellationToken);

@@ -10,8 +10,8 @@ public sealed partial class FinGrowDbContext
     public const string TenantFilter = "Tenant";
 
     /// <summary>
-    /// Entidades que no pertenecen a ninguna empresa (catálogo educativo, cotizaciones, corridas de
-    /// trabajos). Toda entidad nueva tiene que aplicar el filtro de empresa o figurar acá a propósito:
+    /// Entidades que no pertenecen a ninguna empresa (catálogos educativo y de logros, cotizaciones,
+    /// corridas de trabajos). Toda entidad nueva tiene que aplicar el filtro de empresa o figurar acá a propósito:
     /// un test rompe el build si no hace ninguna de las dos cosas.
     /// </summary>
     public static IReadOnlySet<Type> GlobalEntityTypes { get; } = new HashSet<Type>
@@ -22,6 +22,7 @@ public sealed partial class FinGrowDbContext
         typeof(SecurityPrice),
         typeof(JobRun),
         typeof(OutboundEmail),
+        typeof(Achievement),
     };
 
     // Sin sesion (webhooks, trabajos programados, login, seeders) no hay empresa a la que acotar.
@@ -87,6 +88,9 @@ public sealed partial class FinGrowDbContext
 
         modelBuilder.Entity<FinancialHealthScore>().HasQueryFilter(
             TenantFilter, score => IsUnscoped || Employees.Any(employee => employee.Id == score.EmployeeId));
+
+        modelBuilder.Entity<EmployeeAchievement>().HasQueryFilter(
+            TenantFilter, achievement => IsUnscoped || Employees.Any(employee => employee.Id == achievement.EmployeeId));
 
         // El destinatario es polimórfico y no tiene FK, así que se resuelve según su tipo.
         modelBuilder.Entity<Notification>().HasQueryFilter(

@@ -22,6 +22,157 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("FinGrow.Domain.Entities.Achievement", b =>
+                {
+                    b.Property<string>("Code")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("code");
+
+                    b.Property<string>("Condition")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("condition");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Evaluation")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("evaluation");
+
+                    b.Property<bool>("IsMajor")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_major");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Code")
+                        .HasName("pk_achievements");
+
+                    b.ToTable("achievements", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Code = "FirstTransaction",
+                            Condition = "Tiene al menos un movimiento confirmado, cargado a mano o por cualquier integración.",
+                            Description = "Confirmaste tu primer movimiento.",
+                            Evaluation = "Instant",
+                            IsMajor = false,
+                            Name = "Primer paso"
+                        },
+                        new
+                        {
+                            Code = "ReceiptScanned",
+                            Condition = "Tiene al menos un movimiento confirmado que entró por la lectura de un comprobante.",
+                            Description = "Registraste un movimiento sacándole una foto al comprobante.",
+                            Evaluation = "Instant",
+                            IsMajor = false,
+                            Name = "Sin papeles"
+                        },
+                        new
+                        {
+                            Code = "ChannelLinked",
+                            Condition = "Vinculó al menos una integración: Gmail, Mercado Pago, Telegram, WhatsApp o InvertirOnline.",
+                            Description = "Vinculaste tu primera integración.",
+                            Evaluation = "Instant",
+                            IsMajor = false,
+                            Name = "Conectado"
+                        },
+                        new
+                        {
+                            Code = "FirstBudget",
+                            Condition = "Tiene al menos un presupuesto con un tope por categoría.",
+                            Description = "Armaste tu primer presupuesto.",
+                            Evaluation = "Instant",
+                            IsMajor = false,
+                            Name = "Con plan"
+                        },
+                        new
+                        {
+                            Code = "FirstGoal",
+                            Condition = "Creó al menos una meta de ahorro.",
+                            Description = "Creaste tu primera meta de ahorro.",
+                            Evaluation = "Instant",
+                            IsMajor = false,
+                            Name = "Con objetivo"
+                        },
+                        new
+                        {
+                            Code = "GoalAchieved",
+                            Condition = "Tiene al menos una meta alcanzada.",
+                            Description = "Llegaste al objetivo de una meta de ahorro.",
+                            Evaluation = "Instant",
+                            IsMajor = true,
+                            Name = "Meta cumplida"
+                        },
+                        new
+                        {
+                            Code = "ThreeGoalsAchieved",
+                            Condition = "Tiene al menos 3 metas alcanzadas.",
+                            Description = "Cumpliste tres metas de ahorro.",
+                            Evaluation = "Instant",
+                            IsMajor = true,
+                            Name = "Imparable"
+                        },
+                        new
+                        {
+                            Code = "FirstInvestment",
+                            Condition = "Tiene al menos una inversión, cargada a mano o importada de InvertirOnline.",
+                            Description = "Registraste tu primera inversión.",
+                            Evaluation = "Instant",
+                            IsMajor = false,
+                            Name = "Inversor"
+                        },
+                        new
+                        {
+                            Code = "FirstCourse",
+                            Condition = "Completó todas las lecciones de al menos un curso publicado.",
+                            Description = "Terminaste tu primer curso.",
+                            Evaluation = "Instant",
+                            IsMajor = false,
+                            Name = "Aprendiz"
+                        },
+                        new
+                        {
+                            Code = "ConsistentThreeMonths",
+                            Condition = "Cerró 3 meses consecutivos con actividad suficiente: al menos 10 movimientos confirmados y algún ingreso en cada uno.",
+                            Description = "Registraste tus finanzas tres meses seguidos.",
+                            Evaluation = "MonthlyClose",
+                            IsMajor = true,
+                            Name = "Constancia"
+                        },
+                        new
+                        {
+                            Code = "BudgetKept",
+                            Condition = "Cerró un mes con actividad suficiente y con presupuesto mensual, sin ninguna categoría por encima de su tope.",
+                            Description = "Cerraste un mes sin pasarte de ningún tope de tu presupuesto.",
+                            Evaluation = "MonthlyClose",
+                            IsMajor = true,
+                            Name = "Dentro del plan"
+                        },
+                        new
+                        {
+                            Code = "Saver",
+                            Condition = "Cerró un mes con actividad suficiente en el que lo que no gastó fue al menos el 10% de sus ingresos. Lo destinado a ahorro_inversion cuenta como ahorro, igual que en el puntaje de salud financiera.",
+                            Description = "Ahorraste al menos el 10% de tus ingresos en un mes.",
+                            Evaluation = "MonthlyClose",
+                            IsMajor = true,
+                            Name = "Ahorrador"
+                        });
+                });
+
             modelBuilder.Entity("FinGrow.Domain.Entities.Article", b =>
                 {
                     b.Property<Guid>("Id")
@@ -622,6 +773,52 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_employees_email");
 
                     b.ToTable("employees", (string)null);
+                });
+
+            modelBuilder.Entity("FinGrow.Domain.Entities.EmployeeAchievement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AchievedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("achieved_at");
+
+                    b.Property<DateTimeOffset?>("CelebratedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("celebrated_at");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("employee_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_employee_achievements");
+
+                    b.HasIndex("Code")
+                        .HasDatabaseName("ix_employee_achievements_code");
+
+                    b.HasIndex("EmployeeId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_employee_achievements_employee_id_code");
+
+                    b.ToTable("employee_achievements", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_employee_achievements_achieved_before_recorded", "achieved_at <= created_at");
+
+                            t.HasCheckConstraint("ck_employee_achievements_celebrated_after_recorded", "celebrated_at IS NULL OR celebrated_at >= created_at");
+                        });
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.EmployeeDepartmentAssignment", b =>
@@ -1531,7 +1728,7 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_transactions_amount_positive", "amount > 0");
 
-                            t.HasCheckConstraint("ck_transactions_category_matches_type", "(type = 'Expense' AND expense_category IS NOT NULL AND income_category IS NULL)\r\nOR (type = 'Income' AND income_category IS NOT NULL AND expense_category IS NULL)");
+                            t.HasCheckConstraint("ck_transactions_category_matches_type", "(type = 'Expense' AND expense_category IS NOT NULL AND income_category IS NULL)\nOR (type = 'Income' AND income_category IS NOT NULL AND expense_category IS NULL)");
                         });
                 });
 
@@ -1836,6 +2033,23 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                     b.Navigation("Company");
 
                     b.Navigation("Department");
+                });
+
+            modelBuilder.Entity("FinGrow.Domain.Entities.EmployeeAchievement", b =>
+                {
+                    b.HasOne("FinGrow.Domain.Entities.Achievement", null)
+                        .WithMany()
+                        .HasForeignKey("Code")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_employee_achievements_achievements_code");
+
+                    b.HasOne("FinGrow.Domain.Entities.Employee", null)
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_employee_achievements_employees_employee_id");
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.EmployeeDepartmentAssignment", b =>
