@@ -1,9 +1,11 @@
 namespace FinGrow.Application.Features.Metrics.GetDepartmentMetrics;
 
 using FinGrow.Domain.Entities;
+using FinGrow.Domain.ValueObjects;
 
 public sealed record DepartmentMetricsResponse(
     DateOnly Period,
+    int FiscalYear,
     int ActiveEmployees,
     decimal? ParticipationRate,
     int ConfirmedTransactions,
@@ -13,9 +15,12 @@ public sealed record DepartmentMetricsResponse(
     int EmployeesWithIntegration,
     decimal? AverageFinancialHealthScore)
 {
-    public static DepartmentMetricsResponse FromSnapshot(DepartmentMetricsSnapshot snapshot) =>
+    public static DepartmentMetricsResponse FromSnapshot(
+        DepartmentMetricsSnapshot snapshot,
+        int fiscalYearStartMonth) =>
         new(
             snapshot.PeriodStart,
+            FinGrow.Domain.ValueObjects.FiscalYear.From(snapshot.PeriodStart, fiscalYearStartMonth).StartYear,
             snapshot.Metrics.ActiveEmployees,
             snapshot.Metrics.ParticipationRate,
             snapshot.Metrics.ConfirmedTransactions,
@@ -25,4 +30,3 @@ public sealed record DepartmentMetricsResponse(
             snapshot.Metrics.EmployeesWithIntegration,
             snapshot.Metrics.AverageFinancialHealthScore);
 }
-

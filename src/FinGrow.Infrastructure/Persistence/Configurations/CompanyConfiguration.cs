@@ -56,6 +56,19 @@ internal sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
             .HasMaxLength(3)
             .IsRequired();
 
+        builder.Property(company => company.Theme)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
+        builder.Property(company => company.Language)
+            .HasConversion<string>()
+            .HasMaxLength(5)
+            .IsRequired();
+
+        builder.Property(company => company.FiscalYearStartMonth)
+            .IsRequired();
+
         builder.Property(company => company.IsActive).IsRequired();
         builder.Property(company => company.CreatedAt).IsRequired();
         builder.Property(company => company.UpdatedAt).IsRequired();

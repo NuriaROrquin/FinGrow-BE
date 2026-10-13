@@ -3,10 +3,12 @@ namespace FinGrow.Application.Features.Metrics.GetCompanyMetrics;
 using FinGrow.Application.Common;
 using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Repositories;
+using FinGrow.Domain.ValueObjects;
 using MediatR;
 
 internal sealed class GetCompanyMetricsQueryHandler(
     ICurrentUser currentUser,
+    ICompanyRepository companies,
     IMetricsSnapshotRepository snapshots,
     MetricsAnonymizationPolicy anonymizationPolicy)
     : IRequestHandler<GetCompanyMetricsQuery, Result<IReadOnlyList<CompanyMetricsResponse>>>
@@ -21,6 +23,12 @@ internal sealed class GetCompanyMetricsQueryHandler(
                 Error.Forbidden("Metrics.Unauthenticated", "Solo una empresa puede consultar sus metricas."));
         }
 
+        if (await companies.GetByIdAsync(companyId, cancellationToken) is not { } company)
+        {
+            return Result.Failure<IReadOnlyList<CompanyMetricsResponse>>(
+                Error.NotFound("Metrics.CompanyNotFound", "No existe la empresa solicitada."));
+        }
+
         var companySnapshots = await snapshots.ListCompanyAsync(
             companyId, request.FromDate, request.ToDate, cancellationToken);
 
@@ -31,6 +39,8 @@ internal sealed class GetCompanyMetricsQueryHandler(
         }
 
         return Result.Success<IReadOnlyList<CompanyMetricsResponse>>(
-            companySnapshots.Select(CompanyMetricsResponse.FromSnapshot).ToList());
+            companySnapshots
+                .Select(snapshot => CompanyMetricsResponse.FromSnapshot(snapshot, company.FiscalYearStartMonth))
+                .ToList());
     }
 }

@@ -37,6 +37,9 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
         Email = email;
         PasswordHash = passwordHash;
         DefaultCurrency = defaultCurrency;
+        Theme = Theme.Light;
+        Language = Language.es;
+        FiscalYearStartMonth = 1;
         IsActive = true;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
@@ -60,6 +63,12 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
     public string PasswordHash { get; private set; } = string.Empty;
 
     public Currency DefaultCurrency { get; private set; }
+
+    public Theme Theme { get; private set; }
+
+    public Language Language { get; private set; }
+
+    public int FiscalYearStartMonth { get; private set; }
 
     public bool IsActive { get; private set; }
 
@@ -167,6 +176,26 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
         Name = EnsureValidName(name);
         Email = email;
         DefaultCurrency = defaultCurrency;
+        UpdatedAt = updatedAt;
+    }
+
+    public void UpdatePreferences(
+        Theme theme,
+        Language language,
+        Currency currency,
+        int fiscalYearStartMonth,
+        DateTimeOffset updatedAt)
+    {
+        Theme = EnsureDefined(theme, "El tema");
+        Language = EnsureDefined(language, "El idioma");
+        DefaultCurrency = EnsureDefined(currency, "La moneda");
+
+        if (fiscalYearStartMonth is < 1 or > 12)
+        {
+            throw new DomainException("El mes de inicio del año fiscal tiene que estar entre 1 y 12.");
+        }
+
+        FiscalYearStartMonth = fiscalYearStartMonth;
         UpdatedAt = updatedAt;
     }
 
@@ -282,6 +311,12 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
         string.IsNullOrWhiteSpace(passwordHash)
             ? throw new DomainException("La contrasena es obligatoria.")
             : passwordHash;
+
+    private static TEnum EnsureDefined<TEnum>(TEnum value, string fieldName)
+        where TEnum : struct, Enum =>
+        Enum.IsDefined(value)
+            ? value
+            : throw new DomainException($"{fieldName} no es valido.");
 
     private static string? EnsureOptionalText(string? value, int maxLength, string fieldName)
     {
