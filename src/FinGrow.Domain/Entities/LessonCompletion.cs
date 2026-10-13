@@ -1,6 +1,7 @@
 namespace FinGrow.Domain.Entities;
 
 using FinGrow.Domain.Common;
+using FinGrow.Domain.Events;
 
 public sealed class LessonCompletion : AggregateRoot
 {
@@ -14,6 +15,8 @@ public sealed class LessonCompletion : AggregateRoot
         EmployeeId = employeeId;
         LessonId = lessonId;
         CompletedAt = completedAt;
+
+        Raise(new LessonCompleted(employeeId, lessonId, completedAt));
     }
 
     public Guid EmployeeId { get; private set; }

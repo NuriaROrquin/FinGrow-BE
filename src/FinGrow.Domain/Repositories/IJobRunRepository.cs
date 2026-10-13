@@ -8,5 +8,7 @@ public interface IJobRunRepository
 
     Task<JobRun?> FindLastAsync(string jobName, CancellationToken cancellationToken = default);
 
+    Task<bool> HasSucceededAsync(string jobName, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<JobRun>> ListRecentAsync(string jobName, int take, CancellationToken cancellationToken = default);
 }

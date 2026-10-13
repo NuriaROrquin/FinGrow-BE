@@ -3,6 +3,7 @@ namespace FinGrow.Domain.Entities;
 using FinGrow.Domain.Common;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.Errors;
+using FinGrow.Domain.Events;
 using FinGrow.Domain.ValueObjects;
 
 /// <summary>
@@ -34,6 +35,8 @@ public sealed class Goal : AggregateRoot
         Status = GoalStatus.Active;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
+
+        Raise(new GoalCreated(id, employeeId, createdAt));
     }
 
     public Guid EmployeeId { get; private set; }
@@ -272,6 +275,11 @@ public sealed class Goal : AggregateRoot
     {
         if (CurrentAmount.IsAtLeast(TargetAmount))
         {
+            if (Status != GoalStatus.Achieved)
+            {
+                Raise(new GoalAchieved(Id, EmployeeId, occurredAt));
+            }
+
             Status = GoalStatus.Achieved;
             AchievedAt ??= occurredAt;
         }
