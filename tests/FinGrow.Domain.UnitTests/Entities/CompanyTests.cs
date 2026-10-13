@@ -16,6 +16,16 @@ public class CompanyTests
     }
 
     [Fact]
+    public void A_company_starts_with_the_corporate_preference_defaults()
+    {
+        var company = CreateCompany();
+
+        company.Theme.ShouldBe(Theme.Light);
+        company.Language.ShouldBe(Language.es);
+        company.FiscalYearStartMonth.ShouldBe(1);
+    }
+
+    [Fact]
     public void A_department_is_added_to_the_company_aggregate()
     {
         var company = CreateCompany();
