@@ -338,7 +338,12 @@ que interprete el texto (`POST /api/v1/message-parsing/transactions`), guarda el
 pendiente con fuente `Telegram` y contesta con lo que entendió y botones para confirmarlo o
 descartarlo. Si el mensaje no dice el medio de pago, los botones son los medios de pago y tocar
 uno confirma con ese medio; si el empleado no contesta, queda pendiente en la bandeja de la app
-con Efectivo. Si falta el monto, el bot repregunta y no registra nada. Los toques de botón llegan
+con Efectivo. La fecha es la que dice el mensaje ("Ayer gasté $500 en el súper"): la API le manda
+a FinGrow-AI la fecha de hoy en Argentina para que resuelva "ayer" o "el lunes", y si el mensaje
+no dice ninguna o la que dice cae en el futuro, registra la de hoy. Con un período vago ("la
+semana pasada", "hace unos días") FinGrow-AI estima la fecha y la propuesta la muestra como
+«(estimada)»: el empleado la confirma o la descarta con los mismos botones. Si falta el monto, el bot
+repregunta y no registra nada. Los toques de botón llegan
 como `callback_query`, por eso el webhook tiene que registrarse con ese tipo en `allowed_updates`.
 
 Una nota de voz (HU-71) sigue el mismo camino: la API la baja con `getFile` del Bot API, la
