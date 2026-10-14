@@ -205,8 +205,10 @@ public sealed class FakeTelegramBotClient : ITelegramBotClient
         }
 
         DownloadedFiles.Add(fileId);
-        return Task.FromResult<ReadOnlyMemory<byte>>(new byte[] { 1, 2, 3 });
+        return Task.FromResult<ReadOnlyMemory<byte>>(FileContent);
     }
+
+    public byte[] FileContent { get; set; } = new byte[] { 1, 2, 3 };
 
     private void ThrowIfUnreachable()
     {
@@ -627,6 +629,36 @@ public sealed class FakeAiService : IAiService
         TranscribedAudios.Add((audio.ToArray(), contentType));
 
         return TranscriptionResult;
+    }
+
+    public ReceiptScan ScanResult { get; set; } = new(
+        ReceiptScanOutcome.Scanned,
+        new ScannedReceipt(
+            "Supermercado Día",
+            1250.50m,
+            Currency.ARS,
+            new DateOnly(2026, 10, 3),
+            ExpenseCategory.Alimentos,
+            PaymentMethod.DebitCard,
+            0.93),
+        "fake-ocr+fake-model");
+
+    public List<(byte[] Document, string ContentType, Currency DefaultCurrency)> ScannedReceipts { get; } = new();
+
+    public Task<ReceiptScan> ScanReceiptAsync(
+        ReadOnlyMemory<byte> document,
+        string contentType,
+        Currency defaultCurrency,
+        CancellationToken cancellationToken = default)
+    {
+        if (Unreachable)
+        {
+            throw new HttpRequestException("FinGrow-AI unreachable");
+        }
+
+        ScannedReceipts.Add((document.ToArray(), contentType, defaultCurrency));
+
+        return Task.FromResult(ScanResult);
     }
 }
 

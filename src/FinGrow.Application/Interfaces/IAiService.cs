@@ -70,6 +70,29 @@ public sealed record AudioTranscription(AudioTranscriptionOutcome Outcome, strin
     public static AudioTranscription Of(AudioTranscriptionOutcome outcome) => new(outcome, null, null);
 }
 
+public enum ReceiptScanOutcome
+{
+    Scanned,
+    MissingAmount,
+    Unreadable,
+    UnsupportedDocument,
+    TooLarge
+}
+
+public sealed record ScannedReceipt(
+    string? Merchant,
+    decimal Amount,
+    Currency Currency,
+    DateOnly? OccurredOn,
+    ExpenseCategory Category,
+    PaymentMethod? PaymentMethod,
+    double Confidence);
+
+public sealed record ReceiptScan(ReceiptScanOutcome Outcome, ScannedReceipt? Receipt, string? Model)
+{
+    public static ReceiptScan Of(ReceiptScanOutcome outcome, string? model = null) => new(outcome, null, model);
+}
+
 public interface IAiService
 {
     Task<bool> IsHealthyAsync(CancellationToken cancellationToken = default);
@@ -92,5 +115,11 @@ public interface IAiService
     Task<AudioTranscription> TranscribeAudioAsync(
         ReadOnlyMemory<byte> audio,
         string contentType,
+        CancellationToken cancellationToken = default);
+
+    Task<ReceiptScan> ScanReceiptAsync(
+        ReadOnlyMemory<byte> document,
+        string contentType,
+        Currency defaultCurrency,
         CancellationToken cancellationToken = default);
 }

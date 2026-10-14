@@ -348,6 +348,13 @@ public class WhatsAppWebhookTests
             CancellationToken cancellationToken = default) =>
             Task.FromResult(new AudioTranscription(
                 AudioTranscriptionOutcome.Transcribed, "Gasté 500 pesos en el súper con débito", "fake-transcribe"));
+
+        public Task<ReceiptScan> ScanReceiptAsync(
+            ReadOnlyMemory<byte> document,
+            string contentType,
+            Currency defaultCurrency,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class VoiceNoteMediaClient : ITwilioMediaClient

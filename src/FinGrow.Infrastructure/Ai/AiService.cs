@@ -53,6 +53,22 @@ internal sealed class AiService : IAiService
             ["audio_too_large"] = AudioTranscriptionOutcome.TooLarge
         }.ToFrozenDictionary(StringComparer.Ordinal);
 
+    private static readonly FrozenDictionary<string, ReceiptScanOutcome> ReceiptScanStatuses =
+        new Dictionary<string, ReceiptScanOutcome>(StringComparer.Ordinal)
+        {
+            ["parsed"] = ReceiptScanOutcome.Scanned,
+            ["missing_amount"] = ReceiptScanOutcome.MissingAmount,
+            ["unreadable"] = ReceiptScanOutcome.Unreadable
+        }.ToFrozenDictionary(StringComparer.Ordinal);
+
+    private static readonly FrozenDictionary<string, ReceiptScanOutcome> ReceiptScanErrors =
+        new Dictionary<string, ReceiptScanOutcome>(StringComparer.Ordinal)
+        {
+            ["document_not_readable"] = ReceiptScanOutcome.Unreadable,
+            ["unsupported_document"] = ReceiptScanOutcome.UnsupportedDocument,
+            ["document_too_large"] = ReceiptScanOutcome.TooLarge
+        }.ToFrozenDictionary(StringComparer.Ordinal);
+
     private readonly HttpClient _httpClient;
 
     public AiService(HttpClient httpClient) => _httpClient = httpClient;
@@ -233,6 +249,85 @@ internal sealed class AiService : IAiService
         return new AudioTranscription(AudioTranscriptionOutcome.Transcribed, payload.Text.Trim(), payload.Model);
     }
 
+    public async Task<ReceiptScan> ScanReceiptAsync(
+        ReadOnlyMemory<byte> document,
+        string contentType,
+        Currency defaultCurrency,
+        CancellationToken cancellationToken = default)
+    {
+        var file = new ReadOnlyMemoryContent(document);
+        file.Headers.ContentType = MediaTypeHeaderValue.TryParse(contentType, out var mediaType)
+            ? mediaType
+            : new MediaTypeHeaderValue("application/octet-stream");
+
+        using var form = new MultipartFormDataContent();
+        form.Add(file, "file", "receipt");
+        form.Add(new StringContent(defaultCurrency.ToString()), "default_currency");
+
+        using var response = await _httpClient.PostAsync("/api/v1/receipt-scanning/receipts", form, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var code = await ReadErrorCodeAsync(response, cancellationToken);
+
+            if (code is not null && ReceiptScanErrors.TryGetValue(code, out var failure))
+            {
+                return ReceiptScan.Of(failure);
+            }
+
+            response.EnsureSuccessStatusCode();
+        }
+
+        ScanReceiptResponse? payload;
+
+        try
+        {
+            payload = await response.Content.ReadFromJsonAsync<ScanReceiptResponse>(cancellationToken);
+        }
+        catch (JsonException exception)
+        {
+            throw new HttpRequestException("FinGrow-AI devolvio un JSON invalido al escanear el comprobante.", exception);
+        }
+
+        if (payload is null || !ReceiptScanStatuses.TryGetValue(payload.Status ?? string.Empty, out var outcome))
+        {
+            throw new HttpRequestException("FinGrow-AI devolvio un status desconocido al escanear el comprobante.");
+        }
+
+        return outcome == ReceiptScanOutcome.Scanned
+            ? new ReceiptScan(outcome, ToScannedReceipt(payload.Receipt), payload.Model)
+            : ReceiptScan.Of(outcome, payload.Model);
+    }
+
+    private static ScannedReceipt ToScannedReceipt(ScannedReceiptPayload? receipt)
+    {
+        if (receipt is null
+            || receipt.Amount <= 0
+            || !Enum.TryParse<Currency>(receipt.Currency, ignoreCase: false, out var currency)
+            || !Enum.IsDefined(currency)
+            || !ExpenseCategoryExtensions.TryFromWireValue(receipt.Category, out var category)
+            || !ConfidenceScale.IsValid(receipt.Confidence))
+        {
+            throw new HttpRequestException("FinGrow-AI devolvio un comprobante incompleto.");
+        }
+
+        PaymentMethod? paymentMethod = receipt.PaymentMethod is not null
+            && PaymentMethods.TryGetValue(receipt.PaymentMethod, out var method)
+                ? method
+                : null;
+
+        var merchant = string.IsNullOrWhiteSpace(receipt.Merchant) ? null : receipt.Merchant.Trim();
+
+        return new ScannedReceipt(
+            merchant,
+            receipt.Amount,
+            currency,
+            ToDate(receipt.OccurredOn),
+            category,
+            paymentMethod,
+            receipt.Confidence);
+    }
+
     private static async Task<string?> ReadErrorCodeAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         try
@@ -303,6 +398,20 @@ internal sealed class AiService : IAiService
     private sealed record TranscriptionResponse(
         [property: JsonPropertyName("text")] string? Text,
         [property: JsonPropertyName("model")] string? Model);
+
+    private sealed record ScanReceiptResponse(
+        [property: JsonPropertyName("status")] string? Status,
+        [property: JsonPropertyName("receipt")] ScannedReceiptPayload? Receipt,
+        [property: JsonPropertyName("model")] string? Model);
+
+    private sealed record ScannedReceiptPayload(
+        [property: JsonPropertyName("merchant")] string? Merchant,
+        [property: JsonPropertyName("amount"), JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)] decimal Amount,
+        [property: JsonPropertyName("currency")] string? Currency,
+        [property: JsonPropertyName("occurred_on")] string? OccurredOn,
+        [property: JsonPropertyName("category")] string? Category,
+        [property: JsonPropertyName("payment_method")] string? PaymentMethod,
+        [property: JsonPropertyName("confidence")] double Confidence);
 
     private sealed record ErrorResponse([property: JsonPropertyName("code")] string? Code);
 

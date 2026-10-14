@@ -66,6 +66,13 @@ public class AiServiceHealthCheckTests
             string contentType,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+
+        public Task<ReceiptScan> ScanReceiptAsync(
+            ReadOnlyMemory<byte> document,
+            string contentType,
+            Currency defaultCurrency,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class AiHealthWebApplicationFactory : WebApplicationFactory<Program>
