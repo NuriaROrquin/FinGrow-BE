@@ -209,6 +209,7 @@ public sealed class Transaction : AggregateRoot
 
         Status = TransactionStatus.Discarded;
         UpdatedAt = discardedAt;
+        Raise(new TransactionDiscarded(Id, EmployeeId, discardedAt));
     }
 
     public void SuggestExpenseCategory(

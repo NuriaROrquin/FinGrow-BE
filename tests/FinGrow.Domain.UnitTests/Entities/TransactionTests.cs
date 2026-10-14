@@ -477,6 +477,21 @@ public class TransactionTests
         confirmed.OccurredAt.ShouldBe(Now);
     }
 
+    [Fact]
+    public void A_discarded_proposal_announces_it_so_its_receipt_can_be_released()
+    {
+        var transaction = RegisterExpense(Money.From(4500m, Currency.ARS));
+        _ = transaction.DequeueDomainEvents();
+        var discardedAt = Now.AddMinutes(5);
+
+        transaction.Discard(discardedAt);
+
+        var discarded = transaction.DequeueDomainEvents().ShouldHaveSingleItem().ShouldBeOfType<TransactionDiscarded>();
+        discarded.TransactionId.ShouldBe(transaction.Id);
+        discarded.EmployeeId.ShouldBe(EmployeeId);
+        discarded.OccurredAt.ShouldBe(discardedAt);
+    }
+
     private static Transaction RegisterExpense(Money amount) => Transaction.RegisterExpense(
         EmployeeId,
         amount,
