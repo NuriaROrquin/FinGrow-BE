@@ -4,6 +4,7 @@ using FinGrow.Api.Extensions;
 using FinGrow.Application.Common;
 using FinGrow.Application.DTOs;
 using FinGrow.Application.Features.Receipts.GetReceiptFile;
+using FinGrow.Application.Features.Receipts.ScanReceipt;
 using FinGrow.Application.Features.Receipts.UploadReceipt;
 using FinGrow.Domain.Entities;
 using MediatR;
@@ -39,6 +40,17 @@ public sealed class ReceiptsController(ISender sender) : ControllerBase
 
         return (await sender.Send(command, cancellationToken)).ToActionResult();
     }
+
+    [HttpPost("{id:guid}/scan")]
+    [ProducesResponseType<TransactionResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> Scan(Guid id, CancellationToken cancellationToken) =>
+        (await sender.Send(new ScanReceiptCommand(id), cancellationToken)).ToActionResult();
 
     [HttpGet("{id:guid}/file")]
     [ProducesResponseType(StatusCodes.Status200OK)]

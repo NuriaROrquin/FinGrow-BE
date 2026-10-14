@@ -23,6 +23,8 @@ using Features.Notifications.Delivery;
 using Features.OutboundEmails;
 using Features.OutboundEmails.DeliverDueEmails;
 using Features.Receipts.Cleanup;
+using Features.Receipts.Scanning;
+using Features.Receipts.Storing;
 using Features.Session;
 using FluentValidation;
 using Jobs;
@@ -45,6 +47,8 @@ public static class DependencyInjection
         services.AddScoped<ChatTransactionProposer>();
         services.AddScoped<ChatTransactionReviewer>();
         services.AddScoped<ChatVoiceNoteTranscriber>();
+        services.AddScoped<ReceiptStorer>();
+        services.AddScoped<ReceiptScanner>();
         services.AddScoped<WhatsAppProposalReviewer>();
         services.AddScoped<MercadoPagoSynchronizer>();
         services.AddScoped<GmailSynchronizer>();
