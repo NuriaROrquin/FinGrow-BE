@@ -16,4 +16,12 @@ public static class InvestmentTypeExtensions
     };
 
     public static bool IsQuoted(this InvestmentType type) => type.QuotedOn() is not null;
+
+    public static bool AccruesInterest(this InvestmentType type) =>
+        type is InvestmentType.FixedTermDeposit or InvestmentType.Repo or InvestmentType.RemuneratedAccount;
+
+    public static bool HasTerm(this InvestmentType type) =>
+        type is InvestmentType.FixedTermDeposit or InvestmentType.Repo;
+
+    public static bool CompoundsDaily(this InvestmentType type) => type is InvestmentType.RemuneratedAccount;
 }
