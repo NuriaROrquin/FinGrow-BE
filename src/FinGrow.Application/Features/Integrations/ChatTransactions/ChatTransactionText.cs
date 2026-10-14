@@ -59,7 +59,7 @@ internal static class ChatTransactionText
     public static bool IsAllowed(TransactionType type, PaymentMethod? paymentMethod) =>
         paymentMethod is { } method && PaymentMethodsFor(type).Contains(method);
 
-    public static string Proposal(Transaction transaction, bool asksPaymentMethod)
+    public static string Proposal(Transaction transaction, bool asksPaymentMethod, bool dateIsEstimate = false)
     {
         ArgumentNullException.ThrowIfNull(transaction);
 
@@ -67,10 +67,10 @@ internal static class ChatTransactionText
             ? PaymentMethodQuestion(transaction.Type) + " Elegí uno para confirmarlo."
             : "¿Lo registro?";
 
-        return Summary(transaction, asksPaymentMethod) + "\n\n" + question;
+        return Summary(transaction, asksPaymentMethod, dateIsEstimate) + "\n\n" + question;
     }
 
-    public static string Summary(Transaction transaction, bool asksPaymentMethod)
+    public static string Summary(Transaction transaction, bool asksPaymentMethod, bool dateIsEstimate = false)
     {
         ArgumentNullException.ThrowIfNull(transaction);
 
@@ -78,7 +78,8 @@ internal static class ChatTransactionText
         {
             (transaction.Type == TransactionType.Income ? "💰 Ingreso: " : "💸 Gasto: ") + FormatAmount(transaction.Amount),
             "🏷️ Categoría: " + CategoryLabel(transaction),
-            "📝 " + transaction.Description
+            "📝 " + transaction.Description,
+            "📅 " + FormatDate(transaction.OccurredOn) + (dateIsEstimate ? " (estimada)" : string.Empty)
         };
 
         if (!asksPaymentMethod)
@@ -125,6 +126,8 @@ internal static class ChatTransactionText
             PaymentMethod.DigitalWallet => "📱 Billetera virtual",
             _ => paymentMethod.ToString()
         };
+
+    public static string FormatDate(DateOnly date) => date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
 
     public static string FormatAmount(Money amount)
     {

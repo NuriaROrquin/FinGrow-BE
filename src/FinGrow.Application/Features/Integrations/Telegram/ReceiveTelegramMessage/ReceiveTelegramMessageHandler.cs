@@ -155,7 +155,7 @@ internal sealed partial class ReceiveTelegramMessageHandler : IRequestHandler<Re
             case ProposalOutcome.Proposed:
                 await ReplyAsync(
                     request.ChatId,
-                    WithHeard(heard, ChatTransactionText.Proposal(proposal.Transaction!, proposal.AsksPaymentMethod)),
+                    WithHeard(heard, ChatTransactionText.Proposal(proposal.Transaction!, proposal.AsksPaymentMethod, proposal.DateIsEstimate)),
                     TelegramTransactionCallback.KeyboardFor(proposal.Transaction!, proposal.AsksPaymentMethod),
                     cancellationToken);
                 break;

@@ -6,11 +6,11 @@ using FinGrow.Domain.Entities;
 
 internal static class WhatsAppTransactionText
 {
-    public static string Proposal(Transaction transaction, bool asksPaymentMethod)
+    public static string Proposal(Transaction transaction, bool asksPaymentMethod, bool dateIsEstimate = false)
     {
         ArgumentNullException.ThrowIfNull(transaction);
 
-        var summary = ChatTransactionText.Summary(transaction, asksPaymentMethod);
+        var summary = ChatTransactionText.Summary(transaction, asksPaymentMethod, dateIsEstimate);
 
         if (!asksPaymentMethod)
         {

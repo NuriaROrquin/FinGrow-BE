@@ -177,7 +177,7 @@ internal sealed partial class ReceiveWhatsAppMessageHandler
 
         var reply = proposal.Outcome switch
         {
-            ProposalOutcome.Proposed => WhatsAppTransactionText.Proposal(proposal.Transaction!, proposal.AsksPaymentMethod),
+            ProposalOutcome.Proposed => WhatsAppTransactionText.Proposal(proposal.Transaction!, proposal.AsksPaymentMethod, proposal.DateIsEstimate),
             ProposalOutcome.TooLong => ChatTransactionText.TooLongReply,
             ProposalOutcome.MissingAmount => ChatTransactionText.MissingAmountReply,
             ProposalOutcome.MultipleTransactions => ChatTransactionText.MultipleTransactionsReply,
