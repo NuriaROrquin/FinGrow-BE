@@ -1,6 +1,7 @@
 namespace FinGrow.Infrastructure.Ai;
 
 using System.Collections.Frozen;
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -103,9 +104,10 @@ internal sealed class AiService : IAiService
     public async Task<ParsedMessage> ParseTransactionMessageAsync(
         string text,
         Currency defaultCurrency,
+        DateOnly today,
         CancellationToken cancellationToken = default)
     {
-        var request = new ParseMessageRequest(text, defaultCurrency.ToString());
+        var request = new ParseMessageRequest(text, defaultCurrency.ToString(), today);
 
         using var response = await _httpClient.PostAsJsonAsync("/api/v1/message-parsing/transactions", request, cancellationToken);
 
@@ -273,6 +275,8 @@ internal sealed class AiService : IAiService
             throw new HttpRequestException("FinGrow-AI devolvio una categoria que no corresponde al tipo de movimiento.");
         }
 
+        var occurredOn = ToDate(transaction.OccurredOn);
+
         PaymentMethod? paymentMethod = transaction.PaymentMethod is not null
             && PaymentMethods.TryGetValue(transaction.PaymentMethod, out var method)
                 ? method
@@ -286,8 +290,15 @@ internal sealed class AiService : IAiService
             incomeCategory,
             transaction.Description.Trim(),
             paymentMethod,
-            transaction.Confidence);
+            transaction.Confidence,
+            occurredOn,
+            occurredOn is not null && transaction.OccurredOnIsEstimate == true);
     }
+
+    private static DateOnly? ToDate(string? value) =>
+        DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
+            ? date
+            : null;
 
     private sealed record TranscriptionResponse(
         [property: JsonPropertyName("text")] string? Text,
@@ -297,7 +308,8 @@ internal sealed class AiService : IAiService
 
     private sealed record ParseMessageRequest(
         [property: JsonPropertyName("text")] string Text,
-        [property: JsonPropertyName("default_currency")] string DefaultCurrency);
+        [property: JsonPropertyName("default_currency")] string DefaultCurrency,
+        [property: JsonPropertyName("today")] DateOnly Today);
 
     private sealed record ParseMessageResponse(
         [property: JsonPropertyName("status")] string? Status,
@@ -312,7 +324,9 @@ internal sealed class AiService : IAiService
         [property: JsonPropertyName("income_category")] string? IncomeCategory,
         [property: JsonPropertyName("description")] string? Description,
         [property: JsonPropertyName("payment_method")] string? PaymentMethod,
-        [property: JsonPropertyName("confidence")] double Confidence);
+        [property: JsonPropertyName("confidence")] double Confidence,
+        [property: JsonPropertyName("occurred_on")] string? OccurredOn,
+        [property: JsonPropertyName("occurred_on_is_estimate")] bool? OccurredOnIsEstimate);
 
     private sealed record ParseBillRequest(
         [property: JsonPropertyName("subject")] string Subject,

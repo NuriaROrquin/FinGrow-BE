@@ -22,7 +22,9 @@ public sealed record ParsedTransaction(
     IncomeCategory? IncomeCategory,
     string Description,
     PaymentMethod? PaymentMethod,
-    double Confidence);
+    double Confidence,
+    DateOnly? OccurredOn = null,
+    bool OccurredOnIsEstimate = false);
 
 public sealed record ParsedMessage(MessageParsingOutcome Outcome, ParsedTransaction? Transaction, string? Model)
 {
@@ -79,6 +81,7 @@ public interface IAiService
     Task<ParsedMessage> ParseTransactionMessageAsync(
         string text,
         Currency defaultCurrency,
+        DateOnly today,
         CancellationToken cancellationToken = default);
 
     Task<ParsedBillEmail> ParseBillEmailAsync(
