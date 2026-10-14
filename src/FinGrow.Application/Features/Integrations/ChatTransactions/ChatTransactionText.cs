@@ -25,6 +25,17 @@ internal static class ChatTransactionText
     public const string AudioNotUnderstoodReply =
         "No pude entender el audio. ¿Me lo mandás de nuevo o me lo escribís? Por ejemplo: Gasté $500 en el súper.";
 
+    public const string ReceiptRead = "🧾 Esto leí en el ticket:";
+
+    public const string ReceiptUnreadableReply =
+        "No pude leer el ticket. ¿Me mandás otra foto, más cerca y con buena luz? También podés escribirme el gasto. Por ejemplo: Gasté $500 en el súper.";
+
+    public const string ReceiptMissingAmountReply =
+        "No encontré el total en el ticket. ¿Me escribís el gasto? Por ejemplo: Gasté $500 en el súper.";
+
+    public const string ReceiptUnsupportedReply =
+        "Solo puedo leer fotos de tickets o PDF de una sola página, de hasta 5 MB. También podés escribirme el gasto. Por ejemplo: Gasté $500 en el súper.";
+
     public const string AiUnavailableReply =
         "No pude procesar tu mensaje en este momento. Probá de nuevo en unos minutos.";
 

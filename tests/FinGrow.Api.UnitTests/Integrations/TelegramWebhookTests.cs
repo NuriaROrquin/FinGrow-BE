@@ -151,6 +151,26 @@ public class TelegramWebhookTests
     }
 
     [Fact]
+    public async Task A_receipt_photo_from_a_linked_chat_is_scanned_and_proposed_with_buttons()
+    {
+        using var factory = new WebhookWebApplicationFactory();
+        var client = factory.CreateClient();
+        factory.LinkChat();
+
+        var response = await PostAsync(client, PrivatePhoto());
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        factory.Bot.DownloadedFiles.ShouldHaveSingleItem().ShouldBe("AgACAgEAAxkBAAIC-large");
+        var receipt = factory.Receipts.ShouldHaveSingleItem();
+        factory.Storage.ShouldContainKey(receipt.StorageKey);
+        var transaction = factory.Transactions.ShouldHaveSingleItem();
+        transaction.Source.ShouldBe(TransactionSource.ReceiptScan);
+        transaction.Status.ShouldBe(TransactionStatus.Pending);
+        receipt.TransactionId.ShouldBe(transaction.Id);
+        factory.Bot.SentWithButtons.ShouldHaveSingleItem().Text.ShouldStartWith("🧾 Esto leí en el ticket:");
+    }
+
+    [Fact]
     public async Task Tapping_a_button_confirms_the_transaction_and_edits_the_message()
     {
         using var factory = new WebhookWebApplicationFactory();
@@ -219,6 +239,21 @@ public class TelegramWebhookTests
         },
     };
 
+    private static object PrivatePhoto() => new
+    {
+        update_id = 103,
+        message = new
+        {
+            message_id = 10,
+            chat = new { id = ChatId, type = "private" },
+            photo = new[]
+            {
+                new { file_id = "AgACAgEAAxkBAAIC-small", file_unique_id = "AQADs", width = 90, height = 120, file_size = 1500 },
+                new { file_id = "AgACAgEAAxkBAAIC-large", file_unique_id = "AQADl", width = 960, height = 1280, file_size = 98000 },
+            },
+        },
+    };
+
     private static async Task<HttpResponseMessage> PostAsync(HttpClient client, object update, string secret = Secret)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(WebhookPath, UriKind.Relative))
@@ -250,6 +285,10 @@ public class TelegramWebhookTests
         public RecordingTelegramBotClient Bot { get; } = new();
 
         public List<Transaction> Transactions { get; } = new();
+
+        public List<TransactionReceipt> Receipts { get; } = new();
+
+        public Dictionary<string, byte[]> Storage { get; } = new(StringComparer.Ordinal);
 
         public void LinkChat() =>
             Integrations.Add(EmployeeIntegration.Create(Employee.Id, IntegrationProvider.Telegram, "123456789", DateTimeOffset.UtcNow));
@@ -286,6 +325,8 @@ public class TelegramWebhookTests
                 services.AddSingleton<ITelegramBotClient>(Bot);
                 services.AddScoped<ITransactionRepository>(_ => new InMemoryTransactionRepository(Transactions));
                 services.AddSingleton<IAiService, SupermarketAiService>();
+                services.AddScoped<ITransactionReceiptRepository>(_ => new InMemoryReceiptRepository(Receipts));
+                services.AddSingleton<IFileStorage>(new InMemoryFileStorage(Storage));
             });
         }
     }
@@ -333,7 +374,7 @@ public class TelegramWebhookTests
         public Task<ReadOnlyMemory<byte>> DownloadFileAsync(string fileId, CancellationToken cancellationToken = default)
         {
             DownloadedFiles.Add(fileId);
-            return Task.FromResult<ReadOnlyMemory<byte>>(new byte[] { 1, 2, 3 });
+            return Task.FromResult<ReadOnlyMemory<byte>>(new byte[] { 0xFF, 0xD8, 0xFF, 0xE0 });
         }
     }
 
@@ -368,6 +409,59 @@ public class TelegramWebhookTests
             CancellationToken cancellationToken = default) =>
             Task.FromResult(new AudioTranscription(
                 AudioTranscriptionOutcome.Transcribed, "Gasté 500 pesos en el súper", "fake-transcribe"));
+
+        public Task<ReceiptScan> ScanReceiptAsync(
+            ReadOnlyMemory<byte> document,
+            string contentType,
+            Currency defaultCurrency,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new ReceiptScan(
+                ReceiptScanOutcome.Scanned,
+                new ScannedReceipt("Supermercado Día", 1250.50m, Currency.ARS, null, ExpenseCategory.Alimentos, PaymentMethod.DebitCard, 0.93),
+                "fake-ocr"));
+    }
+
+    private sealed class InMemoryReceiptRepository(List<TransactionReceipt> receipts) : ITransactionReceiptRepository
+    {
+        public void Add(TransactionReceipt receipt) => receipts.Add(receipt);
+
+        public void Remove(TransactionReceipt receipt) => receipts.Remove(receipt);
+
+        public Task<TransactionReceipt?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+            Task.FromResult(receipts.FirstOrDefault(receipt => receipt.Id == id));
+
+        public Task<TransactionReceipt?> GetByTransactionIdAsync(Guid transactionId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(receipts.FirstOrDefault(receipt => receipt.TransactionId == transactionId));
+
+        public Task<IReadOnlyDictionary<Guid, Guid>> GetIdsByTransactionAsync(
+            IReadOnlyCollection<Guid> transactionIds,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<string>> ListStorageKeysByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<TransactionReceipt>> ListDetachedUploadedBeforeAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class InMemoryFileStorage(Dictionary<string, byte[]> files) : IFileStorage
+    {
+        public async Task SaveAsync(string key, Stream content, string contentType, CancellationToken cancellationToken = default)
+        {
+            using var copy = new MemoryStream();
+            await content.CopyToAsync(copy, cancellationToken);
+            files[key] = copy.ToArray();
+        }
+
+        public Task<StoredFile?> OpenAsync(string key, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task DeleteAsync(string key, CancellationToken cancellationToken = default)
+        {
+            files.Remove(key);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class InMemoryTransactionRepository : ITransactionRepository
