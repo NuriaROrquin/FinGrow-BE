@@ -687,6 +687,9 @@ public sealed class FakeJobRunRepository : IJobRunRepository
     public Task<JobRun?> FindLastAsync(string jobName, CancellationToken cancellationToken = default) =>
         Task.FromResult(MostRecentFirst(jobName).FirstOrDefault());
 
+    public Task<bool> HasSucceededAsync(string jobName, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Runs.Any(run => run.JobName == jobName && run.Status == JobRunStatus.Succeeded));
+
     public Task<IReadOnlyList<JobRun>> ListRecentAsync(string jobName, int take, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<JobRun>>(MostRecentFirst(jobName).Take(take).ToList());
 
@@ -1221,5 +1224,52 @@ public sealed class FakeEmailSender : IEmailSender
 
         Sent.Add(message);
         return Task.FromResult($"re-{Sent.Count}");
+    }
+}
+
+public sealed class FakeAchievementRepository : IAchievementRepository
+{
+    public List<EmployeeAchievement> Achievements { get; } = new();
+
+    public void Add(EmployeeAchievement achievement) => Achievements.Add(achievement);
+
+    public Task<IReadOnlyList<EmployeeAchievement>> ListByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<EmployeeAchievement>>(Achievements
+            .Where(achievement => achievement.EmployeeId == employeeId)
+            .OrderBy(achievement => achievement.AchievedAt)
+            .ToList());
+
+    public Task<IReadOnlyList<EmployeeAchievement>> ListUncelebratedAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<EmployeeAchievement>>(Achievements
+            .Where(achievement => achievement.EmployeeId == employeeId && !achievement.IsCelebrated)
+            .OrderBy(achievement => achievement.AchievedAt)
+            .ToList());
+}
+
+public sealed class FakeAchievementProgressReadRepository : IAchievementProgressReadRepository
+{
+    public Dictionary<(Guid EmployeeId, AchievementCode Code), DateTimeOffset> Reached { get; } = new();
+
+    public List<(Guid EmployeeId, IReadOnlyCollection<AchievementCode> Codes)> Requests { get; } = new();
+
+    public Exception? Failure { get; set; }
+
+    public void Reach(Guid employeeId, AchievementCode code, DateTimeOffset reachedAt) => Reached[(employeeId, code)] = reachedAt;
+
+    public Task<IReadOnlyDictionary<AchievementCode, DateTimeOffset>> ListReachedAsync(
+        Guid employeeId,
+        IReadOnlyCollection<AchievementCode> codes,
+        CancellationToken cancellationToken = default)
+    {
+        if (Failure is not null)
+        {
+            return Task.FromException<IReadOnlyDictionary<AchievementCode, DateTimeOffset>>(Failure);
+        }
+
+        Requests.Add((employeeId, codes.ToList()));
+
+        return Task.FromResult<IReadOnlyDictionary<AchievementCode, DateTimeOffset>>(codes
+            .Where(code => Reached.ContainsKey((employeeId, code)))
+            .ToDictionary(code => code, code => Reached[(employeeId, code)]));
     }
 }

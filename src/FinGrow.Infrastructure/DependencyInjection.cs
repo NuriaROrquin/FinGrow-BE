@@ -121,6 +121,8 @@ public static class DependencyInjection
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<INotificationChannelSettingRepository, NotificationChannelSettingRepository>();
         services.AddScoped<IOutboundEmailRepository, OutboundEmailRepository>();
+        services.AddScoped<IAchievementRepository, AchievementRepository>();
+        services.AddScoped<IAchievementProgressReadRepository, AchievementProgressReadRepository>();
 
         services.AddScoped<DatabaseSeeder>();
         services.AddScoped<EducationCatalogSeeder>();

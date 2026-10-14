@@ -2,6 +2,8 @@ namespace FinGrow.Application;
 
 using System.Reflection;
 using Common.Behaviors;
+using Features.Achievements;
+using Features.Achievements.Evaluate;
 using Events;
 using Features.Integrations.ChatTransactions;
 using Features.Integrations.Gmail.Sync;
@@ -54,6 +56,8 @@ public static class DependencyInjection
         services.AddScoped<DepartmentManagerEligibility>();
         services.AddScoped<FinancialHealthScorer>();
         services.AddSingleton<MetricsAnonymizationPolicy>();
+        services.AddScoped<AchievementGranter>();
+        services.AddScoped<MonthlyAchievementsEvaluator>();
 
         services.AddSingleton<IDomainEventDispatcher, DomainEventDispatcher>();
         services.AddScoped<Notifier>();
@@ -72,6 +76,7 @@ public static class DependencyInjection
         services.AddScoped<IScheduledJob, GoalProgressAlertsJob>();
         services.AddScoped<IScheduledJob, EmailDeliveryJob>();
         services.AddScoped<IScheduledJob, ReceiptsCleanupJob>();
+        services.AddScoped<IScheduledJob, AchievementsEvaluationJob>();
 
         return services;
     }

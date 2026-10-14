@@ -3,6 +3,7 @@ namespace FinGrow.Domain.Entities;
 using FinGrow.Domain.Common;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.Errors;
+using FinGrow.Domain.Events;
 using FinGrow.Domain.ValueObjects;
 
 public sealed class Budget : AggregateRoot
@@ -96,6 +97,7 @@ public sealed class Budget : AggregateRoot
         var created = BudgetCategoryLimit.Create(Id, category, limit, updatedAt);
         _limits.Add(created);
         UpdatedAt = updatedAt;
+        Raise(new BudgetLimitSet(Id, EmployeeId, category, updatedAt));
 
         return created;
     }

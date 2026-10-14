@@ -76,6 +76,10 @@ public sealed partial class FinGrowDbContext : DbContext, IUnitOfWork
 
     public DbSet<OutboundEmail> OutboundEmails => Set<OutboundEmail>();
 
+    public DbSet<Achievement> Achievements => Set<Achievement>();
+
+    public DbSet<EmployeeAchievement> EmployeeAchievements => Set<EmployeeAchievement>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());

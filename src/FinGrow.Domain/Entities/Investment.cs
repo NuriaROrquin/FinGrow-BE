@@ -3,6 +3,7 @@ namespace FinGrow.Domain.Entities;
 using FinGrow.Domain.Common;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.Errors;
+using FinGrow.Domain.Events;
 using FinGrow.Domain.ValueObjects;
 
 /// <summary>
@@ -102,6 +103,7 @@ public sealed class Investment : AggregateRoot
             purchasedOn,
             ValuationSource.Manual,
             createdAt));
+        investment.Raise(new InvestmentAdded(investment.Id, employeeId, investment.Source, createdAt));
 
         return investment;
     }
@@ -143,6 +145,7 @@ public sealed class Investment : AggregateRoot
         investment.Source = source;
         investment.ExternalReference = reference;
         investment.RecordValuation(marketValue, valuedOn, ValuationSource.Feed, createdAt);
+        investment.Raise(new InvestmentAdded(investment.Id, employeeId, source, createdAt));
 
         return investment;
     }

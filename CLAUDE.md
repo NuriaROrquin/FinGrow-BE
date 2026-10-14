@@ -338,6 +338,26 @@ la aplica `FinancialHealthScorer` (`Application/Features/Metrics/FinancialHealth
   fallida y la siguiente genera la foto que falta. No conviertas con una cotización inventada ni
   guardes una foto con parte de la plantilla sin puntuar.
 
+## Logros
+
+El catálogo vive en `AchievementCatalog` y lo carga la migración con `HasData`: sumar un logro
+es un valor en `AchievementCode`, una entrada en el catálogo y una migración. El README tiene la
+tabla completa. Lo que no se deduce leyendo:
+
+- **Un logro no se revoca.** No agregues una baja cuando se borra el movimiento o la meta que lo
+  originó: registra algo que pasó en una fecha, igual que el puntaje.
+- **Todo otorgamiento pasa por `AchievementGranter`**, que consulta qué falta y le pregunta a
+  `IAchievementProgressReadRepository` si se cumple. Un evento nuevo que destrabe un logro es una
+  interfaz más en `UnlockInstantAchievementsHandler`; no otorgues un logro desde otro handler.
+- **`UnlockInstantAchievementsHandler` se traga sus errores a propósito.** MediatR corta en la
+  primera reacción que falla y `TransactionConfirmed` también dispara las alertas de presupuesto.
+  Lo que quede sin otorgar lo recupera `achievements-evaluation`.
+- **Tres formas de otorgar, y cada una decide si se celebra** (`AchievementGrantMode`): `Live`
+  avisa y queda por celebrar; `Backfill` (primera corrida exitosa del trabajo) no avisa pero queda
+  por celebrar, para que el front muestre todas las medallas juntas; `Recover` (corridas
+  siguientes) nace celebrado, porque celebrar días después algo que falló en el momento confunde.
+- **La empresa no ve logros.** No los sumes a los snapshots ni a ningún endpoint de empresa.
+
 ## Correos
 
 Un correo nunca se manda directo desde un handler: se encola con `OutboundEmail.Queue` en

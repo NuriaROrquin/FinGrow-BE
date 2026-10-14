@@ -29,6 +29,8 @@ public sealed class EmployeeIntegration : AggregateRoot
         LinkedAt = linkedAt;
         CreatedAt = linkedAt;
         UpdatedAt = linkedAt;
+
+        Raise(new IntegrationLinked(id, employeeId, provider, linkedAt));
     }
 
     public Guid EmployeeId { get; private set; }
@@ -75,6 +77,7 @@ public sealed class EmployeeIntegration : AggregateRoot
         ExternalAccountId = EnsureValidExternalAccountId(externalAccountId);
         LinkedAt = linkedAt;
         UpdatedAt = linkedAt;
+        Raise(new IntegrationLinked(Id, EmployeeId, Provider, linkedAt));
     }
 
     public void Authorize(OAuthGrant grant, DateTimeOffset now)

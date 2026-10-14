@@ -7,6 +7,7 @@ using FinGrow.Api.Jobs;
 using FinGrow.Application.Interfaces;
 using FinGrow.Application.Jobs;
 using FinGrow.Domain.Entities;
+using FinGrow.Domain.Enums;
 using FinGrow.Domain.Repositories;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -203,6 +204,9 @@ public class JobsEndpointsTests
 
         public Task<JobRun?> FindLastAsync(string jobName, CancellationToken cancellationToken = default) =>
             Task.FromResult(Runs.Where(run => run.JobName == jobName).OrderByDescending(run => run.StartedAt).FirstOrDefault());
+
+        public Task<bool> HasSucceededAsync(string jobName, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Runs.Any(run => run.JobName == jobName && run.Status == JobRunStatus.Succeeded));
 
         public Task<IReadOnlyList<JobRun>> ListRecentAsync(string jobName, int take, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<JobRun>>(Runs.Where(run => run.JobName == jobName).OrderByDescending(run => run.StartedAt).Take(take).ToList());
