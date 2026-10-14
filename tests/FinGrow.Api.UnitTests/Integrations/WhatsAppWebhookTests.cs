@@ -329,6 +329,7 @@ public class WhatsAppWebhookTests
         public Task<ParsedMessage> ParseTransactionMessageAsync(
             string text,
             Currency defaultCurrency,
+            DateOnly today,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(new ParsedMessage(
                 MessageParsingOutcome.Parsed,

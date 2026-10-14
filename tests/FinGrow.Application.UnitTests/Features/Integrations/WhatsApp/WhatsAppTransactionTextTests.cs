@@ -18,6 +18,22 @@ public class WhatsAppTransactionTextTests
             "💸 Gasto: $ 2.500 (ARS)\n" +
             "🏷️ Categoría: Alimentos\n" +
             "📝 Súper\n" +
+            "📅 12/10/2026\n" +
+            "💳 Débito\n" +
+            "\n" +
+            "¿Lo registro? Respondé SÍ o NO.");
+    }
+
+    [Fact]
+    public void A_proposal_with_an_estimated_date_marks_the_date()
+    {
+        var proposal = WhatsAppTransactionText.Proposal(Expense(PaymentMethod.DebitCard), asksPaymentMethod: false, dateIsEstimate: true);
+
+        proposal.ShouldBe(
+            "💸 Gasto: $ 2.500 (ARS)\n" +
+            "🏷️ Categoría: Alimentos\n" +
+            "📝 Súper\n" +
+            "📅 12/10/2026 (estimada)\n" +
             "💳 Débito\n" +
             "\n" +
             "¿Lo registro? Respondé SÍ o NO.");

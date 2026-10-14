@@ -575,16 +575,16 @@ public sealed class FakeAiService : IAiService
 
     public ParsedMessage ParseResult { get; set; } = ParsedMessage.Of(MessageParsingOutcome.NotATransaction, "fake-model");
 
-    public List<(string Text, Currency DefaultCurrency)> ParsedMessages { get; } = new();
+    public List<(string Text, Currency DefaultCurrency, DateOnly Today)> ParsedMessages { get; } = new();
 
-    public Task<ParsedMessage> ParseTransactionMessageAsync(string text, Currency defaultCurrency, CancellationToken cancellationToken = default)
+    public Task<ParsedMessage> ParseTransactionMessageAsync(string text, Currency defaultCurrency, DateOnly today, CancellationToken cancellationToken = default)
     {
         if (Unreachable)
         {
             throw new HttpRequestException("FinGrow-AI unreachable");
         }
 
-        ParsedMessages.Add((text, defaultCurrency));
+        ParsedMessages.Add((text, defaultCurrency, today));
 
         return Task.FromResult(ParseResult);
     }

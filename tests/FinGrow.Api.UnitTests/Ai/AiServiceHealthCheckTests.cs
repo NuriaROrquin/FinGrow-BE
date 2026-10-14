@@ -57,6 +57,7 @@ public class AiServiceHealthCheckTests
         public Task<ParsedMessage> ParseTransactionMessageAsync(
             string text,
             Currency defaultCurrency,
+            DateOnly today,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 

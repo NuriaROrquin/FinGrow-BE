@@ -145,7 +145,7 @@ public class ReceiveTelegramMessageHandlerTests
         var result = await Handle("Gasté $500 en supermercado");
 
         result.IsSuccess.ShouldBeTrue();
-        _ai.ParsedMessages.ShouldHaveSingleItem().ShouldBe(("Gasté $500 en supermercado", Currency.ARS));
+        _ai.ParsedMessages.ShouldHaveSingleItem().ShouldBe(("Gasté $500 en supermercado", Currency.ARS, new DateOnly(2026, 3, 15)));
         var transaction = _transactions.Transactions.ShouldHaveSingleItem();
         transaction.EmployeeId.ShouldBe(_employee.Id);
         transaction.Type.ShouldBe(TransactionType.Expense);
@@ -160,6 +160,61 @@ public class ReceiveTelegramMessageHandlerTests
         transaction.AiConfidence.ShouldBe(0.9);
         transaction.AiModel.ShouldBe("fake-model");
         _unitOfWork.SaveCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task The_date_stated_in_the_message_is_the_date_of_the_transaction()
+    {
+        LinkChat();
+        _ai.ParseResult = Parsed(Expense(paymentMethod: null) with { OccurredOn = new DateOnly(2026, 3, 14) });
+
+        await Handle("Ayer gasté $500 en supermercado");
+
+        _transactions.Transactions.Single().OccurredOn.ShouldBe(new DateOnly(2026, 3, 14));
+        _bot.SentWithButtons.ShouldHaveSingleItem().Text.ShouldContain("📅 14/03/2026");
+    }
+
+    [Fact]
+    public async Task An_estimated_date_is_flagged_in_the_proposal()
+    {
+        LinkChat();
+        _ai.ParseResult = Parsed(Expense(paymentMethod: null) with
+        {
+            OccurredOn = new DateOnly(2026, 3, 8),
+            OccurredOnIsEstimate = true
+        });
+
+        await Handle("La semana pasada compré jabón para ropa 100");
+
+        _transactions.Transactions.Single().OccurredOn.ShouldBe(new DateOnly(2026, 3, 8));
+        _bot.SentWithButtons.ShouldHaveSingleItem().Text.ShouldContain("📅 08/03/2026 (estimada)");
+    }
+
+    [Fact]
+    public async Task An_exact_date_is_not_flagged_as_estimated()
+    {
+        LinkChat();
+        _ai.ParseResult = Parsed(Expense(paymentMethod: null) with { OccurredOn = new DateOnly(2026, 3, 14) });
+
+        await Handle("Ayer gasté $500 en supermercado");
+
+        _bot.SentWithButtons.ShouldHaveSingleItem().Text.ShouldNotContain("(estimada)");
+    }
+
+    [Fact]
+    public async Task A_date_in_the_future_is_replaced_by_today()
+    {
+        LinkChat();
+        _ai.ParseResult = Parsed(Expense(paymentMethod: null) with
+        {
+            OccurredOn = new DateOnly(2026, 3, 16),
+            OccurredOnIsEstimate = true
+        });
+
+        await Handle("Mañana gasto $500 en supermercado");
+
+        _transactions.Transactions.Single().OccurredOn.ShouldBe(new DateOnly(2026, 3, 15));
+        _bot.SentWithButtons.ShouldHaveSingleItem().Text.ShouldNotContain("(estimada)");
     }
 
     [Fact]
