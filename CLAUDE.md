@@ -255,6 +255,19 @@ fila, y guarda todas las filas juntas al final: si se corta a mitad de camino, q
 archivo ya no existe, y la corrida siguiente las limpia porque borrar un archivo inexistente no
 falla. Al revés quedaría un archivo sin fila que nadie volvería a encontrar.
 
+**Escanear un comprobante (HU-12)** pasa por `ReceiptScanner` (`Receipts/Scanning`), que usan
+`POST /api/receipts/{id}/scan` y las fotos que llegan al bot de Telegram. Guardar el archivo es
+`ReceiptStorer` (`Receipts/Storing`), el mismo para la subida desde la app y para Telegram: valida
+tipo, tamaño y firma, y si la base falla borra el archivo. Lo que no se deduce leyendo:
+
+- **La propuesta nace con fuente `ReceiptScan` aunque llegue por Telegram**: la fuente dice qué la
+  interpretó, y es lo que cuenta para el logro `ReceiptScanned`.
+- **`ai_confidence` es la confianza de la lectura**, no la de la categoría (ver más abajo).
+- **Más de 5 MB no se manda a FinGrow-AI** (`ReceiptScanner.MaxScannableBytes`): es el tope de
+  Textract para un documento en bytes, aunque un comprobante pueda pesar hasta 10 MB.
+- **Una propuesta descartada suelta su comprobante** (`TransactionDiscarded` →
+  `ReleaseDiscardedReceiptHandler`), para que `receipts-cleanup` lo borre.
+
 ## Trabajos programados
 
 No hay scheduler dentro del proceso. Los trabajos implementan `IScheduledJob`

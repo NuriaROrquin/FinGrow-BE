@@ -244,6 +244,7 @@ mismo código funciona contra Cloudflare R2 en los entornos desplegados y contra
 | `POST /api/transactions` con `receiptId` | Crea el movimiento y le asocia el comprobante en la misma operación: o se guardan los dos, o ninguno. 404 si el comprobante no existe, 403 si es de otro empleado |
 | `PUT /api/transactions/{id}` con `receiptId` | Igual que al crear, pero sobre un movimiento existente. Si ya tenía uno, lo reemplaza. Sin `receiptId`, conserva el que tenía |
 | `DELETE /api/transactions/{id}/receipt` | Quita el comprobante del movimiento, que queda sin ninguno |
+| `POST /api/receipts/{id}/scan` | Escanea un comprobante ya subido (HU-12) y devuelve el movimiento propuesto, pendiente, con el comprobante asociado. Ver [Escaneo de comprobantes](#escaneo-de-comprobantes-hu-12) |
 
 **Un movimiento tiene como máximo un comprobante** (índice único en `transaction_receipts.transaction_id`): asociarle otro reemplaza al anterior, que queda suelto. Las respuestas de los movimientos (listado, detalle, crear, editar, pendientes y confirmar) informan su `receiptId`, o `null` si no tiene.
 
@@ -251,6 +252,31 @@ Un comprobante que deja de usarse (se reemplaza, se quita o se borra su movimien
 
 Un comprobante nace sin movimiento: si el OCR falla, la imagen ya quedó guardada y se asocia
 después. Si el almacenamiento no responde, la subida devuelve 503 y no se crea nada en la base.
+
+#### Escaneo de comprobantes (HU-12)
+
+`POST /api/receipts/{id}/scan` lee el archivo del almacenamiento, se lo manda a FinGrow-AI
+(`POST /api/v1/receipt-scanning/receipts`, Amazon Textract más Claude para el comercio y la
+categoría) y registra un gasto **pendiente** con fuente `ReceiptScan`: el empleado lo revisa y lo
+confirma o descarta como cualquier otra propuesta (HU-15).
+
+- **Lo que se precarga**: monto, moneda (pesos si el ticket no dice otra), fecha, comercio (como
+  descripción), categoría y medio de pago. Sin medio de pago queda Efectivo; sin fecha, o con una
+  fecha futura, queda la de hoy; sin comercio, la descripción es «Comprobante escaneado».
+- **La confianza** es la de la lectura (la menor entre monto, fecha y comercio) y se guarda en
+  `ai_confidence`, con `ai_model` = OCR + modelo. Un campo que no se pudo leer baja la confianza a
+  media.
+- **No se escanea dos veces**: si el comprobante ya tiene una propuesta pendiente, la devuelve; si
+  está asociado a un movimiento ya registrado, responde 409. `external_reference` es
+  `receipt:<id>`.
+- **Cuando no se puede leer**, responde 400 con un código propio y no crea nada:
+  `Receipt.Unreadable`, `Receipt.MissingAmount`, `Receipt.UnsupportedForScan` (un PDF de más de
+  una página) o `Receipt.TooLargeToScan` (más de 5 MB, el máximo que Textract acepta en bytes; el
+  frontend recomprime las fotos antes de subirlas). Si FinGrow-AI no responde, 503
+  `Receipt.ScanUnavailable`. En todos los casos el comprobante sigue guardado y el empleado lo
+  puede asociar a un movimiento cargado a mano (`POST /api/transactions` con `receiptId`).
+- **Descartar una propuesta suelta su comprobante** (evento `TransactionDiscarded`), así
+  `receipts-cleanup` lo borra pasado el período de gracia.
 
 **En local** no hay que configurar nada: `docker compose up` levanta S3Mock con el bucket
 `fingrow-receipts` ya creado y `appsettings.Development.json` apunta a él. Nada de lo que se sube
@@ -351,6 +377,14 @@ transcribe con FinGrow-AI (`POST /api/v1/transcription/audio`, que necesita
 `TRANSCRIPTION_PROVIDER=openai` en ese servicio) y propone el movimiento con los mismos botones,
 precedido de «🎙️ Entendí: …». El audio no se guarda. Las notas de voz llegan como `message`,
 así que no hace falta tocar `allowed_updates`.
+
+Una foto de un ticket, o un PDF de una página mandado como archivo (HU-12), se baja con
+`getFile`, se guarda como comprobante igual que uno subido desde la app y se escanea con
+FinGrow-AI. La propuesta llega con fuente `ReceiptScan`, precedida de «🧾 Esto leí en el ticket:»
+y con los mismos botones; si el ticket no dice el medio de pago, los botones son los medios de
+pago. Si el ticket no se puede leer o no tiene total, el bot lo dice y no registra nada: el
+comprobante queda suelto y lo limpia `receipts-cleanup`. Un reintento del mismo update no lo
+vuelve a guardar ni a escanear (`external_reference` = chat + mensaje).
 
 ### InvertirOnline (IOL)
 
