@@ -9,4 +9,8 @@ public interface IInvestmentTracking
     string? Symbol { get; }
 
     decimal? Quantity { get; }
+
+    decimal? AnnualRate { get; }
+
+    int? TermDays { get; }
 }

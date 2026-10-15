@@ -26,5 +26,40 @@ internal sealed class InvestmentTrackingValidator : AbstractValidator<IInvestmen
             .GreaterThan(0m)
             .When(tracking => tracking.Quantity.HasValue)
             .WithMessage("La cantidad tiene que ser mayor a cero.");
+
+        RuleFor(tracking => tracking.AnnualRate)
+            .NotNull()
+            .When(tracking => tracking.Type.AccruesInterest())
+            .WithMessage(Investment.RateRequiredMessage);
+
+        RuleFor(tracking => tracking.AnnualRate)
+            .Null()
+            .When(tracking => !tracking.Type.AccruesInterest())
+            .WithMessage(Investment.NotAccruingMessage);
+
+        RuleFor(tracking => tracking.AnnualRate)
+            .Must(annualRate => annualRate is > 0m and <= Investment.MaxAnnualRate)
+            .When(tracking => tracking.AnnualRate.HasValue)
+            .WithMessage(Investment.RateOutOfRangeMessage);
+
+        RuleFor(tracking => tracking.AnnualRate)
+            .Must(annualRate => decimal.Round(annualRate!.Value, Investment.AnnualRateDecimals) == annualRate)
+            .When(tracking => tracking.AnnualRate.HasValue)
+            .WithMessage(Investment.RateDecimalsMessage);
+
+        RuleFor(tracking => tracking.TermDays)
+            .NotNull()
+            .When(tracking => tracking.Type.HasTerm())
+            .WithMessage(Investment.TermRequiredMessage);
+
+        RuleFor(tracking => tracking.TermDays)
+            .Null()
+            .When(tracking => !tracking.Type.HasTerm())
+            .WithMessage(Investment.TermNotAllowedMessage);
+
+        RuleFor(tracking => tracking.TermDays)
+            .InclusiveBetween(1, Investment.MaxTermDays)
+            .When(tracking => tracking.TermDays.HasValue)
+            .WithMessage(Investment.TermOutOfRangeMessage);
     }
 }

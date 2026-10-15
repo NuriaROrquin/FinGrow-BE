@@ -24,6 +24,7 @@ internal sealed class CreateInvestmentHandler(
             dateTimeProvider.UtcNow);
 
         investment.Track(request.Symbol, request.Quantity, dateTimeProvider.UtcNow);
+        investment.AgreeRate(request.AnnualRate, request.TermDays, dateTimeProvider.Today, dateTimeProvider.UtcNow);
 
         investmentRepository.Add(investment);
         await unitOfWork.SaveChangesAsync(cancellationToken);
