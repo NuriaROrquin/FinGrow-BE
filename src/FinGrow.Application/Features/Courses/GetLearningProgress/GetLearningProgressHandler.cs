@@ -16,6 +16,7 @@ internal sealed class GetLearningProgressHandler(ICourseRepository courseReposit
         var courses = await courseRepository.ListPublishedAsync(
             level: null,
             maxDurationMinutes: null,
+            relatedInvestmentType: null,
             cancellationToken);
 
         var completedLessonIds = await courseRepository.ListCompletedLessonIdsAsync(request.EmployeeId, cancellationToken);
