@@ -2,8 +2,10 @@ namespace FinGrow.Api.Controllers;
 
 using FinGrow.Api.Extensions;
 using FinGrow.Application.Common;
+using FinGrow.Application.DTOs;
 using FinGrow.Application.Features.Metrics.GetCompanyMetrics;
 using FinGrow.Application.Features.Metrics.GetDepartmentMetrics;
+using FinGrow.Application.Features.Metrics.GetParticipation;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -22,6 +24,12 @@ public sealed class CompanyMetricsController(ISender sender) : ControllerBase
         [FromQuery] DateOnly? toDate,
         CancellationToken cancellationToken) =>
         (await sender.Send(new GetCompanyMetricsQuery(fromDate, toDate), cancellationToken)).ToActionResult();
+
+    [HttpGet("metrics/participation")]
+    [ProducesResponseType<CompanyParticipationResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> Participation(CancellationToken cancellationToken) =>
+        (await sender.Send(new GetParticipationQuery(), cancellationToken)).ToActionResult();
 
     [HttpGet("departments/{departmentId:guid}/metrics")]
     [ProducesResponseType<IReadOnlyList<DepartmentMetricsResponse>>(StatusCodes.Status200OK)]
