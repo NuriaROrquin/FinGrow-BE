@@ -10,20 +10,23 @@ internal sealed class UpdateDepartmentCommandHandler : IRequestHandler<UpdateDep
 {
     private readonly ICurrentUser _currentUser;
     private readonly ICompanyRepository _companies;
-    private readonly IEmployeeRepository _employees;
+    private readonly DepartmentManagerEligibility _managers;
+    private readonly DepartmentResponseBuilder _responses;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _clock;
 
     public UpdateDepartmentCommandHandler(
         ICurrentUser currentUser,
         ICompanyRepository companies,
-        IEmployeeRepository employees,
+        DepartmentManagerEligibility managers,
+        DepartmentResponseBuilder responses,
         IUnitOfWork unitOfWork,
         IDateTimeProvider clock)
     {
         _currentUser = currentUser;
         _companies = companies;
-        _employees = employees;
+        _managers = managers;
+        _responses = responses;
         _unitOfWork = unitOfWork;
         _clock = clock;
     }
@@ -36,7 +39,7 @@ internal sealed class UpdateDepartmentCommandHandler : IRequestHandler<UpdateDep
             return Result.Failure<DepartmentResponse>(DepartmentErrors.NoAutenticado);
         }
 
-        if (company.FindDepartment(request.DepartmentId) is null)
+        if (company.FindDepartment(request.DepartmentId) is not { } current)
         {
             return Result.Failure<DepartmentResponse>(DepartmentErrors.NotFound(request.DepartmentId));
         }
@@ -46,16 +49,21 @@ internal sealed class UpdateDepartmentCommandHandler : IRequestHandler<UpdateDep
             return Result.Failure<DepartmentResponse>(DepartmentErrors.NameTaken(request.Name));
         }
 
+        if (request.ManagerId is { } managerId
+            && managerId != current.ManagerId
+            && !await _managers.IsEligibleAsync(managerId, companyId, cancellationToken))
+        {
+            return Result.Failure<DepartmentResponse>(DepartmentErrors.ManagerNotAvailable);
+        }
+
         var department = company.UpdateDepartment(
             request.DepartmentId,
             request.Name,
             request.Description,
-            request.ManagerName,
+            request.ManagerId,
             _clock.UtcNow);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var employees = await _employees.CountByDepartmentAsync(companyId, cancellationToken);
-
-        return Result.Success(DepartmentResponse.FromEntity(department, employees.GetValueOrDefault(department.Id)));
+        return Result.Success(await _responses.BuildAsync(companyId, department, cancellationToken));
     }
 }

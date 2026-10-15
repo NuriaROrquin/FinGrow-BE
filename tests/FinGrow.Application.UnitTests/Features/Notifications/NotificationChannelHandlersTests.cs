@@ -23,7 +23,7 @@ public class NotificationChannelHandlersTests
     {
         var channels = (await List()).Value;
 
-        channels.Count.ShouldBe(2);
+        channels.Count.ShouldBe(3);
         var inApp = channels.Single(channel => channel.Channel == NotificationChannel.InApp);
         inApp.IsEnabled.ShouldBeTrue();
         inApp.IsConfigurable.ShouldBeFalse();
@@ -32,6 +32,10 @@ public class NotificationChannelHandlersTests
         telegram.IsEnabled.ShouldBeTrue();
         telegram.IsConfigurable.ShouldBeTrue();
         telegram.IsConnected.ShouldBeFalse();
+        var email = channels.Single(channel => channel.Channel == NotificationChannel.Email);
+        email.IsEnabled.ShouldBeTrue();
+        email.IsConfigurable.ShouldBeTrue();
+        email.IsConnected.ShouldBeTrue();
     }
 
     [Fact]

@@ -16,15 +16,46 @@ public class CompanyTests
     }
 
     [Fact]
-    public void A_department_is_added_to_the_company_aggregate()
+    public void A_company_starts_with_the_corporate_preference_defaults()
     {
         var company = CreateCompany();
 
-        var department = company.AddDepartment("Ventas", "Ventas y atencion al cliente", "Maria Gonzalez", Now);
+        company.Theme.ShouldBe(Theme.Light);
+        company.Language.ShouldBe(Language.es);
+        company.FiscalYearStartMonth.ShouldBe(1);
+    }
+
+    [Fact]
+    public void A_department_is_added_to_the_company_aggregate()
+    {
+        var company = CreateCompany();
+        var managerId = Guid.CreateVersion7();
+
+        var department = company.AddDepartment("Ventas", "Ventas y atencion al cliente", managerId, Now);
 
         company.Departments.ShouldContain(department);
         department.CompanyId.ShouldBe(company.Id);
+        department.ManagerId.ShouldBe(managerId);
         department.IsActive.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void A_department_can_be_left_without_a_manager()
+    {
+        var company = CreateCompany();
+        var department = company.AddDepartment("Ventas", null, Guid.CreateVersion7(), Now);
+
+        company.UpdateDepartment(department.Id, "Ventas", null, null, Now.AddDays(1));
+
+        department.ManagerId.ShouldBeNull();
+    }
+
+    [Fact]
+    public void An_empty_manager_id_is_rejected()
+    {
+        var company = CreateCompany();
+
+        Should.Throw<DomainException>(() => company.AddDepartment("Ventas", null, Guid.Empty, Now));
     }
 
     [Fact]
@@ -41,12 +72,13 @@ public class CompanyTests
     {
         var company = CreateCompany();
         var department = company.AddDepartment("Ventas", null, null, Now);
+        var managerId = Guid.CreateVersion7();
 
-        company.UpdateDepartment(department.Id, "Ventas Online", "Canal digital", "Maria Gonzalez", Now.AddDays(1));
+        company.UpdateDepartment(department.Id, "Ventas Online", "Canal digital", managerId, Now.AddDays(1));
 
         department.Name.ShouldBe("Ventas Online");
         department.Description.ShouldBe("Canal digital");
-        department.ManagerName.ShouldBe("Maria Gonzalez");
+        department.ManagerId.ShouldBe(managerId);
         department.UpdatedAt.ShouldBe(Now.AddDays(1));
     }
 
@@ -106,6 +138,70 @@ public class CompanyTests
     }
 
     [Fact]
+    public void Deactivating_records_when_and_reactivating_clears_it()
+    {
+        var company = CreateCompany();
+        var department = company.AddDepartment("Logistica", null, null, Now);
+
+        company.DeactivateDepartment(department.Id, Now.AddDays(10));
+
+        department.DeactivatedAt.ShouldBe(Now.AddDays(10));
+
+        company.ActivateDepartment(department.Id, Now.AddDays(20));
+
+        department.IsActive.ShouldBeTrue();
+        department.DeactivatedAt.ShouldBeNull();
+        department.UpdatedAt.ShouldBe(Now.AddDays(20));
+    }
+
+    [Fact]
+    public void Deactivating_twice_keeps_the_first_date()
+    {
+        var company = CreateCompany();
+        var department = company.AddDepartment("Logistica", null, null, Now);
+        company.DeactivateDepartment(department.Id, Now.AddDays(10));
+
+        company.DeactivateDepartment(department.Id, Now.AddDays(15));
+
+        department.DeactivatedAt.ShouldBe(Now.AddDays(10));
+    }
+
+    [Fact]
+    public void A_department_of_another_company_cannot_be_activated_or_deactivated()
+    {
+        var company = CreateCompany();
+        var foreign = CreateCompany().AddDepartment("Ventas", null, null, Now);
+
+        Should.Throw<DomainException>(() => company.DeactivateDepartment(foreign.Id, Now));
+        Should.Throw<DomainException>(() => company.ActivateDepartment(foreign.Id, Now));
+    }
+
+    [Theory]
+    [InlineData(5, true)]
+    [InlineData(31, true)]
+    [InlineData(-1, false)]
+    public void A_deactivated_department_was_active_during_the_periods_it_overlapped(int deactivatedDaysAfterStart, bool expected)
+    {
+        var periodStart = new DateTimeOffset(2026, 4, 1, 3, 0, 0, TimeSpan.Zero);
+        var periodEnd = new DateTimeOffset(2026, 5, 1, 3, 0, 0, TimeSpan.Zero);
+        var company = CreateCompany();
+        var department = company.AddDepartment("Logistica", null, null, Now);
+        company.DeactivateDepartment(department.Id, periodStart.AddDays(deactivatedDaysAfterStart));
+
+        department.WasActiveDuring(periodStart, periodEnd).ShouldBe(expected);
+    }
+
+    [Fact]
+    public void A_department_created_after_the_period_was_not_active_during_it()
+    {
+        var company = CreateCompany();
+        var department = company.AddDepartment("Logistica", null, null, Now);
+
+        department.WasActiveDuring(Now.AddDays(-30), Now).ShouldBeFalse();
+        department.WasActiveDuring(Now.AddDays(-30), Now.AddTicks(1)).ShouldBeTrue();
+    }
+
+    [Fact]
     public void A_company_without_a_legal_name_is_not_created()
     {
         Should.Throw<DomainException>(() => Company.Create(
@@ -115,6 +211,30 @@ public class CompanyTests
             "hash",
             Currency.ARS,
             Now));
+    }
+
+    [Fact]
+    public void Corporate_information_can_be_updated()
+    {
+        var company = CreateCompany();
+
+        company.UpdateCorporateInformation(
+            "Nueva Empresa S.A.",
+            TaxId.From("30712345671"),
+            Email.From("contacto@nuevaempresa.com"),
+            "Tecnología",
+            "+54 11 4321-8765",
+            "Av. Corrientes 1234, CABA",
+            2010,
+            Now.AddDays(1));
+
+        company.Name.ShouldBe("Nueva Empresa S.A.");
+        company.TaxId.Value.ShouldBe("30712345671");
+        company.Email.Value.ShouldBe("contacto@nuevaempresa.com");
+        company.Industry.ShouldBe("Tecnología");
+        company.PhoneNumber.ShouldBe("+54 11 4321-8765");
+        company.FiscalAddress.ShouldBe("Av. Corrientes 1234, CABA");
+        company.FoundedYear.ShouldBe(2010);
     }
 
     private static Company CreateCompany() => Company.Create(

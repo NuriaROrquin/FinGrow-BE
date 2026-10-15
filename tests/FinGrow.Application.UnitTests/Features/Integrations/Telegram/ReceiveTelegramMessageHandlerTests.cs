@@ -5,6 +5,8 @@ using FinGrow.Application.Features.Integrations.ChatTransactions;
 using FinGrow.Application.Features.Integrations.Linking;
 using FinGrow.Application.Features.Integrations.Telegram;
 using FinGrow.Application.Features.Integrations.Telegram.ReceiveTelegramMessage;
+using FinGrow.Application.Features.Receipts.Scanning;
+using FinGrow.Application.Features.Receipts.Storing;
 using FinGrow.Application.Interfaces;
 using FinGrow.Application.UnitTests.Fakes;
 using FinGrow.Domain.Entities;
@@ -16,6 +18,9 @@ public class ReceiveTelegramMessageHandlerTests
 {
     private const long ChatId = 123456789;
     private const string Code = "ABCD2345";
+    private const string VoiceNoteFileId = "AwACAgEAAxkBAAIB";
+    private const string PhotoFileId = "AgACAgEAAxkBAAIC";
+    private static readonly byte[] Jpeg = { 0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10 };
     private static readonly DateTimeOffset Now = new(2026, 3, 15, 10, 0, 0, TimeSpan.Zero);
 
     private readonly FakeEmployeeRepository _employees = new();
@@ -26,6 +31,8 @@ public class ReceiveTelegramMessageHandlerTests
     private readonly FakeDateTimeProvider _clock = new(Now);
     private readonly FakeTransactionRepository _transactions = new();
     private readonly FakeAiService _ai = new();
+    private readonly FakeTransactionReceiptRepository _receipts = new();
+    private readonly FakeFileStorage _storage = new();
     private readonly Employee _employee = CreateEmployee();
 
     public ReceiveTelegramMessageHandlerTests() => _employees.Employees.Add(_employee);
@@ -144,7 +151,7 @@ public class ReceiveTelegramMessageHandlerTests
         var result = await Handle("Gasté $500 en supermercado");
 
         result.IsSuccess.ShouldBeTrue();
-        _ai.ParsedMessages.ShouldHaveSingleItem().ShouldBe(("Gasté $500 en supermercado", Currency.ARS));
+        _ai.ParsedMessages.ShouldHaveSingleItem().ShouldBe(("Gasté $500 en supermercado", Currency.ARS, new DateOnly(2026, 3, 15)));
         var transaction = _transactions.Transactions.ShouldHaveSingleItem();
         transaction.EmployeeId.ShouldBe(_employee.Id);
         transaction.Type.ShouldBe(TransactionType.Expense);
@@ -159,6 +166,61 @@ public class ReceiveTelegramMessageHandlerTests
         transaction.AiConfidence.ShouldBe(0.9);
         transaction.AiModel.ShouldBe("fake-model");
         _unitOfWork.SaveCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task The_date_stated_in_the_message_is_the_date_of_the_transaction()
+    {
+        LinkChat();
+        _ai.ParseResult = Parsed(Expense(paymentMethod: null) with { OccurredOn = new DateOnly(2026, 3, 14) });
+
+        await Handle("Ayer gasté $500 en supermercado");
+
+        _transactions.Transactions.Single().OccurredOn.ShouldBe(new DateOnly(2026, 3, 14));
+        _bot.SentWithButtons.ShouldHaveSingleItem().Text.ShouldContain("📅 14/03/2026");
+    }
+
+    [Fact]
+    public async Task An_estimated_date_is_flagged_in_the_proposal()
+    {
+        LinkChat();
+        _ai.ParseResult = Parsed(Expense(paymentMethod: null) with
+        {
+            OccurredOn = new DateOnly(2026, 3, 8),
+            OccurredOnIsEstimate = true
+        });
+
+        await Handle("La semana pasada compré jabón para ropa 100");
+
+        _transactions.Transactions.Single().OccurredOn.ShouldBe(new DateOnly(2026, 3, 8));
+        _bot.SentWithButtons.ShouldHaveSingleItem().Text.ShouldContain("📅 08/03/2026 (estimada)");
+    }
+
+    [Fact]
+    public async Task An_exact_date_is_not_flagged_as_estimated()
+    {
+        LinkChat();
+        _ai.ParseResult = Parsed(Expense(paymentMethod: null) with { OccurredOn = new DateOnly(2026, 3, 14) });
+
+        await Handle("Ayer gasté $500 en supermercado");
+
+        _bot.SentWithButtons.ShouldHaveSingleItem().Text.ShouldNotContain("(estimada)");
+    }
+
+    [Fact]
+    public async Task A_date_in_the_future_is_replaced_by_today()
+    {
+        LinkChat();
+        _ai.ParseResult = Parsed(Expense(paymentMethod: null) with
+        {
+            OccurredOn = new DateOnly(2026, 3, 16),
+            OccurredOnIsEstimate = true
+        });
+
+        await Handle("Mañana gasto $500 en supermercado");
+
+        _transactions.Transactions.Single().OccurredOn.ShouldBe(new DateOnly(2026, 3, 15));
+        _bot.SentWithButtons.ShouldHaveSingleItem().Text.ShouldNotContain("(estimada)");
     }
 
     [Fact]
@@ -246,6 +308,19 @@ public class ReceiveTelegramMessageHandlerTests
     }
 
     [Fact]
+    public async Task A_message_longer_than_the_AI_accepts_is_answered_without_calling_the_AI()
+    {
+        LinkChat();
+
+        var result = await Handle(new string('a', ChatTransactionProposer.MaxTextLength + 1));
+
+        result.IsSuccess.ShouldBeTrue();
+        _bot.Sent.ShouldHaveSingleItem().Text.ShouldBe(ChatTransactionText.TooLongReply);
+        _ai.ParsedMessages.ShouldBeEmpty();
+        _transactions.Transactions.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task When_the_AI_is_down_the_employee_is_told_to_try_again_and_nothing_is_registered()
     {
         LinkChat();
@@ -309,16 +384,250 @@ public class ReceiveTelegramMessageHandlerTests
         _bot.Sent.ShouldBeEmpty();
     }
 
-    private Task<Result> Handle(string text, long chatId = ChatId)
+    [Fact]
+    public async Task A_voice_note_is_transcribed_and_proposed_with_the_same_buttons_as_a_written_message()
+    {
+        LinkChat();
+        _ai.TranscriptionResult = Transcribed("Gasté 2500 pesos en el súper con débito");
+        _ai.ParseResult = Parsed(Expense(PaymentMethod.DebitCard));
+
+        var result = await HandleVoiceNote();
+
+        result.IsSuccess.ShouldBeTrue();
+        _bot.DownloadedFiles.ShouldBe(new[] { VoiceNoteFileId });
+        _ai.TranscribedAudios.ShouldHaveSingleItem().ContentType.ShouldBe("audio/ogg");
+        _ai.ParsedMessages.ShouldHaveSingleItem().Text.ShouldBe("Gasté 2500 pesos en el súper con débito");
+        var transaction = _transactions.Transactions.ShouldHaveSingleItem();
+        transaction.Status.ShouldBe(TransactionStatus.Pending);
+        transaction.Source.ShouldBe(TransactionSource.Telegram);
+        transaction.ExternalReference.ShouldBe("telegram:123456789:42");
+        var (_, text, buttonRows) = _bot.SentWithButtons.ShouldHaveSingleItem();
+        text.ShouldBe(
+            "🎙️ Entendí: «Gasté 2500 pesos en el súper con débito»\n\n" +
+            ChatTransactionText.Proposal(transaction, asksPaymentMethod: false));
+        buttonRows.SelectMany(row => row).Select(button => button.Text)
+            .ShouldBe(new[] { ChatTransactionText.ConfirmLabel, ChatTransactionText.DiscardLabel });
+    }
+
+    [Fact]
+    public async Task A_voice_note_without_an_amount_shows_what_was_heard_and_asks_again()
+    {
+        LinkChat();
+        _ai.TranscriptionResult = Transcribed("Gasté en el súper");
+        _ai.ParseResult = ParsedMessage.Of(MessageParsingOutcome.MissingAmount);
+
+        await HandleVoiceNote();
+
+        _bot.Sent.ShouldHaveSingleItem().Text.ShouldBe(
+            "🎙️ Entendí: «Gasté en el súper»\n\n" + ChatTransactionText.MissingAmountReply);
+        _transactions.Transactions.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(AudioTranscriptionOutcome.NotUnderstood)]
+    [InlineData(AudioTranscriptionOutcome.UnsupportedFormat)]
+    [InlineData(AudioTranscriptionOutcome.TooLarge)]
+    public async Task A_voice_note_that_cannot_be_transcribed_asks_to_repeat_it_or_write_it(AudioTranscriptionOutcome outcome)
+    {
+        LinkChat();
+        _ai.TranscriptionResult = AudioTranscription.Of(outcome);
+
+        await HandleVoiceNote();
+
+        _bot.Sent.ShouldHaveSingleItem().Text.ShouldBe(ChatTransactionText.AudioNotUnderstoodReply);
+        _ai.ParsedMessages.ShouldBeEmpty();
+        _transactions.Transactions.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task When_telegram_does_not_hand_over_the_voice_note_the_employee_is_told_to_try_again()
+    {
+        LinkChat();
+        _bot.FilesUnavailable = true;
+
+        var result = await HandleVoiceNote();
+
+        result.IsSuccess.ShouldBeTrue();
+        _bot.Sent.ShouldHaveSingleItem().Text.ShouldBe(ChatTransactionText.AiUnavailableReply);
+        _ai.TranscribedAudios.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task When_the_transcription_service_is_down_the_employee_is_told_to_try_again()
+    {
+        LinkChat();
+        _ai.Unreachable = true;
+
+        var result = await HandleVoiceNote();
+
+        result.IsSuccess.ShouldBeTrue();
+        _bot.Sent.ShouldHaveSingleItem().Text.ShouldBe(ChatTransactionText.AiUnavailableReply);
+        _transactions.Transactions.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_voice_note_telegram_delivers_twice_is_proposed_once()
+    {
+        LinkChat();
+        _ai.ParseResult = Parsed(Expense(PaymentMethod.Cash));
+        await HandleVoiceNote();
+
+        await HandleVoiceNote();
+
+        _transactions.Transactions.ShouldHaveSingleItem();
+        _bot.SentWithButtons.ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task A_receipt_photo_from_a_linked_chat_is_stored_scanned_and_proposed_with_buttons()
+    {
+        LinkChat();
+        _bot.FileContent = Jpeg;
+
+        var result = await HandleReceipt();
+
+        result.IsSuccess.ShouldBeTrue();
+        _bot.DownloadedFiles.ShouldBe(new[] { PhotoFileId });
+        var receipt = _receipts.Receipts.ShouldHaveSingleItem();
+        _storage.Files[receipt.StorageKey].Content.ShouldBe(Jpeg);
+        var transaction = _transactions.Transactions.ShouldHaveSingleItem();
+        transaction.Source.ShouldBe(TransactionSource.ReceiptScan);
+        transaction.Status.ShouldBe(TransactionStatus.Pending);
+        transaction.Description.ShouldBe("Supermercado Día");
+        transaction.ExternalReference.ShouldBe(ReceiveTelegramMessageHandler.ExternalReference(ChatId, 42));
+        receipt.TransactionId.ShouldBe(transaction.Id);
+        var sent = _bot.SentWithButtons.ShouldHaveSingleItem();
+        sent.Text.ShouldStartWith(ChatTransactionText.ReceiptRead);
+        sent.Text.ShouldContain("Supermercado Día");
+        sent.ButtonRows.ShouldHaveSingleItem().Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task A_receipt_without_payment_method_asks_how_it_was_paid()
+    {
+        LinkChat();
+        _bot.FileContent = Jpeg;
+        _ai.ScanResult = new ReceiptScan(
+            ReceiptScanOutcome.Scanned,
+            new ScannedReceipt("Farmacity", 8900m, Currency.ARS, null, ExpenseCategory.Salud, null, 0.9),
+            "fake-ocr");
+
+        await HandleReceipt();
+
+        var sent = _bot.SentWithButtons.ShouldHaveSingleItem();
+        sent.Text.ShouldContain(ChatTransactionText.PaymentMethodQuestion(TransactionType.Expense));
+        sent.ButtonRows.Count.ShouldBeGreaterThan(1);
+    }
+
+    [Fact]
+    public async Task A_retried_receipt_update_is_not_stored_or_scanned_twice()
+    {
+        LinkChat();
+        _bot.FileContent = Jpeg;
+
+        await HandleReceipt();
+        await HandleReceipt();
+
+        _receipts.Receipts.ShouldHaveSingleItem();
+        _ai.ScannedReceipts.ShouldHaveSingleItem();
+        _bot.SentWithButtons.ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task A_document_that_is_not_an_image_or_pdf_is_not_downloaded()
+    {
+        LinkChat();
+
+        await HandleReceipt(new TelegramReceiptFile("BQACAgEAAxkBAAID", "application/zip", "resumen.zip"));
+
+        _bot.DownloadedFiles.ShouldBeEmpty();
+        _bot.Sent.ShouldHaveSingleItem().Text.ShouldBe(ChatTransactionText.ReceiptUnsupportedReply);
+    }
+
+    [Fact]
+    public async Task A_file_whose_content_does_not_match_its_type_is_rejected()
+    {
+        LinkChat();
+
+        await HandleReceipt();
+
+        _receipts.Receipts.ShouldBeEmpty();
+        _bot.Sent.ShouldHaveSingleItem().Text.ShouldBe(ChatTransactionText.ReceiptUnsupportedReply);
+    }
+
+    [Theory]
+    [InlineData(ReceiptScanOutcome.Unreadable, ChatTransactionText.ReceiptUnreadableReply)]
+    [InlineData(ReceiptScanOutcome.MissingAmount, ChatTransactionText.ReceiptMissingAmountReply)]
+    [InlineData(ReceiptScanOutcome.UnsupportedDocument, ChatTransactionText.ReceiptUnsupportedReply)]
+    public async Task A_receipt_the_ocr_cannot_read_gets_a_reply_and_keeps_the_image(
+        ReceiptScanOutcome outcome,
+        string reply)
+    {
+        LinkChat();
+        _bot.FileContent = Jpeg;
+        _ai.ScanResult = ReceiptScan.Of(outcome);
+
+        await HandleReceipt();
+
+        _transactions.Transactions.ShouldBeEmpty();
+        _receipts.Receipts.ShouldHaveSingleItem().TransactionId.ShouldBeNull();
+        _bot.Sent.ShouldHaveSingleItem().Text.ShouldBe(reply);
+    }
+
+    [Fact]
+    public async Task When_telegram_does_not_return_the_file_it_asks_to_try_again_later()
+    {
+        LinkChat();
+        _bot.FilesUnavailable = true;
+
+        await HandleReceipt();
+
+        _receipts.Receipts.ShouldBeEmpty();
+        _bot.Sent.ShouldHaveSingleItem().Text.ShouldBe(ChatTransactionText.AiUnavailableReply);
+    }
+
+    [Fact]
+    public async Task A_receipt_from_an_unlinked_chat_gets_the_linking_instructions()
+    {
+        await HandleReceipt();
+
+        _bot.DownloadedFiles.ShouldBeEmpty();
+        _bot.Sent.ShouldHaveSingleItem().Text.ShouldBe(ReceiveTelegramMessageHandler.NotLinkedReply);
+    }
+
+    private Task<Result> HandleReceipt(TelegramReceiptFile? file = null) =>
+        Send(new ReceiveTelegramMessageCommand(
+            ChatId, string.Empty, 42, Receipt: file ?? new TelegramReceiptFile(PhotoFileId, "image/jpeg")));
+
+    private Task<Result> HandleVoiceNote() =>
+        Send(new ReceiveTelegramMessageCommand(ChatId, string.Empty, 42, new TelegramVoiceNote(VoiceNoteFileId, "audio/ogg")));
+
+    private static AudioTranscription Transcribed(string text) =>
+        new(AudioTranscriptionOutcome.Transcribed, text, "fake-transcribe");
+
+    private Task<Result> Handle(string text, long chatId = ChatId) =>
+        Send(new ReceiveTelegramMessageCommand(chatId, text, 42));
+
+    private Task<Result> Send(ReceiveTelegramMessageCommand command)
     {
         var linker = new LinkCodeRedeemer(
             _integrations, _linkCodes, _employees, _unitOfWork, _clock, NullLogger<LinkCodeRedeemer>.Instance);
+        var voiceNotes = new ChatVoiceNoteTranscriber(_ai, NullLogger<ChatVoiceNoteTranscriber>.Instance);
         var proposer = new ChatTransactionProposer(
             _ai, _transactions, _unitOfWork, _clock, NullLogger<ChatTransactionProposer>.Instance);
+        var storer = new ReceiptStorer(_receipts, _storage, _unitOfWork, _clock, NullLogger<ReceiptStorer>.Instance);
+        var scanner = new ReceiptScanner(_ai, _transactions, _unitOfWork, _clock, NullLogger<ReceiptScanner>.Instance);
         var handler = new ReceiveTelegramMessageHandler(
-            _integrations, linker, proposer, _bot, NullLogger<ReceiveTelegramMessageHandler>.Instance);
+            _integrations,
+            linker,
+            voiceNotes,
+            proposer,
+            storer,
+            scanner,
+            _bot,
+            NullLogger<ReceiveTelegramMessageHandler>.Instance);
 
-        return handler.Handle(new ReceiveTelegramMessageCommand(chatId, text, 42), CancellationToken.None);
+        return handler.Handle(command, CancellationToken.None);
     }
 
     private void LinkChat() =>

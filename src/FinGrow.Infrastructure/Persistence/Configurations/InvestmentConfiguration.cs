@@ -13,6 +13,13 @@ internal sealed class InvestmentConfiguration : IEntityTypeConfiguration<Investm
             table.HasCheckConstraint("ck_investments_invested_positive", "invested_amount > 0");
             table.HasCheckConstraint("ck_investments_symbol_with_quantity", "(symbol IS NULL) = (quantity IS NULL)");
             table.HasCheckConstraint("ck_investments_quantity_positive", "quantity IS NULL OR quantity > 0");
+            table.HasCheckConstraint("ck_investments_annual_rate_positive", "annual_rate IS NULL OR annual_rate > 0");
+            table.HasCheckConstraint(
+                "ck_investments_term_with_rate",
+                "term_days IS NULL OR (annual_rate IS NOT NULL AND term_days > 0)");
+            table.HasCheckConstraint(
+                "ck_investments_external_reference_when_imported",
+                "(source = 'Manual') = (external_reference IS NULL)");
         });
 
         builder.HasKey(investment => investment.Id);
@@ -35,6 +42,18 @@ internal sealed class InvestmentConfiguration : IEntityTypeConfiguration<Investm
 
         builder.Property(investment => investment.Quantity)
             .HasPrecision(30, 10);
+
+        builder.Property(investment => investment.AnnualRate)
+            .HasPrecision(5, Investment.AnnualRateDecimals);
+
+        builder.Property(investment => investment.Source)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
+        builder.Property(investment => investment.ExternalReference)
+            .HasMaxLength(Investment.MaxExternalReferenceLength);
+
         builder.Property(investment => investment.CreatedAt).IsRequired();
         builder.Property(investment => investment.UpdatedAt).IsRequired();
 
@@ -44,6 +63,8 @@ internal sealed class InvestmentConfiguration : IEntityTypeConfiguration<Investm
         builder.Ignore(investment => investment.ReturnAmount);
         builder.Ignore(investment => investment.ReturnPercentage);
         builder.Ignore(investment => investment.HasMarketValuation);
+        builder.Ignore(investment => investment.MaturesOn);
+        builder.Ignore(investment => investment.IsValuedAtMaturity);
 
         builder.HasOne(investment => investment.Employee)
             .WithMany()
@@ -61,5 +82,10 @@ internal sealed class InvestmentConfiguration : IEntityTypeConfiguration<Investm
             .AutoInclude();
 
         builder.HasIndex(investment => new { investment.EmployeeId, investment.Type });
+
+        // Una posicion de la integracion es una sola inversion: la segunda sincronizacion la actualiza.
+        builder.HasIndex(investment => new { investment.EmployeeId, investment.Source, investment.ExternalReference })
+            .IsUnique()
+            .HasFilter("external_reference IS NOT NULL");
     }
 }

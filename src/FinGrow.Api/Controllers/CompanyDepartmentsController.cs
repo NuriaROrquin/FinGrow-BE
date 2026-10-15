@@ -1,7 +1,9 @@
 namespace FinGrow.Api.Controllers;
 
+using FinGrow.Api.Contracts;
 using FinGrow.Api.Extensions;
 using FinGrow.Application.Common;
+using FinGrow.Application.Features.Departments.ChangeDepartmentStatus;
 using FinGrow.Application.Features.Departments.CreateDepartment;
 using FinGrow.Application.Features.Departments.DeleteDepartment;
 using FinGrow.Application.Features.Departments.ListDepartments;
@@ -29,6 +31,15 @@ public sealed class CompanyDepartmentsController(ISender sender) : ControllerBas
         UpdateDepartmentCommand command,
         CancellationToken cancellationToken) =>
         (await sender.Send(command with { DepartmentId = departmentId }, cancellationToken)).ToActionResult();
+
+    [HttpPut("{departmentId:guid}/status")]
+    public async Task<IActionResult> ChangeStatus(
+        Guid departmentId,
+        ChangeDepartmentStatusRequest request,
+        CancellationToken cancellationToken) =>
+        (await sender.Send(
+            new ChangeDepartmentStatusCommand(departmentId, request.IsActive!.Value, request.MoveEmployeesTo),
+            cancellationToken)).ToActionResult();
 
     [HttpDelete("{departmentId:guid}")]
     public async Task<IActionResult> Delete(Guid departmentId, CancellationToken cancellationToken) =>

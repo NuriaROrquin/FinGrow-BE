@@ -19,17 +19,19 @@ internal sealed class DiscardTransactionHandler(
             return Result.Failure(TransactionReviewErrors.Unauthenticated);
         }
 
-        var transaction = await transactionRepository.GetByIdAsync(request.Id, cancellationToken);
+        var owned = Ownership.Require(
+            await transactionRepository.GetByIdAsync(request.Id, cancellationToken),
+            transaction => transaction.EmployeeId,
+            employeeId,
+            TransactionReviewErrors.NotFound(request.Id),
+            TransactionReviewErrors.NotOwned);
 
-        if (transaction is null)
+        if (owned.IsFailure)
         {
-            return Result.Failure(TransactionReviewErrors.NotFound(request.Id));
+            return Result.Failure(owned.Error);
         }
 
-        if (transaction.EmployeeId != employeeId)
-        {
-            return Result.Failure(TransactionReviewErrors.NotOwned);
-        }
+        var transaction = owned.Value;
 
         if (!transaction.IsPending)
         {

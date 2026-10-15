@@ -31,6 +31,11 @@ public class CompanyEmployeesEndpointsTests
         temporaryPassword.ShouldNotBeNullOrWhiteSpace();
         body.RootElement.GetProperty("employee").GetProperty("departmentName").GetString().ShouldBe("Ventas");
 
+        var welcome = factory.QueuedEmails.ShouldHaveSingleItem();
+        welcome.Recipient.Value.ShouldBe("juan.perez@acme.com");
+        welcome.TextBody.ShouldNotBeNull();
+        welcome.TextBody.ShouldContain(temporaryPassword!);
+
         var login = await factory.CreateClient().PostAsJsonAsync(
             new Uri("/login/empleado", UriKind.Relative),
             new { email = "juan.perez@acme.com", password = temporaryPassword });

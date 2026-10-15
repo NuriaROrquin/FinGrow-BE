@@ -18,8 +18,11 @@ public sealed class ArticlesController(ISender sender) : ControllerBase
     public async Task<IActionResult> List(
         [FromQuery] EducationCategory? category,
         [FromQuery] int? maxReadingTime,
+        [FromQuery] InvestmentType? investmentType,
         CancellationToken cancellationToken) =>
-        (await sender.Send(new ListArticlesQuery(category, maxReadingTime), cancellationToken)).ToActionResult();
+        (await sender.Send(
+            new ListArticlesQuery(category, maxReadingTime, investmentType),
+            cancellationToken)).ToActionResult();
 
     [HttpGet("{slug}")]
     public async Task<IActionResult> Get(string slug, CancellationToken cancellationToken) =>

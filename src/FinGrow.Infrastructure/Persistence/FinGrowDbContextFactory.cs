@@ -1,5 +1,6 @@
 namespace FinGrow.Infrastructure.Persistence;
 
+using FinGrow.Application.Interfaces;
 using FinGrow.Infrastructure.Persistence.Protection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
@@ -16,6 +17,25 @@ public sealed class FinGrowDbContextFactory : IDesignTimeDbContextFactory<FinGro
             .UseNpgsql(connectionString, npgsql => npgsql.MigrationsAssembly(typeof(FinGrowDbContext).Assembly.FullName))
             .Options;
 
-        return new FinGrowDbContext(options, new AesGcmSecretProtector(new byte[TokenEncryptionOptions.KeyBytes]));
+        return new FinGrowDbContext(
+            options,
+            new AesGcmSecretProtector(new byte[TokenEncryptionOptions.KeyBytes]),
+            new DesignTimeCurrentUser());
+    }
+
+    // Las herramientas de EF no tienen sesion: solo necesitan armar el modelo.
+    private sealed class DesignTimeCurrentUser : ICurrentUser
+    {
+        public Guid? UserId => null;
+
+        public Guid? CompanyId => null;
+
+        public string? FullName => null;
+
+        public string? Role => null;
+
+        public DateTimeOffset? ExpiresAt => null;
+
+        public bool IsAuthenticated => false;
     }
 }

@@ -3,6 +3,7 @@ namespace FinGrow.Domain.Entities;
 using FinGrow.Domain.Common;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.Errors;
+using FinGrow.Domain.Events;
 using FinGrow.Domain.ValueObjects;
 
 public sealed class Budget : AggregateRoot
@@ -96,6 +97,7 @@ public sealed class Budget : AggregateRoot
         var created = BudgetCategoryLimit.Create(Id, category, limit, updatedAt);
         _limits.Add(created);
         UpdatedAt = updatedAt;
+        Raise(new BudgetLimitSet(Id, EmployeeId, category, updatedAt));
 
         return created;
     }
@@ -109,22 +111,20 @@ public sealed class Budget : AggregateRoot
         UpdatedAt = updatedAt;
     }
 
-    public void ChangeCurrency(Currency currency, DateTimeOffset updatedAt)
-    {
-        foreach (var limit in _limits)
-        {
-            limit.Change(Money.From(limit.Limit.Amount, currency), updatedAt);
-        }
-
-        UpdatedAt = updatedAt;
-    }
-
     public BudgetHealth Evaluate(ExpenseCategory category, Money spent)
     {
         ArgumentNullException.ThrowIfNull(spent);
 
         var limit = LimitFor(category)
             ?? throw new DomainException("El presupuesto no tiene un tope para esa categoria.");
+
+        return HealthOf(limit, spent);
+    }
+
+    public static BudgetHealth HealthOf(Money limit, Money spent)
+    {
+        ArgumentNullException.ThrowIfNull(limit);
+        ArgumentNullException.ThrowIfNull(spent);
 
         if (spent.IsAtLeast(limit))
         {

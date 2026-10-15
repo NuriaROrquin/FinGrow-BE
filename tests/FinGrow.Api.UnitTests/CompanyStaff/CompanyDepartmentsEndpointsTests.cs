@@ -3,6 +3,9 @@ namespace FinGrow.Api.UnitTests.CompanyStaff;
 using System.Net;
 using System.Net.Http.Json;
 using FinGrow.Application.Common;
+using FinGrow.Domain.Entities;
+using FinGrow.Domain.Enums;
+using FinGrow.Domain.ValueObjects;
 
 public class CompanyDepartmentsEndpointsTests
 {
@@ -12,18 +15,21 @@ public class CompanyDepartmentsEndpointsTests
     public async Task Creating_a_department_persists_it_in_the_company_of_the_token()
     {
         using var factory = new CompanyStaffWebApplicationFactory();
+        var manager = factory.AddEmployee(department: null, "maria.gonzalez@acme.com");
         var client = factory.CreateCompanyClient();
 
         var response = await client.PostAsJsonAsync(
             new Uri(DepartmentsPath, UriKind.Relative),
-            new { name = "Ventas", description = "Ventas y atención al cliente", managerName = "María González" });
+            new { name = "Ventas", description = "Ventas y atención al cliente", managerId = manager.Id });
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var department = factory.Company.Departments.ShouldHaveSingleItem();
         department.Name.ShouldBe("Ventas");
+        department.ManagerId.ShouldBe(manager.Id);
         var body = await response.Content.ReadAsStringAsync();
         body.ShouldContain($"\"id\":\"{department.Id}\"");
         body.ShouldContain("\"employeeCount\":0");
+        body.ShouldContain($"\"manager\":{{\"id\":\"{manager.Id}\",\"fullName\":\"Ana Gomez\",\"isActive\":true}}");
     }
 
     [Fact]
@@ -77,11 +83,38 @@ public class CompanyDepartmentsEndpointsTests
 
         var response = await client.PutAsJsonAsync(
             new Uri($"{DepartmentsPath}/{sales.Id}", UriKind.Relative),
-            new { name = "Ventas Online", description = "Canal digital", managerName = (string?)null });
+            new { name = "Ventas Online", description = "Canal digital", managerId = (Guid?)null });
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         sales.Name.ShouldBe("Ventas Online");
         sales.Description.ShouldBe("Canal digital");
+    }
+
+    [Fact]
+    public async Task An_employee_of_another_company_cannot_be_assigned_as_manager()
+    {
+        using var factory = new CompanyStaffWebApplicationFactory();
+        var sales = factory.Company.AddDepartment("Ventas", null, null, CompanyStaffWebApplicationFactory.CreatedAt);
+        var outsider = Employee.Create(
+            Guid.CreateVersion7(),
+            null,
+            "Persona Ajena",
+            Email.From("ajena@otra.com"),
+            null,
+            "hash",
+            Currency.ARS,
+            DateOnly.FromDateTime(CompanyStaffWebApplicationFactory.CreatedAt.Date),
+            CompanyStaffWebApplicationFactory.CreatedAt);
+        factory.Employees.Add(outsider);
+        var client = factory.CreateCompanyClient();
+
+        var response = await client.PutAsJsonAsync(
+            new Uri($"{DepartmentsPath}/{sales.Id}", UriKind.Relative),
+            new { name = "Ventas", description = (string?)null, managerId = outsider.Id });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync()).ShouldContain("Department.ManagerNotAvailable");
+        sales.ManagerId.ShouldBeNull();
     }
 
     [Fact]
@@ -111,6 +144,66 @@ public class CompanyDepartmentsEndpointsTests
         response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
         (await response.Content.ReadAsStringAsync()).ShouldContain("tiene 2 empleados asignados");
         factory.Company.Departments.ShouldContain(sales);
+    }
+
+    [Fact]
+    public async Task Deactivating_a_department_moves_its_employees_and_hides_it_from_assignments()
+    {
+        using var factory = new CompanyStaffWebApplicationFactory();
+        var marketing = factory.Company.AddDepartment("Marketing", null, null, CompanyStaffWebApplicationFactory.CreatedAt);
+        var sales = factory.Company.AddDepartment("Ventas", null, null, CompanyStaffWebApplicationFactory.CreatedAt);
+        var ana = factory.AddEmployee(marketing, "ana@acme.com");
+        var client = factory.CreateCompanyClient();
+
+        var response = await client.PutAsJsonAsync(
+            new Uri($"{DepartmentsPath}/{marketing.Id}/status", UriKind.Relative),
+            new { isActive = false, moveEmployeesTo = sales.Id });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        marketing.IsActive.ShouldBeFalse();
+        ana.DepartmentId.ShouldBe(sales.Id);
+        (await response.Content.ReadAsStringAsync()).ShouldContain("\"isActive\":false");
+
+        var assignment = await client.PostAsJsonAsync(
+            new Uri("/api/company/employees", UriKind.Relative),
+            new { fullName = "Bruno Díaz", email = "bruno@acme.com", departmentId = marketing.Id });
+        assignment.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Reactivating_a_department_makes_it_available_for_assignments_again()
+    {
+        using var factory = new CompanyStaffWebApplicationFactory();
+        var marketing = factory.Company.AddDepartment("Marketing", null, null, CompanyStaffWebApplicationFactory.CreatedAt);
+        marketing.Deactivate(CompanyStaffWebApplicationFactory.CreatedAt);
+        var client = factory.CreateCompanyClient();
+
+        var response = await client.PutAsJsonAsync(
+            new Uri($"{DepartmentsPath}/{marketing.Id}/status", UriKind.Relative),
+            new { isActive = true });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        marketing.IsActive.ShouldBeTrue();
+
+        var assignment = await client.PostAsJsonAsync(
+            new Uri("/api/company/employees", UriKind.Relative),
+            new { fullName = "Bruno Díaz", email = "bruno@acme.com", departmentId = marketing.Id });
+        assignment.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Changing_the_status_without_saying_which_responds_400()
+    {
+        using var factory = new CompanyStaffWebApplicationFactory();
+        var marketing = factory.Company.AddDepartment("Marketing", null, null, CompanyStaffWebApplicationFactory.CreatedAt);
+        var client = factory.CreateCompanyClient();
+
+        var response = await client.PutAsJsonAsync(
+            new Uri($"{DepartmentsPath}/{marketing.Id}/status", UriKind.Relative),
+            new { moveEmployeesTo = (Guid?)null });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        marketing.IsActive.ShouldBeTrue();
     }
 
     [Fact]

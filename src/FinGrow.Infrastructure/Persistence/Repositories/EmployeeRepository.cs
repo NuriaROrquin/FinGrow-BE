@@ -14,8 +14,12 @@ internal sealed class EmployeeRepository : IEmployeeRepository
     public Task<Employee?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         _dbContext.Employees.FirstOrDefaultAsync(employee => employee.Id == id, cancellationToken);
 
+    // El email es la credencial de login y es unico en toda la plataforma: tanto el login como el
+    // chequeo de unicidad al dar de alta o editar tienen que ver a los empleados de todas las empresas.
     public Task<Employee?> GetByEmailAsync(Email email, CancellationToken cancellationToken) =>
-        _dbContext.Set<Employee>().SingleOrDefaultAsync(employee => employee.Email == email, cancellationToken);
+        _dbContext.Set<Employee>()
+            .IgnoreQueryFilters(new[] { FinGrowDbContext.TenantFilter })
+            .SingleOrDefaultAsync(employee => employee.Email == email, cancellationToken);
 
     public async Task<IReadOnlyDictionary<Guid, int>> CountByDepartmentAsync(
         Guid companyId,
@@ -33,6 +37,21 @@ internal sealed class EmployeeRepository : IEmployeeRepository
             .AsNoTracking()
             .Where(employee => employee.CompanyId == companyId)
             .OrderBy(employee => employee.FullName)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Employee>> ListByDepartmentAsync(
+        Guid departmentId,
+        CancellationToken cancellationToken = default) =>
+        await _dbContext.Employees
+            .Where(employee => employee.DepartmentId == departmentId)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Employee>> ListByIdsAsync(
+        IReadOnlyCollection<Guid> ids,
+        CancellationToken cancellationToken = default) =>
+        await _dbContext.Employees
+            .AsNoTracking()
+            .Where(employee => ids.Contains(employee.Id))
             .ToListAsync(cancellationToken);
 
     public void Add(Employee employee) => _dbContext.Employees.Add(employee);

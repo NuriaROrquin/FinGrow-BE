@@ -12,7 +12,10 @@ internal sealed class CourseRatingReadRepository(FinGrowDbContext dbContext) : I
     {
         var ids = courseIds.ToList();
 
+        // El promedio y la cantidad de votos son anonimos y valen para toda la plataforma; solo el voto
+        // propio es del empleado.
         var totals = await dbContext.CourseRatings
+            .IgnoreQueryFilters(new[] { FinGrowDbContext.TenantFilter })
             .AsNoTracking()
             .Where(rating => ids.Contains(rating.CourseId))
             .GroupBy(rating => rating.CourseId)

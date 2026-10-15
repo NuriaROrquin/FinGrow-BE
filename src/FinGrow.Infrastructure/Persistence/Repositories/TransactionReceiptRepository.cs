@@ -8,6 +8,8 @@ internal sealed class TransactionReceiptRepository(FinGrowDbContext dbContext) :
 {
     public void Add(TransactionReceipt receipt) => dbContext.TransactionReceipts.Add(receipt);
 
+    public void Remove(TransactionReceipt receipt) => dbContext.TransactionReceipts.Remove(receipt);
+
     public Task<TransactionReceipt?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         dbContext.TransactionReceipts.FirstOrDefaultAsync(receipt => receipt.Id == id, cancellationToken);
 
@@ -36,5 +38,13 @@ internal sealed class TransactionReceiptRepository(FinGrowDbContext dbContext) :
             .AsNoTracking()
             .Where(receipt => receipt.EmployeeId == employeeId)
             .Select(receipt => receipt.StorageKey)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<TransactionReceipt>> ListDetachedUploadedBeforeAsync(
+        DateTimeOffset cutoff,
+        CancellationToken cancellationToken = default) =>
+        await dbContext.TransactionReceipts
+            .Where(receipt => receipt.TransactionId == null && receipt.UploadedAt < cutoff)
+            .OrderBy(receipt => receipt.UploadedAt)
             .ToListAsync(cancellationToken);
 }

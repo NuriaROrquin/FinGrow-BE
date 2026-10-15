@@ -13,6 +13,16 @@ internal static class DepartmentErrors
     public static Error NameTaken(string name) =>
         Error.Conflict("Department.NameTaken", $"Ya existe un departamento llamado '{name.Trim()}'.");
 
+    public static readonly Error ManagerNotAvailable =
+        Error.Validation(
+            "Department.ManagerNotAvailable",
+            "El responsable tiene que ser un empleado activo de tu empresa.");
+
+    public static readonly Error InvalidMoveTarget =
+        Error.Validation(
+            "Department.InvalidMoveTarget",
+            "Para mover a sus empleados elegí otro departamento activo de tu empresa.");
+
     public static Error HasEmployees(int employees) =>
         Error.Conflict(
             "Department.HasEmployees",

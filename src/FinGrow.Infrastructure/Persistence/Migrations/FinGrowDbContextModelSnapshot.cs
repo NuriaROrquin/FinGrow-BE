@@ -22,6 +22,157 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("FinGrow.Domain.Entities.Achievement", b =>
+                {
+                    b.Property<string>("Code")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("code");
+
+                    b.Property<string>("Condition")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("condition");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Evaluation")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("evaluation");
+
+                    b.Property<bool>("IsMajor")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_major");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Code")
+                        .HasName("pk_achievements");
+
+                    b.ToTable("achievements", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Code = "FirstTransaction",
+                            Condition = "Tiene al menos un movimiento confirmado, cargado a mano o por cualquier integración.",
+                            Description = "Confirmaste tu primer movimiento.",
+                            Evaluation = "Instant",
+                            IsMajor = false,
+                            Name = "Primer paso"
+                        },
+                        new
+                        {
+                            Code = "ReceiptScanned",
+                            Condition = "Tiene al menos un movimiento confirmado que entró por la lectura de un comprobante.",
+                            Description = "Registraste un movimiento sacándole una foto al comprobante.",
+                            Evaluation = "Instant",
+                            IsMajor = false,
+                            Name = "Sin papeles"
+                        },
+                        new
+                        {
+                            Code = "ChannelLinked",
+                            Condition = "Vinculó al menos una integración: Gmail, Mercado Pago, Telegram, WhatsApp o InvertirOnline.",
+                            Description = "Vinculaste tu primera integración.",
+                            Evaluation = "Instant",
+                            IsMajor = false,
+                            Name = "Conectado"
+                        },
+                        new
+                        {
+                            Code = "FirstBudget",
+                            Condition = "Tiene al menos un presupuesto con un tope por categoría.",
+                            Description = "Armaste tu primer presupuesto.",
+                            Evaluation = "Instant",
+                            IsMajor = false,
+                            Name = "Con plan"
+                        },
+                        new
+                        {
+                            Code = "FirstGoal",
+                            Condition = "Creó al menos una meta de ahorro.",
+                            Description = "Creaste tu primera meta de ahorro.",
+                            Evaluation = "Instant",
+                            IsMajor = false,
+                            Name = "Con objetivo"
+                        },
+                        new
+                        {
+                            Code = "GoalAchieved",
+                            Condition = "Tiene al menos una meta alcanzada.",
+                            Description = "Llegaste al objetivo de una meta de ahorro.",
+                            Evaluation = "Instant",
+                            IsMajor = true,
+                            Name = "Meta cumplida"
+                        },
+                        new
+                        {
+                            Code = "ThreeGoalsAchieved",
+                            Condition = "Tiene al menos 3 metas alcanzadas.",
+                            Description = "Cumpliste tres metas de ahorro.",
+                            Evaluation = "Instant",
+                            IsMajor = true,
+                            Name = "Imparable"
+                        },
+                        new
+                        {
+                            Code = "FirstInvestment",
+                            Condition = "Tiene al menos una inversión, cargada a mano o importada de InvertirOnline.",
+                            Description = "Registraste tu primera inversión.",
+                            Evaluation = "Instant",
+                            IsMajor = false,
+                            Name = "Inversor"
+                        },
+                        new
+                        {
+                            Code = "FirstCourse",
+                            Condition = "Completó todas las lecciones de al menos un curso publicado.",
+                            Description = "Terminaste tu primer curso.",
+                            Evaluation = "Instant",
+                            IsMajor = false,
+                            Name = "Aprendiz"
+                        },
+                        new
+                        {
+                            Code = "ConsistentThreeMonths",
+                            Condition = "Cerró 3 meses consecutivos con actividad suficiente: al menos 10 movimientos confirmados y algún ingreso en cada uno.",
+                            Description = "Registraste tus finanzas tres meses seguidos.",
+                            Evaluation = "MonthlyClose",
+                            IsMajor = true,
+                            Name = "Constancia"
+                        },
+                        new
+                        {
+                            Code = "BudgetKept",
+                            Condition = "Cerró un mes con actividad suficiente y con presupuesto mensual, sin ninguna categoría por encima de su tope.",
+                            Description = "Cerraste un mes sin pasarte de ningún tope de tu presupuesto.",
+                            Evaluation = "MonthlyClose",
+                            IsMajor = true,
+                            Name = "Dentro del plan"
+                        },
+                        new
+                        {
+                            Code = "Saver",
+                            Condition = "Cerró un mes con actividad suficiente en el que lo que no gastó fue al menos el 10% de sus ingresos. Lo destinado a ahorro_inversion cuenta como ahorro, igual que en el puntaje de salud financiera.",
+                            Description = "Ahorraste al menos el 10% de tus ingresos en un mes.",
+                            Evaluation = "MonthlyClose",
+                            IsMajor = true,
+                            Name = "Ahorrador"
+                        });
+                });
+
             modelBuilder.Entity("FinGrow.Domain.Entities.Article", b =>
                 {
                     b.Property<Guid>("Id")
@@ -198,9 +349,33 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(256)")
                         .HasColumnName("email");
 
+                    b.Property<string>("FiscalAddress")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("fiscal_address");
+
+                    b.Property<int>("FiscalYearStartMonth")
+                        .HasColumnType("integer")
+                        .HasColumnName("fiscal_year_start_month");
+
+                    b.Property<int?>("FoundedYear")
+                        .HasColumnType("integer")
+                        .HasColumnName("founded_year");
+
+                    b.Property<string>("Industry")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("industry");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
+
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)")
+                        .HasColumnName("language");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -214,11 +389,22 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("password_hash");
 
+                    b.Property<string>("PhoneNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("phone_number");
+
                     b.Property<string>("TaxId")
                         .IsRequired()
                         .HasMaxLength(11)
                         .HasColumnType("character varying(11)")
                         .HasColumnName("tax_id");
+
+                    b.Property<string>("Theme")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("theme");
 
                     b.Property<DateTimeOffset?>("TwoFactorEnabledAt")
                         .HasColumnType("timestamp with time zone")
@@ -405,6 +591,10 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<DateTimeOffset?>("DeactivatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deactivated_at");
+
                     b.Property<string>("Description")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -414,10 +604,9 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
-                    b.Property<string>("ManagerName")
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)")
-                        .HasColumnName("manager_name");
+                    b.Property<Guid?>("ManagerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("manager_id");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -431,6 +620,9 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_departments");
+
+                    b.HasIndex("ManagerId")
+                        .HasDatabaseName("ix_departments_manager_id");
 
                     b.HasIndex("CompanyId", "Name")
                         .IsUnique()
@@ -599,6 +791,52 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                     b.ToTable("employees", (string)null);
                 });
 
+            modelBuilder.Entity("FinGrow.Domain.Entities.EmployeeAchievement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AchievedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("achieved_at");
+
+                    b.Property<DateTimeOffset?>("CelebratedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("celebrated_at");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("employee_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_employee_achievements");
+
+                    b.HasIndex("Code")
+                        .HasDatabaseName("ix_employee_achievements_code");
+
+                    b.HasIndex("EmployeeId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_employee_achievements_employee_id_code");
+
+                    b.ToTable("employee_achievements", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_employee_achievements_achieved_before_recorded", "achieved_at <= created_at");
+
+                            t.HasCheckConstraint("ck_employee_achievements_celebrated_after_recorded", "celebrated_at IS NULL OR celebrated_at >= created_at");
+                        });
+                });
+
             modelBuilder.Entity("FinGrow.Domain.Entities.EmployeeDepartmentAssignment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -656,6 +894,11 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("employee_id");
 
+                    b.Property<string>("ErrorReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("error_reason");
+
                     b.Property<string>("ExternalAccountId")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -676,6 +919,12 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("provider");
 
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -691,7 +940,50 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_employee_integrations_provider_external_account_id");
 
-                    b.ToTable("employee_integrations", (string)null);
+                    b.ToTable("employee_integrations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_employee_integrations_error_has_reason", "(status = 'Error') = (error_reason IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("FinGrow.Domain.Entities.FinancialHealthScore", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("ComputedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("computed_at");
+
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("employee_id");
+
+                    b.Property<DateOnly>("PeriodStart")
+                        .HasColumnType("date")
+                        .HasColumnName("period_start");
+
+                    b.Property<int>("Score")
+                        .HasColumnType("integer")
+                        .HasColumnName("score");
+
+                    b.HasKey("Id")
+                        .HasName("pk_financial_health_scores");
+
+                    b.HasIndex("EmployeeId", "PeriodStart")
+                        .IsUnique()
+                        .HasDatabaseName("ix_financial_health_scores_employee_id_period_start");
+
+                    b.ToTable("financial_health_scores", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_financial_health_scores_factors_range", "savings_factor between 0 and 100 and cushion_factor between 0 and 100 and (budget_factor is null or budget_factor between 0 and 100) and (goals_factor is null or goals_factor between 0 and 100)");
+
+                            t.HasCheckConstraint("ck_financial_health_scores_period_starts_on_day_one", "extract(day from period_start) = 1");
+
+                            t.HasCheckConstraint("ck_financial_health_scores_score_range", "score between 0 and 100");
+                        });
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.Goal", b =>
@@ -835,6 +1127,11 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<decimal?>("AnnualRate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("annual_rate");
+
                     b.Property<string>("AssetName")
                         .IsRequired()
                         .HasMaxLength(120)
@@ -849,6 +1146,11 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("employee_id");
 
+                    b.Property<string>("ExternalReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("external_reference");
+
                     b.Property<DateOnly>("PurchasedOn")
                         .HasColumnType("date")
                         .HasColumnName("purchased_on");
@@ -858,10 +1160,20 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(30,10)")
                         .HasColumnName("quantity");
 
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("source");
+
                     b.Property<string>("Symbol")
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)")
                         .HasColumnName("symbol");
+
+                    b.Property<int?>("TermDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("term_days");
 
                     b.Property<string>("Type")
                         .IsRequired()
@@ -879,13 +1191,24 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                     b.HasIndex("EmployeeId", "Type")
                         .HasDatabaseName("ix_investments_employee_id_type");
 
+                    b.HasIndex("EmployeeId", "Source", "ExternalReference")
+                        .IsUnique()
+                        .HasDatabaseName("ix_investments_employee_id_source_external_reference")
+                        .HasFilter("external_reference IS NOT NULL");
+
                     b.ToTable("investments", null, t =>
                         {
+                            t.HasCheckConstraint("ck_investments_annual_rate_positive", "annual_rate IS NULL OR annual_rate > 0");
+
+                            t.HasCheckConstraint("ck_investments_external_reference_when_imported", "(source = 'Manual') = (external_reference IS NULL)");
+
                             t.HasCheckConstraint("ck_investments_invested_positive", "invested_amount > 0");
 
                             t.HasCheckConstraint("ck_investments_quantity_positive", "quantity IS NULL OR quantity > 0");
 
                             t.HasCheckConstraint("ck_investments_symbol_with_quantity", "(symbol IS NULL) = (quantity IS NULL)");
+
+                            t.HasCheckConstraint("ck_investments_term_with_rate", "term_days IS NULL OR (annual_rate IS NOT NULL AND term_days > 0)");
                         });
                 });
 
@@ -1149,6 +1472,83 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("FinGrow.Domain.Entities.OutboundEmail", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("HtmlBody")
+                        .HasColumnType("text")
+                        .HasColumnName("html_body")
+                        .HasAnnotation("FinGrow:Encrypted", true);
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTimeOffset?>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at");
+
+                    b.Property<string>("ProviderMessageId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("provider_message_id");
+
+                    b.Property<string>("Recipient")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("recipient");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("subject");
+
+                    b.Property<string>("TextBody")
+                        .HasColumnType("text")
+                        .HasColumnName("text_body")
+                        .HasAnnotation("FinGrow:Encrypted", true);
+
+                    b.HasKey("Id")
+                        .HasName("pk_outbound_emails");
+
+                    b.HasIndex("Status", "NextAttemptAt")
+                        .HasDatabaseName("ix_outbound_emails_status_next_attempt_at");
+
+                    b.ToTable("outbound_emails", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_outbound_emails_attempts_not_negative", "attempts >= 0");
+
+                            t.HasCheckConstraint("ck_outbound_emails_body_only_while_awaiting", "status IN ('Pending', 'Failed') OR (html_body IS NULL AND text_body IS NULL)");
+
+                            t.HasCheckConstraint("ck_outbound_emails_sent_has_provider_id", "status <> 'Sent' OR (sent_at IS NOT NULL AND provider_message_id IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("FinGrow.Domain.Entities.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1357,7 +1757,7 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_transactions_amount_positive", "amount > 0");
 
-                            t.HasCheckConstraint("ck_transactions_category_matches_type", "(type = 'Expense' AND expense_category IS NOT NULL AND income_category IS NULL)\nOR (type = 'Income' AND income_category IS NOT NULL AND expense_category IS NULL)");
+                            t.HasCheckConstraint("ck_transactions_category_matches_type", "(type = 'Expense' AND expense_category IS NOT NULL AND income_category IS NULL)\r\nOR (type = 'Income' AND income_category IS NOT NULL AND expense_category IS NULL)");
                         });
                 });
 
@@ -1509,6 +1909,14 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                                 .HasColumnType("integer")
                                 .HasColumnName("employees_with_integration");
 
+                            b1.Property<int>("EmployeesWithScore")
+                                .HasColumnType("integer")
+                                .HasColumnName("employees_with_score");
+
+                            b1.Property<int>("FinancialHealthScoreSum")
+                                .HasColumnType("integer")
+                                .HasColumnName("financial_health_score_sum");
+
                             b1.Property<int>("GoalsAchieved")
                                 .HasColumnType("integer")
                                 .HasColumnName("goals_achieved");
@@ -1556,6 +1964,12 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_departments_companies_company_id");
+
+                    b.HasOne("FinGrow.Domain.Entities.Employee", null)
+                        .WithMany()
+                        .HasForeignKey("ManagerId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_departments_employees_manager_id");
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.DepartmentMetricsSnapshot", b =>
@@ -1600,6 +2014,14 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                                 .HasColumnType("integer")
                                 .HasColumnName("employees_with_integration");
 
+                            b1.Property<int>("EmployeesWithScore")
+                                .HasColumnType("integer")
+                                .HasColumnName("employees_with_score");
+
+                            b1.Property<int>("FinancialHealthScoreSum")
+                                .HasColumnType("integer")
+                                .HasColumnName("financial_health_score_sum");
+
                             b1.Property<int>("GoalsAchieved")
                                 .HasColumnType("integer")
                                 .HasColumnName("goals_achieved");
@@ -1640,6 +2062,23 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                     b.Navigation("Company");
 
                     b.Navigation("Department");
+                });
+
+            modelBuilder.Entity("FinGrow.Domain.Entities.EmployeeAchievement", b =>
+                {
+                    b.HasOne("FinGrow.Domain.Entities.Achievement", null)
+                        .WithMany()
+                        .HasForeignKey("Code")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_employee_achievements_achievements_code");
+
+                    b.HasOne("FinGrow.Domain.Entities.Employee", null)
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_employee_achievements_employees_employee_id");
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.EmployeeDepartmentAssignment", b =>
@@ -1700,6 +2139,55 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         });
 
                     b.Navigation("Grant");
+                });
+
+            modelBuilder.Entity("FinGrow.Domain.Entities.FinancialHealthScore", b =>
+                {
+                    b.HasOne("FinGrow.Domain.Entities.Employee", null)
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_financial_health_scores_employees_employee_id");
+
+                    b.OwnsOne("FinGrow.Domain.ValueObjects.FinancialHealthFactors", "Factors", b1 =>
+                        {
+                            b1.Property<Guid>("FinancialHealthScoreId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<decimal?>("Budget")
+                                .HasPrecision(5, 2)
+                                .HasColumnType("numeric(5,2)")
+                                .HasColumnName("budget_factor");
+
+                            b1.Property<decimal>("Cushion")
+                                .HasPrecision(5, 2)
+                                .HasColumnType("numeric(5,2)")
+                                .HasColumnName("cushion_factor");
+
+                            b1.Property<decimal?>("Goals")
+                                .HasPrecision(5, 2)
+                                .HasColumnType("numeric(5,2)")
+                                .HasColumnName("goals_factor");
+
+                            b1.Property<decimal>("Savings")
+                                .HasPrecision(5, 2)
+                                .HasColumnType("numeric(5,2)")
+                                .HasColumnName("savings_factor");
+
+                            b1.HasKey("FinancialHealthScoreId")
+                                .HasName("pk_financial_health_scores");
+
+                            b1.ToTable("financial_health_scores");
+
+                            b1.WithOwner()
+                                .HasForeignKey("FinancialHealthScoreId")
+                                .HasConstraintName("fk_financial_health_scores_financial_health_scores_id");
+                        });
+
+                    b.Navigation("Factors")
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.Goal", b =>

@@ -76,7 +76,7 @@ public class NotificationsEndpointsTests
     }
 
     [Fact]
-    public async Task Reading_a_notification_marks_it_and_someone_else_one_responds_404()
+    public async Task Reading_a_notification_marks_it_and_someone_else_one_responds_403()
     {
         using var factory = new NotificationsWebApplicationFactory();
         var own = factory.Store(NotificationRecipient.Employee(factory.UserId));
@@ -84,12 +84,12 @@ public class NotificationsEndpointsTests
         var client = CreateClient(factory, Rol.Empleado);
 
         var read = await client.PostAsync(new Uri($"{NotificationsPath}/{own.Id}/read", UriKind.Relative), content: null);
-        var notFound = await client.PostAsync(new Uri($"{NotificationsPath}/{foreign.Id}/read", UriKind.Relative), content: null);
+        var forbidden = await client.PostAsync(new Uri($"{NotificationsPath}/{foreign.Id}/read", UriKind.Relative), content: null);
 
         read.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await read.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("isRead").GetBoolean().ShouldBeTrue();
         own.IsRead.ShouldBeTrue();
-        notFound.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        forbidden.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
         foreign.IsRead.ShouldBeFalse();
     }
 
@@ -120,9 +120,10 @@ public class NotificationsEndpointsTests
             new { isEnabled = false });
 
         var names = channels.EnumerateArray().Select(channel => channel.GetProperty("channel").GetString()).ToList();
-        names.Count.ShouldBe(2);
+        names.Count.ShouldBe(3);
         names.ShouldContain("InApp");
         names.ShouldContain("Telegram");
+        names.ShouldContain("Email");
         change.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await change.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("isEnabled").GetBoolean().ShouldBeFalse();
         var stored = factory.ChannelSettings.ShouldHaveSingleItem();
@@ -203,9 +204,13 @@ public class NotificationsEndpointsTests
                     ["Twilio:AuthToken"] = "unit-test-twilio-auth-token",
                     ["Telegram:BotToken"] = "unit-test-telegram-bot-token",
                     ["Telegram:WebhookSecret"] = "unit-test-telegram-secret",
+                    ["Email:ResendApiKey"] = "re_unit_test_key",
                     ["MercadoPago:ClientId"] = "unit-test-mp-client-id",
                     ["MercadoPago:ClientSecret"] = "unit-test-mp-client-secret",
                     ["MercadoPago:RedirectUri"] = "https://api.test/api/integrations/mercadopago/oauth/callback",
+                    ["Gmail:ClientId"] = "unit-test-gmail-client-id",
+                    ["Gmail:ClientSecret"] = "unit-test-gmail-client-secret",
+                    ["Gmail:RedirectUri"] = "https://api.test/api/integrations/gmail/oauth/callback",
                     ["TokenEncryption:Key"] = "dW5pdC10ZXN0LXRva2VuLWVuY3J5cHRpb24ta2V5ISE=",
                     ["Jobs:ApiKey"] = "unit-test-jobs-api-key",
                 }));

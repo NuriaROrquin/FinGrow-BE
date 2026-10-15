@@ -15,6 +15,7 @@ internal sealed class ListArticlesHandler(IArticleRepository articleRepository)
         var articles = await articleRepository.ListPublishedAsync(
             request.Category,
             request.MaxReadingTimeMinutes,
+            request.RelatedInvestmentType,
             cancellationToken);
 
         return Result.Success<IReadOnlyList<ArticleSummaryResponse>>(

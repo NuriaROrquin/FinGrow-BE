@@ -48,6 +48,7 @@ public sealed record PortfolioSummaryResponse(
     public static PortfolioSummaryResponse FromInvestments(IReadOnlyCollection<Investment> investments)
     {
         var quoted = investments.Where(investment => investment.HasMarketValuation).ToList();
+        var stillValued = quoted.Where(investment => !investment.IsValuedAtMaturity).ToList();
 
         var currencies = investments
             .GroupBy(investment => investment.InvestedAmount.Currency)
@@ -78,7 +79,7 @@ public sealed record PortfolioSummaryResponse(
         return new PortfolioSummaryResponse(
             investments.Count,
             investments.Count - quoted.Count,
-            quoted.Count == 0 ? null : quoted.Min(investment => investment.ValuedOn),
+            stillValued.Count == 0 ? null : stillValued.Min(investment => investment.ValuedOn),
             lastPurchase,
             currencies,
             allocation);

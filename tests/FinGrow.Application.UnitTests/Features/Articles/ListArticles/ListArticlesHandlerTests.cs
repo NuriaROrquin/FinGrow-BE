@@ -20,7 +20,8 @@ public class ListArticlesHandlerTests
         EducationCategory category = EducationCategory.Savings,
         int readingTimeMinutes = 5,
         bool published = true,
-        DateTimeOffset? publishedAt = null)
+        DateTimeOffset? publishedAt = null,
+        InvestmentType? relatedInvestmentType = null)
     {
         var article = Article.Create(
             slug,
@@ -29,7 +30,7 @@ public class ListArticlesHandlerTests
             "## Subtitulo\n\nCuerpo en **Markdown**.",
             category,
             readingTimeMinutes,
-            relatedInvestmentType: null,
+            relatedInvestmentType,
             Now);
 
         if (published)
@@ -43,8 +44,11 @@ public class ListArticlesHandlerTests
 
     private Task<Result<IReadOnlyList<Application.DTOs.ArticleSummaryResponse>>> ListAsync(
         EducationCategory? category = null,
-        int? maxReadingTime = null) =>
-        new ListArticlesHandler(_articles).Handle(new ListArticlesQuery(category, maxReadingTime), CancellationToken.None);
+        int? maxReadingTime = null,
+        InvestmentType? investmentType = null) =>
+        new ListArticlesHandler(_articles).Handle(
+            new ListArticlesQuery(category, maxReadingTime, investmentType),
+            CancellationToken.None);
 
     [Fact]
     public async Task The_list_shows_each_published_article_with_its_category_and_reading_time()
@@ -87,6 +91,17 @@ public class ListArticlesHandlerTests
         var slugs = (await ListAsync(maxReadingTime: 5)).Value.Select(article => article.Slug);
 
         slugs.ShouldBe(UpToFiveMinutes, ignoreOrder: true);
+    }
+
+    [Fact]
+    public async Task Articles_can_be_filtered_by_the_investment_type_they_are_about()
+    {
+        StoreArticle("cedears", relatedInvestmentType: InvestmentType.Cedear);
+        StoreArticle("bonos", relatedInvestmentType: InvestmentType.Bond);
+        StoreArticle("ahorro");
+
+        (await ListAsync(investmentType: InvestmentType.Cedear)).Value
+            .ShouldHaveSingleItem().Slug.ShouldBe("cedears");
     }
 
     [Fact]

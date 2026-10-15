@@ -17,7 +17,11 @@ public sealed record InvestmentResponse(
     bool HasMarketValuation,
     string? Symbol,
     decimal? Quantity,
-    DateTimeOffset CreatedAt)
+    DateTimeOffset CreatedAt,
+    InvestmentSource Source,
+    decimal? AnnualRate,
+    int? TermDays,
+    DateOnly? MaturesOn)
 {
     public static InvestmentResponse FromEntity(Investment investment) => new(
         investment.Id,
@@ -33,5 +37,9 @@ public sealed record InvestmentResponse(
         investment.HasMarketValuation,
         investment.Symbol,
         investment.Quantity,
-        investment.CreatedAt);
+        investment.CreatedAt,
+        investment.Source,
+        investment.AnnualRate,
+        investment.TermDays,
+        investment.MaturesOn);
 }

@@ -24,9 +24,10 @@ public sealed class CoursesController(ISender sender, ICurrentUser currentUser) 
         [FromQuery] CourseLevel? level,
         [FromQuery] int? maxDuration,
         [FromQuery] CourseProgressStatus? status,
+        [FromQuery] InvestmentType? investmentType,
         CancellationToken cancellationToken) =>
         (await sender.Send(
-            new ListCoursesQuery(currentUser.UserId!.Value, level, maxDuration, status),
+            new ListCoursesQuery(currentUser.UserId!.Value, level, maxDuration, status, investmentType),
             cancellationToken)).ToActionResult();
 
     [HttpGet("progress")]

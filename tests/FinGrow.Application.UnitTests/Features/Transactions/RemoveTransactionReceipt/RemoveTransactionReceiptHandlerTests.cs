@@ -43,7 +43,7 @@ public class RemoveTransactionReceiptHandlerTests
     }
 
     [Fact]
-    public async Task A_transaction_of_another_employee_is_reported_as_not_found()
+    public async Task A_transaction_of_another_employee_is_reported_as_forbidden()
     {
         var transaction = AddExpense(Guid.CreateVersion7());
         var receipt = TransactionReceipt.Upload(transaction.EmployeeId, "image/png", 10, null, Now);
@@ -52,7 +52,7 @@ public class RemoveTransactionReceiptHandlerTests
 
         var result = await Handle(transaction.Id);
 
-        result.Error.Type.ShouldBe(ErrorType.NotFound);
+        result.Error.Type.ShouldBe(ErrorType.Forbidden);
         receipt.TransactionId.ShouldBe(transaction.Id);
     }
 

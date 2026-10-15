@@ -110,6 +110,36 @@ public class GetPortfolioSummaryHandlerTests
         last.PurchasedOn.ShouldBe(new DateOnly(2026, 9, 20));
     }
 
+    [Fact]
+    public async Task Accrued_deposits_count_in_the_return_and_a_matured_one_does_not_age_the_valuation_date()
+    {
+        var quoted = Store("AL30", InvestmentType.Bond, 1000m, Currency.ARS, new DateOnly(2026, 8, 1));
+        quoted.RecordValuation(Money.From(1200m, Currency.ARS), new DateOnly(2026, 9, 25), ValuationSource.Feed, Now);
+        var matured = Store("Plazo fijo", InvestmentType.FixedTermDeposit, 1_000_000m, Currency.ARS, new DateOnly(2026, 7, 1));
+        matured.AgreeRate(30m, 30, new DateOnly(2026, 9, 27), Now);
+
+        var summary = (await SummarizeAsync()).Value;
+
+        summary.UnquotedCount.ShouldBe(0);
+        summary.OldestQuotedOn.ShouldBe(new DateOnly(2026, 9, 25));
+        var pesos = summary.Currencies.ShouldHaveSingleItem();
+        pesos.QuotedCount.ShouldBe(2);
+        pesos.QuotedReturnAmount.ShouldBe(24_857.53m);
+    }
+
+    [Fact]
+    public async Task With_only_matured_deposits_there_is_no_valuation_date_to_warn_about()
+    {
+        var matured = Store("Caucion", InvestmentType.Repo, 100_000m, Currency.ARS, new DateOnly(2026, 9, 1));
+        matured.AgreeRate(36.5m, 7, new DateOnly(2026, 9, 27), Now);
+
+        var summary = (await SummarizeAsync()).Value;
+
+        summary.UnquotedCount.ShouldBe(0);
+        summary.OldestQuotedOn.ShouldBeNull();
+        summary.Currencies.ShouldHaveSingleItem().QuotedReturnAmount.ShouldBe(700m);
+    }
+
     private Task<Result<PortfolioSummaryResponse>> SummarizeAsync() =>
         new GetPortfolioSummaryHandler(_investments).Handle(new GetPortfolioSummaryQuery(_employeeId), CancellationToken.None);
 

@@ -12,6 +12,9 @@ using FinGrow.Domain.ValueObjects;
 public sealed class Company : AggregateRoot, ITwoFactorAccount
 {
     public const int MaxNameLength = 200;
+    public const int MaxIndustryLength = 100;
+    public const int MaxPhoneNumberLength = 30;
+    public const int MaxFiscalAddressLength = 300;
 
     private readonly List<Department> _departments = new();
 
@@ -34,6 +37,9 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
         Email = email;
         PasswordHash = passwordHash;
         DefaultCurrency = defaultCurrency;
+        Theme = Theme.Light;
+        Language = Language.es;
+        FiscalYearStartMonth = 1;
         IsActive = true;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
@@ -46,9 +52,23 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
 
     public Email Email { get; private set; } = null!;
 
+    public string? Industry { get; private set; }
+
+    public string? PhoneNumber { get; private set; }
+
+    public string? FiscalAddress { get; private set; }
+
+    public int? FoundedYear { get; private set; }
+
     public string PasswordHash { get; private set; } = string.Empty;
 
     public Currency DefaultCurrency { get; private set; }
+
+    public Theme Theme { get; private set; }
+
+    public Language Language { get; private set; }
+
+    public int FiscalYearStartMonth { get; private set; }
 
     public bool IsActive { get; private set; }
 
@@ -85,14 +105,14 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
             createdAt);
     }
 
-    public Department AddDepartment(string name, string? description, string? managerName, DateTimeOffset createdAt)
+    public Department AddDepartment(string name, string? description, Guid? managerId, DateTimeOffset createdAt)
     {
         if (IsDepartmentNameTaken(name))
         {
             throw new DomainException($"Ya existe un departamento llamado '{name}'.");
         }
 
-        var department = Department.Create(Id, name, description, managerName, createdAt);
+        var department = Department.Create(Id, name, description, managerId, createdAt);
         _departments.Add(department);
         UpdatedAt = createdAt;
 
@@ -109,7 +129,7 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
         Guid departmentId,
         string name,
         string? description,
-        string? managerName,
+        Guid? managerId,
         DateTimeOffset updatedAt)
     {
         var department = GetDepartment(departmentId);
@@ -119,7 +139,7 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
             throw new DomainException($"Ya existe un departamento llamado '{name}'.");
         }
 
-        department.Update(name, description, managerName, updatedAt);
+        department.Update(name, description, managerId, updatedAt);
         UpdatedAt = updatedAt;
 
         return department;
@@ -131,6 +151,24 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
         UpdatedAt = removedAt;
     }
 
+    public Department DeactivateDepartment(Guid departmentId, DateTimeOffset deactivatedAt)
+    {
+        var department = GetDepartment(departmentId);
+        department.Deactivate(deactivatedAt);
+        UpdatedAt = deactivatedAt;
+
+        return department;
+    }
+
+    public Department ActivateDepartment(Guid departmentId, DateTimeOffset activatedAt)
+    {
+        var department = GetDepartment(departmentId);
+        department.Activate(activatedAt);
+        UpdatedAt = activatedAt;
+
+        return department;
+    }
+
     public void UpdateProfile(string name, Email email, Currency defaultCurrency, DateTimeOffset updatedAt)
     {
         ArgumentNullException.ThrowIfNull(email);
@@ -139,6 +177,60 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
         Email = email;
         DefaultCurrency = defaultCurrency;
         UpdatedAt = updatedAt;
+    }
+
+    public void UpdatePreferences(
+        Theme theme,
+        Language language,
+        Currency currency,
+        int fiscalYearStartMonth,
+        DateTimeOffset updatedAt)
+    {
+        Theme = EnsureDefined(theme, "El tema");
+        Language = EnsureDefined(language, "El idioma");
+        DefaultCurrency = EnsureDefined(currency, "La moneda");
+
+        if (fiscalYearStartMonth is < 1 or > 12)
+        {
+            throw new DomainException("El mes de inicio del año fiscal tiene que estar entre 1 y 12.");
+        }
+
+        FiscalYearStartMonth = fiscalYearStartMonth;
+        UpdatedAt = updatedAt;
+    }
+
+    public void UpdateCorporateProfile(string name, TaxId taxId, Email email, DateTimeOffset updatedAt)
+    {
+        ArgumentNullException.ThrowIfNull(taxId);
+        ArgumentNullException.ThrowIfNull(email);
+
+        Name = EnsureValidName(name);
+        TaxId = taxId;
+        Email = email;
+        UpdatedAt = updatedAt;
+    }
+
+    public void UpdateCorporateInformation(
+        string name,
+        TaxId taxId,
+        Email email,
+        string? industry,
+        string? phoneNumber,
+        string? fiscalAddress,
+        int? foundedYear,
+        DateTimeOffset updatedAt)
+    {
+        UpdateCorporateProfile(name, taxId, email, updatedAt);
+        Industry = EnsureIndustry(industry);
+        PhoneNumber = EnsureOptionalText(phoneNumber, MaxPhoneNumberLength, "El teléfono");
+        FiscalAddress = EnsureOptionalText(fiscalAddress, MaxFiscalAddressLength, "La dirección fiscal");
+
+        if (foundedYear is < 1800 or > 9999)
+        {
+            throw new DomainException("El año de fundación no es válido.");
+        }
+
+        FoundedYear = foundedYear;
     }
 
     public void ChangePassword(string passwordHash, DateTimeOffset updatedAt)
@@ -219,4 +311,36 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
         string.IsNullOrWhiteSpace(passwordHash)
             ? throw new DomainException("La contrasena es obligatoria.")
             : passwordHash;
+
+    private static TEnum EnsureDefined<TEnum>(TEnum value, string fieldName)
+        where TEnum : struct, Enum =>
+        Enum.IsDefined(value)
+            ? value
+            : throw new DomainException($"{fieldName} no es valido.");
+
+    private static string? EnsureOptionalText(string? value, int maxLength, string fieldName)
+    {
+        var trimmed = value?.Trim();
+
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            return null;
+        }
+
+        if (trimmed.Length > maxLength)
+        {
+            throw new DomainException($"{fieldName} no puede superar los {maxLength} caracteres.");
+        }
+
+        return trimmed;
+    }
+
+    private static string? EnsureIndustry(string? value)
+    {
+        var industry = EnsureOptionalText(value, MaxIndustryLength, "La industria");
+
+        return industry is null || IndustryTypes.IsValid(industry)
+            ? industry
+            : throw new DomainException("La industria seleccionada no es válida.");
+    }
 }

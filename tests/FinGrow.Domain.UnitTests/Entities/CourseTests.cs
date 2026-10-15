@@ -118,6 +118,28 @@ public class CourseTests
             Now);
 
         course.RelatedInvestmentType.ShouldBe(InvestmentType.Etf);
+        course.IsInvestmentContent.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void A_course_of_the_investments_category_is_investment_content_even_without_a_type()
+    {
+        var course = Course.Create(
+            "perfil-de-inversor",
+            "Tu perfil de inversor",
+            "Riesgo, plazo y objetivos.",
+            CourseLevel.Beginner,
+            EducationCategory.Investments,
+            null,
+            Now);
+
+        course.IsInvestmentContent.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void A_course_unrelated_to_investments_is_not_investment_content()
+    {
+        CreateCourse().IsInvestmentContent.ShouldBeFalse();
     }
 
     [Fact]

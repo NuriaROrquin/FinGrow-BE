@@ -28,13 +28,14 @@ public class CoursesEndpointsTests
         var client = AuthenticatedClient(factory, Rol.Empleado);
 
         var response = await client.GetAsync(new Uri(
-            "/api/courses?level=Intermediate&maxDuration=45&status=NotStarted",
+            "/api/courses?level=Intermediate&maxDuration=45&status=NotStarted&investmentType=Crypto",
             UriKind.Relative));
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         factory.Courses.WasQueried.ShouldBeTrue();
         factory.Courses.RequestedLevel.ShouldBe(CourseLevel.Intermediate);
         factory.Courses.RequestedMaxDurationMinutes.ShouldBe(45);
+        factory.Courses.RequestedInvestmentType.ShouldBe(InvestmentType.Crypto);
         factory.Courses.RequestedEmployeeId.ShouldBe(EmployeeId);
     }
 
@@ -57,6 +58,7 @@ public class CoursesEndpointsTests
         item.GetProperty("level").GetString().ShouldBe("Beginner");
         item.GetProperty("category").GetString().ShouldBe("Basics");
         item.GetProperty("relatedInvestmentType").GetString().ShouldBe("Etf");
+        item.GetProperty("isInvestmentContent").GetBoolean().ShouldBeTrue();
         item.GetProperty("durationMinutes").GetInt32().ShouldBe(25);
         item.GetProperty("lessonCount").GetInt32().ShouldBe(2);
         item.GetProperty("completedLessons").GetInt32().ShouldBe(1);
@@ -69,6 +71,7 @@ public class CoursesEndpointsTests
     [InlineData("maxDuration=-5")]
     [InlineData("level=Experto")]
     [InlineData("status=Terminado")]
+    [InlineData("investmentType=Oro")]
     public async Task An_invalid_filter_is_rejected_with_400_without_querying_the_database(string query)
     {
         using var factory = new CoursesWebApplicationFactory();
@@ -334,16 +337,20 @@ public class CoursesEndpointsTests
 
         public int? RequestedMaxDurationMinutes { get; private set; }
 
+        public InvestmentType? RequestedInvestmentType { get; private set; }
+
         public Guid? RequestedEmployeeId { get; private set; }
 
         public Task<IReadOnlyList<Course>> ListPublishedAsync(
             CourseLevel? level,
             int? maxDurationMinutes,
+            InvestmentType? relatedInvestmentType,
             CancellationToken cancellationToken = default)
         {
             WasQueried = true;
             RequestedLevel = level;
             RequestedMaxDurationMinutes = maxDurationMinutes;
+            RequestedInvestmentType = relatedInvestmentType;
 
             return Task.FromResult<IReadOnlyList<Course>>(Courses.ToList());
         }
@@ -403,9 +410,13 @@ public class CoursesEndpointsTests
                     ["Twilio:AuthToken"] = "unit-test-twilio-auth-token",
                     ["Telegram:BotToken"] = "unit-test-telegram-bot-token",
                     ["Telegram:WebhookSecret"] = "unit-test-telegram-secret",
+                    ["Email:ResendApiKey"] = "re_unit_test_key",
                     ["MercadoPago:ClientId"] = "unit-test-mp-client-id",
                     ["MercadoPago:ClientSecret"] = "unit-test-mp-client-secret",
                     ["MercadoPago:RedirectUri"] = "https://api.test/api/integrations/mercadopago/oauth/callback",
+                    ["Gmail:ClientId"] = "unit-test-gmail-client-id",
+                    ["Gmail:ClientSecret"] = "unit-test-gmail-client-secret",
+                    ["Gmail:RedirectUri"] = "https://api.test/api/integrations/gmail/oauth/callback",
                     ["TokenEncryption:Key"] = "dW5pdC10ZXN0LXRva2VuLWVuY3J5cHRpb24ta2V5ISE=",
                     ["Jobs:ApiKey"] = "unit-test-jobs-api-key-1234",
                 }));

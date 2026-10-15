@@ -9,6 +9,8 @@ using FinGrow.Infrastructure.Ai;
 
 public class AiServiceMessageParsingTests
 {
+    private static readonly DateOnly Today = new(2026, 10, 12);
+
     [Fact]
     public async Task The_text_and_the_default_currency_are_sent_to_FinGrow_AI()
     {
@@ -20,6 +22,97 @@ public class AiServiceMessageParsingTests
         using var body = JsonDocument.Parse(handler.Body!);
         body.RootElement.GetProperty("text").GetString().ShouldBe("Gasté $500 en el super");
         body.RootElement.GetProperty("default_currency").GetString().ShouldBe("USD");
+        body.RootElement.GetProperty("today").GetString().ShouldBe("2026-10-12");
+    }
+
+    [Fact]
+    public async Task The_date_of_the_transaction_is_read_when_the_message_states_it()
+    {
+        using var handler = new RecordingHandler("""
+            {
+              "status": "parsed",
+              "transaction": {
+                "type": "expense", "amount": 500, "currency": "ARS",
+                "expense_category": "alimentos", "income_category": null,
+                "description": "Supermercado", "payment_method": null, "confidence": 0.9,
+                "occurred_on": "2026-10-11"
+              },
+              "model": "m"
+            }
+            """);
+
+        var parsed = await Parse(handler);
+
+        parsed.Transaction!.OccurredOn.ShouldBe(new DateOnly(2026, 10, 11));
+        parsed.Transaction.OccurredOnIsEstimate.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task An_estimated_date_keeps_its_flag()
+    {
+        using var handler = new RecordingHandler("""
+            {
+              "status": "parsed",
+              "transaction": {
+                "type": "expense", "amount": 100, "currency": "ARS",
+                "expense_category": "otros", "income_category": null,
+                "description": "Jabón para ropa", "payment_method": null, "confidence": 0.4,
+                "occurred_on": "2026-10-05", "occurred_on_is_estimate": true
+              },
+              "model": "m"
+            }
+            """);
+
+        var parsed = await Parse(handler);
+
+        parsed.Transaction!.OccurredOn.ShouldBe(new DateOnly(2026, 10, 5));
+        parsed.Transaction.OccurredOnIsEstimate.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task An_estimate_flag_without_a_date_is_ignored()
+    {
+        using var handler = new RecordingHandler("""
+            {
+              "status": "parsed",
+              "transaction": {
+                "type": "expense", "amount": 100, "currency": "ARS",
+                "expense_category": "otros", "income_category": null,
+                "description": "Jabón para ropa", "payment_method": null, "confidence": 0.4,
+                "occurred_on": null, "occurred_on_is_estimate": true
+              },
+              "model": "m"
+            }
+            """);
+
+        var parsed = await Parse(handler);
+
+        parsed.Transaction!.OccurredOn.ShouldBeNull();
+        parsed.Transaction.OccurredOnIsEstimate.ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData("null")]
+    [InlineData("\"ayer\"")]
+    [InlineData("\"2026-13-40\"")]
+    public async Task A_missing_or_unreadable_date_is_left_empty(string occurredOn)
+    {
+        using var handler = new RecordingHandler($$"""
+            {
+              "status": "parsed",
+              "transaction": {
+                "type": "expense", "amount": 500, "currency": "ARS",
+                "expense_category": "alimentos", "income_category": null,
+                "description": "Supermercado", "payment_method": null, "confidence": 0.9,
+                "occurred_on": {{occurredOn}}
+              },
+              "model": "m"
+            }
+            """);
+
+        var parsed = await Parse(handler);
+
+        parsed.Transaction!.OccurredOn.ShouldBeNull();
     }
 
     [Fact]
@@ -106,7 +199,7 @@ public class AiServiceMessageParsingTests
     {
         using var httpClient = new HttpClient(handler, disposeHandler: false) { BaseAddress = new Uri("http://fingrow-ai.test") };
 
-        return await new AiService(httpClient).ParseTransactionMessageAsync(text, currency);
+        return await new AiService(httpClient).ParseTransactionMessageAsync(text, currency, Today);
     }
 
     private sealed class RecordingHandler : HttpMessageHandler

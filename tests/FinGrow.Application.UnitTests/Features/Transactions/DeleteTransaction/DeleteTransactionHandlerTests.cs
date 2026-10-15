@@ -32,7 +32,7 @@ public class DeleteTransactionHandlerTests
     }
 
     [Fact]
-    public async Task Returns_not_found_when_the_transaction_belongs_to_another_employee()
+    public async Task Returns_forbidden_when_the_transaction_belongs_to_another_employee()
     {
         var transactions = new FakeTransactionRepository();
         var unitOfWork = new FakeUnitOfWork();
@@ -50,7 +50,7 @@ public class DeleteTransactionHandlerTests
         var result = await handler.Handle(new DeleteTransactionCommand(transaction.Id), CancellationToken.None);
 
         result.IsFailure.ShouldBeTrue();
-        result.Error.Type.ShouldBe(ErrorType.NotFound);
+        result.Error.Type.ShouldBe(ErrorType.Forbidden);
         unitOfWork.SaveCount.ShouldBe(0);
         transaction.Status.ShouldBe(TransactionStatus.Confirmed);
     }

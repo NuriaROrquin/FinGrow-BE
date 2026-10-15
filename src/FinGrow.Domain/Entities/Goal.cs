@@ -3,6 +3,7 @@ namespace FinGrow.Domain.Entities;
 using FinGrow.Domain.Common;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.Errors;
+using FinGrow.Domain.Events;
 using FinGrow.Domain.ValueObjects;
 
 /// <summary>
@@ -34,6 +35,8 @@ public sealed class Goal : AggregateRoot
         Status = GoalStatus.Active;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
+
+        Raise(new GoalCreated(id, employeeId, createdAt));
     }
 
     public Guid EmployeeId { get; private set; }
@@ -125,6 +128,31 @@ public sealed class Goal : AggregateRoot
         }
 
         return ReachedOn is not { } reachedOn || MonthNumber(reachedOn) >= month;
+    }
+
+    public Money ContributedIn(DateOnly anyDayOfMonth)
+    {
+        var month = MonthNumber(anyDayOfMonth);
+
+        return _contributions
+            .Where(contribution => MonthNumber(contribution.ContributedOn) == month)
+            .Aggregate(Money.Zero(TargetAmount.Currency), (total, contribution) => total.Add(contribution.Amount));
+    }
+
+    public decimal? CommitmentFulfilledIn(DateOnly anyDayOfMonth)
+    {
+        if (!IsCommittedIn(anyDayOfMonth))
+        {
+            return null;
+        }
+
+        if (MonthlyCommitment.IsZero
+            || (ReachedOn is { } reachedOn && MonthNumber(reachedOn) == MonthNumber(anyDayOfMonth)))
+        {
+            return 1m;
+        }
+
+        return Math.Min(1m, ContributedIn(anyDayOfMonth).Amount / MonthlyCommitment.Amount);
     }
 
     /// <summary>
@@ -247,6 +275,11 @@ public sealed class Goal : AggregateRoot
     {
         if (CurrentAmount.IsAtLeast(TargetAmount))
         {
+            if (Status != GoalStatus.Achieved)
+            {
+                Raise(new GoalAchieved(Id, EmployeeId, occurredAt));
+            }
+
             Status = GoalStatus.Achieved;
             AchievedAt ??= occurredAt;
         }

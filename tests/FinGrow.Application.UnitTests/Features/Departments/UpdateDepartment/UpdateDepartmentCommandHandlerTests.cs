@@ -8,22 +8,29 @@ public class UpdateDepartmentCommandHandlerTests
     private readonly CompanyStaffScenario _scenario = new();
 
     private UpdateDepartmentCommandHandler CreateHandler() =>
-        new(_scenario.CurrentUser, _scenario.Companies, _scenario.Employees, _scenario.UnitOfWork, _scenario.Clock);
+        new(
+            _scenario.CurrentUser,
+            _scenario.Companies,
+            _scenario.ManagerEligibility,
+            _scenario.DepartmentResponses,
+            _scenario.UnitOfWork,
+            _scenario.Clock);
 
     [Fact]
     public async Task Saves_the_new_details_and_keeps_the_headcount()
     {
         var sales = _scenario.AddDepartment("Ventas");
-        _scenario.AddEmployee(sales);
+        var manager = _scenario.AddEmployee(sales, fullName: "Carlos Rodríguez");
 
         var result = await CreateHandler().Handle(
-            new UpdateDepartmentCommand(sales.Id, "Ventas Online", "Canal digital", "Carlos Rodríguez"),
+            new UpdateDepartmentCommand(sales.Id, "Ventas Online", "Canal digital", manager.Id),
             CancellationToken.None);
 
         result.IsSuccess.ShouldBeTrue();
         sales.Name.ShouldBe("Ventas Online");
         sales.Description.ShouldBe("Canal digital");
-        sales.ManagerName.ShouldBe("Carlos Rodríguez");
+        sales.ManagerId.ShouldBe(manager.Id);
+        result.Value.Manager.ShouldNotBeNull().FullName.ShouldBe("Carlos Rodríguez");
         sales.UpdatedAt.ShouldBe(CompanyStaffScenario.Now);
         result.Value.EmployeeCount.ShouldBe(1);
         _scenario.UnitOfWork.SaveCount.ShouldBe(1);
@@ -42,6 +49,53 @@ public class UpdateDepartmentCommandHandlerTests
         result.Error.Type.ShouldBe(ErrorType.Conflict);
         marketing.Name.ShouldBe("Marketing");
         _scenario.UnitOfWork.SaveCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task An_employee_of_another_company_cannot_be_the_manager()
+    {
+        var sales = _scenario.AddDepartment("Ventas");
+        var other = CompanyStaffScenario.CreateCompany("Otra S.A.", "hola@otra.com");
+        var outsider = _scenario.AddEmployee(department: null, company: other);
+
+        var result = await CreateHandler().Handle(
+            new UpdateDepartmentCommand(sales.Id, "Ventas", null, outsider.Id),
+            CancellationToken.None);
+
+        result.Error.Code.ShouldBe("Department.ManagerNotAvailable");
+        sales.ManagerId.ShouldBeNull();
+        _scenario.UnitOfWork.SaveCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task A_manager_who_lost_access_can_stay_while_other_details_change()
+    {
+        var sales = _scenario.AddDepartment("Ventas");
+        var manager = _scenario.AddEmployee(sales);
+        _scenario.Company.UpdateDepartment(sales.Id, "Ventas", null, manager.Id, CompanyStaffScenario.CreatedAt);
+        manager.Deactivate(CompanyStaffScenario.CreatedAt);
+
+        var result = await CreateHandler().Handle(
+            new UpdateDepartmentCommand(sales.Id, "Ventas", "Nueva descripción", manager.Id),
+            CancellationToken.None);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Manager.ShouldNotBeNull().IsActive.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task The_manager_can_be_removed()
+    {
+        var sales = _scenario.AddDepartment("Ventas");
+        var manager = _scenario.AddEmployee(sales);
+        _scenario.Company.UpdateDepartment(sales.Id, "Ventas", null, manager.Id, CompanyStaffScenario.CreatedAt);
+
+        var result = await CreateHandler().Handle(
+            new UpdateDepartmentCommand(sales.Id, "Ventas", null, null),
+            CancellationToken.None);
+
+        result.Value.Manager.ShouldBeNull();
+        sales.ManagerId.ShouldBeNull();
     }
 
     [Fact]
