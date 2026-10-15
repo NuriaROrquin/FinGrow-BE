@@ -41,7 +41,7 @@ internal sealed class GetParticipationQueryHandler
         var period = MetricsPeriod.MonthOf(ArgentinaTime.DateOf(_clock.UtcNow));
         var employees = await _employees.ListByCompanyAsync(companyId, cancellationToken);
         var activity = await _activity.ListByCompanyAsync(companyId, period, cancellationToken);
-        var metrics = PeriodMetricsCalculator.Aggregate(activity);
+        var metrics = PeriodMetricsCalculator.Aggregate(activity, new Dictionary<Guid, int>());
 
         return Result.Success(CompanyParticipationResponse.From(period, employees.Count, metrics));
     }
