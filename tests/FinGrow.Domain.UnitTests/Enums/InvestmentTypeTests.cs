@@ -29,6 +29,28 @@ public class InvestmentTypeTests
         type.IsQuoted().ShouldBeFalse();
     }
 
+    [Theory]
+    [InlineData(InvestmentType.FixedTermDeposit, true, false)]
+    [InlineData(InvestmentType.Repo, true, false)]
+    [InlineData(InvestmentType.RemuneratedAccount, false, true)]
+    public void Types_that_accrue_interest_have_a_term_or_compound_daily(InvestmentType type, bool hasTerm, bool compoundsDaily)
+    {
+        type.AccruesInterest().ShouldBeTrue();
+        type.HasTerm().ShouldBe(hasTerm);
+        type.CompoundsDaily().ShouldBe(compoundsDaily);
+    }
+
+    [Theory]
+    [InlineData(InvestmentType.Stock)]
+    [InlineData(InvestmentType.Bond)]
+    [InlineData(InvestmentType.MutualFund)]
+    [InlineData(InvestmentType.Crypto)]
+    public void Quoted_types_do_not_accrue_interest(InvestmentType type)
+    {
+        type.AccruesInterest().ShouldBeFalse();
+        type.HasTerm().ShouldBeFalse();
+    }
+
     [Fact]
     public void Only_mutual_funds_are_matched_by_name_regardless_of_currency()
     {
