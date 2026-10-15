@@ -167,6 +167,19 @@ convive con la importada. Tres cosas a propósito:
 - **Los dos portafolios se piden antes de tocar nada**: si IOL falla con uno, la corrida no guarda
   una foto a medias. Las operaciones (para la fecha de compra) sí pueden fallar: se usa el día de hoy.
 
+**Plazos fijos, cauciones y cuentas remuneradas se valúan con su TNA (HU-32)**, no con un precio:
+`Investment.AgreeRate` guarda TNA y plazo y `Accrue` registra la valuación del día con origen
+`Accrued` (lo hacen el alta, la edición y el trabajo `investment-accruals`). Dos cosas que se
+rompen sin querer:
+
+- **Una valuación `Accrued` es derivada**: sale de capital, fecha, TNA y plazo. `Correct` y
+  `AgreeRate` la borran y la recalculan cuando cambia alguno; por eso no cuenta como "valuación
+  posterior a la compra" que impida corregir el capital. No le agregues lógica que la trate como
+  un dato cargado.
+- **`HasMarketValuation` es "valuada por algo más que el costo"**: `Feed` o `Accrued`. Es lo que
+  el resumen, el filtro de cotizadas y el front leen como "cotizada"; si lo restringís a `Feed`,
+  los plazos fijos vuelven a "Sin cotizar".
+
 ## Aislamiento de datos (T-10)
 
 **Entre empresas, lo garantiza la base de datos de EF**: `FinGrowDbContext.Tenancy.cs` registra un
