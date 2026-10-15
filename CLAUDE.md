@@ -385,11 +385,21 @@ la aplica `FinancialHealthScorer` (`Application/Features/Metrics/FinancialHealth
 no se deduce leyendo:
 
 - **El resumen mensual es la base de los reportes.** `IMonthlySummaryReadRepository` agrupa los
-  confirmados por mes, tipo y categoría y `MonthlySummaryBuilder` arma los meses, incluso los vacíos.
-  HU-41 y HU-42 deberían leer de ahí en lugar de sumar otra consulta.
+  confirmados por mes, tipo y categoría y `MonthlySummaryBuilder.Build` arma los meses, incluso los
+  vacíos. HU-41 y HU-42 leen de ahí en lugar de sumar otra consulta.
+- **`monthly-summary` recorta y `insights` no.** El endpoint de HU-41 pasa por `TrimToHistory`: saca
+  los meses antes del primer movimiento del empleado en la moneda y el mes en curso todavía vacío, y
+  deja en cero cualquier otro mes vacío (es un cero real y cuenta para el promedio). El primer
+  movimiento sale de todo el historial (`FindFirstMovementDateAsync`), no del período: si no, un
+  período que empieza en un mes vacío lo ocultaría aunque hubiera historia antes. `insights` sigue mandándole a la IA todos
+  los meses del período, vacíos incluidos: no cambies `Build` para recortar.
+- **El mes con mayor ingreso, el de mayor gasto y el mejor mes de ahorro son de HU-41** y salen de
+  `MonthHighlights`, que también usa `FinancialHighlights` de HU-44: una sola regla para los dos. En
+  `monthly-summary` no tienen umbral de historial.
 - **La habilitación mira todo el historial y el contenido mira el período.** Que el empleado vea
   hitos y recomendaciones depende de `AchievementCatalog.IsActiveMonth` en 2 meses cualesquiera; el
-  filtro de fechas solo cambia qué se calcula.
+  filtro de fechas solo cambia qué se calcula. Los logros del período no tienen umbral: vienen
+  también en la respuesta de un empleado no habilitado.
 - **Los hitos son reglas, las recomendaciones son IA.** No le pidas a FinGrow-AI que elija el mejor
   mes ni que diga qué logros hay: eso sale de los datos. A la IA le llegan solo agregados y el nombre
   de las metas, nunca movimientos ni el puntaje de salud financiera.
