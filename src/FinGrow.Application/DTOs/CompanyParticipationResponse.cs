@@ -1,6 +1,5 @@
 namespace FinGrow.Application.DTOs;
 
-using FinGrow.Application.Features.Metrics;
 using FinGrow.Domain.ValueObjects;
 
 public sealed record CompanyParticipationResponse(
@@ -13,12 +12,17 @@ public sealed record CompanyParticipationResponse(
     bool IsParticipationHidden,
     int MinimumGroupSize)
 {
-    public static CompanyParticipationResponse From(MetricsPeriod period, int totalEmployees, PeriodMetrics metrics)
+    public static CompanyParticipationResponse From(
+        MetricsPeriod period,
+        int totalEmployees,
+        PeriodMetrics metrics,
+        bool canReveal,
+        int minimumGroupSize)
     {
         ArgumentNullException.ThrowIfNull(period);
         ArgumentNullException.ThrowIfNull(metrics);
 
-        var hidden = metrics.ActiveEmployees > 0 && !AggregatePrivacy.CanDisclose(metrics.ActiveEmployees);
+        var hidden = metrics.ActiveEmployees > 0 && !canReveal;
 
         return new CompanyParticipationResponse(
             period.Start,
@@ -28,6 +32,6 @@ public sealed record CompanyParticipationResponse(
             hidden ? null : metrics.ParticipatingEmployees,
             hidden ? null : metrics.ParticipationRate,
             hidden,
-            AggregatePrivacy.MinimumGroupSize);
+            minimumGroupSize);
     }
 }

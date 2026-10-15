@@ -1,8 +1,10 @@
 namespace FinGrow.Application.UnitTests.Features.Metrics;
 
+using FinGrow.Application.Features.Metrics;
 using FinGrow.Application.Features.Metrics.GetParticipation;
 using FinGrow.Application.Interfaces;
 using FinGrow.Application.UnitTests.Fakes;
+using Microsoft.Extensions.Options;
 
 public class GetParticipationQueryHandlerTests
 {
@@ -10,9 +12,15 @@ public class GetParticipationQueryHandlerTests
 
     private readonly CompanyStaffScenario _scenario = new();
     private readonly FakePeriodActivityReadRepository _activity = new();
+    private MetricsAnonymizationOptions _anonymization = new();
 
     private GetParticipationQueryHandler CreateHandler() =>
-        new(_scenario.CurrentUser, _scenario.Employees, _activity, _scenario.Clock);
+        new(
+            _scenario.CurrentUser,
+            _scenario.Employees,
+            _activity,
+            _scenario.Clock,
+            new MetricsAnonymizationPolicy(Options.Create(_anonymization)));
 
     private void AddEmployees(int participating, int idle, int deactivated = 0)
     {
@@ -52,16 +60,30 @@ public class GetParticipationQueryHandlerTests
     [Fact]
     public async Task Hides_the_participation_when_the_active_group_is_too_small_to_stay_anonymous()
     {
-        AddEmployees(participating: 1, idle: 3, deactivated: 4);
+        AddEmployees(participating: 1, idle: 1, deactivated: 4);
 
         var result = await CreateHandler().Handle(new GetParticipationQuery(), CancellationToken.None);
 
-        result.Value.TotalEmployees.ShouldBe(8);
-        result.Value.ActiveEmployees.ShouldBe(4);
+        result.Value.TotalEmployees.ShouldBe(6);
+        result.Value.ActiveEmployees.ShouldBe(2);
         result.Value.ParticipatingEmployees.ShouldBeNull();
         result.Value.ParticipationRate.ShouldBeNull();
         result.Value.IsParticipationHidden.ShouldBeTrue();
-        result.Value.MinimumGroupSize.ShouldBe(5);
+        result.Value.MinimumGroupSize.ShouldBe(3);
+    }
+
+    [Fact]
+    public async Task Uses_the_company_threshold_of_the_anonymization_settings()
+    {
+        _anonymization = new MetricsAnonymizationOptions { CompanyMinimumEmployees = 10 };
+        AddEmployees(participating: 6, idle: 2);
+
+        var result = await CreateHandler().Handle(new GetParticipationQuery(), CancellationToken.None);
+
+        result.Value.ActiveEmployees.ShouldBe(8);
+        result.Value.ParticipationRate.ShouldBeNull();
+        result.Value.IsParticipationHidden.ShouldBeTrue();
+        result.Value.MinimumGroupSize.ShouldBe(10);
     }
 
     [Fact]

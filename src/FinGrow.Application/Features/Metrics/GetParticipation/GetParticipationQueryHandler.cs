@@ -16,17 +16,20 @@ internal sealed class GetParticipationQueryHandler
     private readonly IEmployeeRepository _employees;
     private readonly IPeriodActivityReadRepository _activity;
     private readonly IDateTimeProvider _clock;
+    private readonly MetricsAnonymizationPolicy _anonymizationPolicy;
 
     public GetParticipationQueryHandler(
         ICurrentUser currentUser,
         IEmployeeRepository employees,
         IPeriodActivityReadRepository activity,
-        IDateTimeProvider clock)
+        IDateTimeProvider clock,
+        MetricsAnonymizationPolicy anonymizationPolicy)
     {
         _currentUser = currentUser;
         _employees = employees;
         _activity = activity;
         _clock = clock;
+        _anonymizationPolicy = anonymizationPolicy;
     }
 
     public async Task<Result<CompanyParticipationResponse>> Handle(
@@ -43,6 +46,11 @@ internal sealed class GetParticipationQueryHandler
         var activity = await _activity.ListByCompanyAsync(companyId, period, cancellationToken);
         var metrics = PeriodMetricsCalculator.Aggregate(activity, new Dictionary<Guid, int>());
 
-        return Result.Success(CompanyParticipationResponse.From(period, employees.Count, metrics));
+        return Result.Success(CompanyParticipationResponse.From(
+            period,
+            employees.Count,
+            metrics,
+            _anonymizationPolicy.CanRevealCompany(metrics),
+            _anonymizationPolicy.CompanyMinimumEmployees));
     }
 }
