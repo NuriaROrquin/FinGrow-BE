@@ -93,6 +93,58 @@ public sealed record ReceiptScan(ReceiptScanOutcome Outcome, ScannedReceipt? Rec
     public static ReceiptScan Of(ReceiptScanOutcome outcome, string? model = null) => new(outcome, null, model);
 }
 
+public enum RecommendationKind
+{
+    Positive,
+    Warning,
+    Tip
+}
+
+public enum RecommendationAction
+{
+    None,
+    Budgets,
+    Goals,
+    Transactions,
+    Education
+}
+
+public sealed record RecommendationsInput(
+    Language Language,
+    Currency Currency,
+    DateOnly PeriodStart,
+    DateOnly PeriodEnd,
+    IReadOnlyList<RecommendationMonth> Months,
+    IReadOnlyList<RecommendationBudgetLimit> BudgetLimits,
+    IReadOnlyList<RecommendationGoal> Goals);
+
+public sealed record RecommendationMonth(
+    int Year,
+    int Month,
+    bool IsReference,
+    decimal Income,
+    decimal Expenses,
+    decimal Savings,
+    IReadOnlyDictionary<ExpenseCategory, decimal> ExpensesByCategory);
+
+public sealed record RecommendationBudgetLimit(ExpenseCategory Category, decimal Limit, decimal Spent);
+
+public sealed record RecommendationGoal(
+    string Name,
+    bool IsAchieved,
+    decimal TargetAmount,
+    decimal CurrentAmount,
+    decimal MonthlyCommitment,
+    DateOnly Deadline);
+
+public sealed record FinancialRecommendation(
+    RecommendationKind Kind,
+    string Title,
+    string Body,
+    RecommendationAction Action);
+
+public sealed record FinancialRecommendations(IReadOnlyList<FinancialRecommendation> Recommendations, string? Model);
+
 public interface IAiService
 {
     Task<bool> IsHealthyAsync(CancellationToken cancellationToken = default);
@@ -121,5 +173,9 @@ public interface IAiService
         ReadOnlyMemory<byte> document,
         string contentType,
         Currency defaultCurrency,
+        CancellationToken cancellationToken = default);
+
+    Task<FinancialRecommendations> RecommendAsync(
+        RecommendationsInput input,
         CancellationToken cancellationToken = default);
 }

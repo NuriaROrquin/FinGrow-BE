@@ -73,6 +73,11 @@ public class AiServiceHealthCheckTests
             Currency defaultCurrency,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+
+        public Task<FinancialRecommendations> RecommendAsync(
+            RecommendationsInput input,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class AiHealthWebApplicationFactory : WebApplicationFactory<Program>

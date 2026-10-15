@@ -419,6 +419,11 @@ public class TelegramWebhookTests
                 ReceiptScanOutcome.Scanned,
                 new ScannedReceipt("Supermercado Día", 1250.50m, Currency.ARS, null, ExpenseCategory.Alimentos, PaymentMethod.DebitCard, 0.93),
                 "fake-ocr"));
+
+        public Task<FinancialRecommendations> RecommendAsync(
+            RecommendationsInput input,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class InMemoryReceiptRepository(List<TransactionReceipt> receipts) : ITransactionReceiptRepository

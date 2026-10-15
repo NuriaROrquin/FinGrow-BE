@@ -4,10 +4,14 @@ using System.Collections.Frozen;
 using System.Globalization;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Enums;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
 
 internal sealed class AiService : IAiService
 {
@@ -69,9 +73,37 @@ internal sealed class AiService : IAiService
             ["document_too_large"] = ReceiptScanOutcome.TooLarge
         }.ToFrozenDictionary(StringComparer.Ordinal);
 
-    private readonly HttpClient _httpClient;
+    private static readonly FrozenDictionary<string, RecommendationKind> RecommendationKinds =
+        new Dictionary<string, RecommendationKind>(StringComparer.Ordinal)
+        {
+            ["positive"] = RecommendationKind.Positive,
+            ["warning"] = RecommendationKind.Warning,
+            ["tip"] = RecommendationKind.Tip
+        }.ToFrozenDictionary(StringComparer.Ordinal);
 
-    public AiService(HttpClient httpClient) => _httpClient = httpClient;
+    private static readonly FrozenDictionary<string, RecommendationAction> RecommendationActions =
+        new Dictionary<string, RecommendationAction>(StringComparer.Ordinal)
+        {
+            ["none"] = RecommendationAction.None,
+            ["budgets"] = RecommendationAction.Budgets,
+            ["goals"] = RecommendationAction.Goals,
+            ["transactions"] = RecommendationAction.Transactions,
+            ["education"] = RecommendationAction.Education
+        }.ToFrozenDictionary(StringComparer.Ordinal);
+
+    private readonly HttpClient _httpClient;
+    private readonly IMemoryCache? _recommendationsCache;
+    private readonly TimeSpan _recommendationsCacheDuration;
+
+    public AiService(
+        HttpClient httpClient,
+        IMemoryCache? recommendationsCache = null,
+        IOptions<AiServiceOptions>? options = null)
+    {
+        _httpClient = httpClient;
+        _recommendationsCache = recommendationsCache;
+        _recommendationsCacheDuration = TimeSpan.FromHours(options?.Value.RecommendationsCacheHours ?? 0);
+    }
 
     public async Task<bool> IsHealthyAsync(CancellationToken cancellationToken = default)
     {
@@ -185,6 +217,111 @@ internal sealed class AiService : IAiService
         return outcome == BillParsingOutcome.Bill
             ? new ParsedBillEmail(outcome, ToParsedBill(payload.Bill), payload.Model)
             : ParsedBillEmail.Of(outcome, payload.Model);
+    }
+
+    public async Task<FinancialRecommendations> RecommendAsync(
+        RecommendationsInput input,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+
+        var request = ToRecommendRequest(input);
+        var cacheKey = RecommendationsCacheKey(request);
+
+        if (cacheKey is not null && _recommendationsCache!.TryGetValue(cacheKey, out FinancialRecommendations? cached) && cached is not null)
+        {
+            return cached;
+        }
+
+        using var response = await _httpClient.PostAsJsonAsync("/api/v1/financial-insights/recommendations", request, cancellationToken);
+
+        response.EnsureSuccessStatusCode();
+
+        RecommendResponse? payload;
+
+        try
+        {
+            payload = await response.Content.ReadFromJsonAsync<RecommendResponse>(cancellationToken);
+        }
+        catch (JsonException exception)
+        {
+            throw new HttpRequestException("FinGrow-AI devolvio un JSON invalido al generar recomendaciones.", exception);
+        }
+
+        var recommendations = (payload?.Recommendations ?? new List<RecommendationPayload>())
+            .Select(ToRecommendation)
+            .OfType<FinancialRecommendation>()
+            .ToList();
+
+        if (recommendations.Count == 0)
+        {
+            throw new HttpRequestException("FinGrow-AI no devolvio ninguna recomendacion valida.");
+        }
+
+        var result = new FinancialRecommendations(recommendations, payload?.Model);
+
+        if (cacheKey is not null)
+        {
+            _recommendationsCache!.Set(cacheKey, result, _recommendationsCacheDuration);
+        }
+
+        return result;
+    }
+
+    private string? RecommendationsCacheKey(RecommendRequest request)
+    {
+        if (_recommendationsCache is null || _recommendationsCacheDuration <= TimeSpan.Zero)
+        {
+            return null;
+        }
+
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(request)));
+
+        return $"ai-recommendations:{Convert.ToHexString(hash)}";
+    }
+
+    private static RecommendRequest ToRecommendRequest(RecommendationsInput input) => new(
+        input.Language.ToString(),
+        input.Currency.ToString(),
+        input.PeriodStart,
+        input.PeriodEnd,
+        input.Months
+            .Select(month => new RecommendMonthPayload(
+                new DateOnly(month.Year, month.Month, 1).ToString("yyyy-MM", CultureInfo.InvariantCulture),
+                month.IsReference,
+                month.Income,
+                month.Expenses,
+                month.Savings,
+                month.ExpensesByCategory
+                    .OrderBy(amount => amount.Key)
+                    .Select(amount => new CategoryAmountPayload(amount.Key.ToWireValue(), amount.Value))
+                    .ToList()))
+            .ToList(),
+        input.BudgetLimits
+            .Select(limit => new BudgetLimitPayload(limit.Category.ToWireValue(), limit.Limit, limit.Spent))
+            .ToList(),
+        input.Goals
+            .Select(goal => new GoalPayload(
+                goal.Name,
+                goal.IsAchieved ? "achieved" : "active",
+                goal.TargetAmount,
+                goal.CurrentAmount,
+                goal.MonthlyCommitment,
+                goal.Deadline))
+            .ToList());
+
+    private static FinancialRecommendation? ToRecommendation(RecommendationPayload? recommendation)
+    {
+        if (recommendation is null
+            || !RecommendationKinds.TryGetValue(recommendation.Kind ?? string.Empty, out var kind)
+            || !RecommendationActions.TryGetValue(recommendation.Action ?? string.Empty, out var action)
+            || string.IsNullOrWhiteSpace(recommendation.Title)
+            || string.IsNullOrWhiteSpace(recommendation.Body))
+        {
+            return null;
+        }
+
+        return new FinancialRecommendation(kind, recommendation.Title.Trim(), recommendation.Body.Trim(), action);
     }
 
     private static ParsedBill ToParsedBill(ParsedBillPayload? bill)
@@ -455,6 +592,50 @@ internal sealed class AiService : IAiService
         [property: JsonPropertyName("due_date")] DateOnly? DueDate,
         [property: JsonPropertyName("category")] string? Category,
         [property: JsonPropertyName("confidence")] double Confidence);
+
+    private sealed record RecommendRequest(
+        [property: JsonPropertyName("language")] string Language,
+        [property: JsonPropertyName("currency")] string Currency,
+        [property: JsonPropertyName("period_start")] DateOnly PeriodStart,
+        [property: JsonPropertyName("period_end")] DateOnly PeriodEnd,
+        [property: JsonPropertyName("months")] List<RecommendMonthPayload> Months,
+        [property: JsonPropertyName("budget_limits")] List<BudgetLimitPayload> BudgetLimits,
+        [property: JsonPropertyName("goals")] List<GoalPayload> Goals);
+
+    private sealed record RecommendMonthPayload(
+        [property: JsonPropertyName("month")] string Month,
+        [property: JsonPropertyName("is_reference")] bool IsReference,
+        [property: JsonPropertyName("income")] decimal Income,
+        [property: JsonPropertyName("expenses")] decimal Expenses,
+        [property: JsonPropertyName("savings")] decimal Savings,
+        [property: JsonPropertyName("expenses_by_category")] List<CategoryAmountPayload> ExpensesByCategory);
+
+    private sealed record CategoryAmountPayload(
+        [property: JsonPropertyName("category")] string Category,
+        [property: JsonPropertyName("amount")] decimal Amount);
+
+    private sealed record BudgetLimitPayload(
+        [property: JsonPropertyName("category")] string Category,
+        [property: JsonPropertyName("limit")] decimal Limit,
+        [property: JsonPropertyName("spent")] decimal Spent);
+
+    private sealed record GoalPayload(
+        [property: JsonPropertyName("name")] string Name,
+        [property: JsonPropertyName("status")] string Status,
+        [property: JsonPropertyName("target_amount")] decimal TargetAmount,
+        [property: JsonPropertyName("current_amount")] decimal CurrentAmount,
+        [property: JsonPropertyName("monthly_commitment")] decimal MonthlyCommitment,
+        [property: JsonPropertyName("deadline")] DateOnly Deadline);
+
+    private sealed record RecommendResponse(
+        [property: JsonPropertyName("recommendations")] List<RecommendationPayload>? Recommendations,
+        [property: JsonPropertyName("model")] string? Model);
+
+    private sealed record RecommendationPayload(
+        [property: JsonPropertyName("kind")] string? Kind,
+        [property: JsonPropertyName("title")] string? Title,
+        [property: JsonPropertyName("body")] string? Body,
+        [property: JsonPropertyName("action")] string? Action);
 
     private sealed record CategorizeRequest([property: JsonPropertyName("transactions")] List<TransactionInput> Transactions);
 

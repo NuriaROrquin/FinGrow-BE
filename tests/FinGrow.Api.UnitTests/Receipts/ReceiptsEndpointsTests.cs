@@ -455,6 +455,11 @@ public class ReceiptsEndpointsTests
             Scanned.Add(document.ToArray());
             return Task.FromResult(Result);
         }
+
+        public Task<FinancialRecommendations> RecommendAsync(
+            RecommendationsInput input,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class NoOpUnitOfWork : IUnitOfWork

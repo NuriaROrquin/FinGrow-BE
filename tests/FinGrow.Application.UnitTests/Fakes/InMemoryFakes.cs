@@ -660,6 +660,29 @@ public sealed class FakeAiService : IAiService
 
         return Task.FromResult(ScanResult);
     }
+
+    public FinancialRecommendations RecommendationsResult { get; set; } = new(
+        new[]
+        {
+            new FinancialRecommendation(RecommendationKind.Positive, "Vas bien", "Ahorraste el 20% de tus ingresos.", RecommendationAction.Goals),
+            new FinancialRecommendation(RecommendationKind.Warning, "Cuidado con alimentos", "Superaste el tope del mes.", RecommendationAction.Budgets),
+            new FinancialRecommendation(RecommendationKind.Tip, "Registra todo", "Cargá tus gastos chicos.", RecommendationAction.Transactions),
+        },
+        "fake-model");
+
+    public List<RecommendationsInput> RecommendationRequests { get; } = new();
+
+    public Task<FinancialRecommendations> RecommendAsync(RecommendationsInput input, CancellationToken cancellationToken = default)
+    {
+        if (Unreachable)
+        {
+            throw new HttpRequestException("FinGrow-AI unreachable");
+        }
+
+        RecommendationRequests.Add(input);
+
+        return Task.FromResult(RecommendationsResult);
+    }
 }
 
 public sealed class FakeRefreshTokenRepository : IRefreshTokenRepository
@@ -1269,6 +1292,48 @@ public sealed class FakeEmailSender : IEmailSender
         Sent.Add(message);
         return Task.FromResult($"re-{Sent.Count}");
     }
+}
+
+public sealed class FakeMonthlySummaryReadRepository : IMonthlySummaryReadRepository
+{
+    public List<(Guid EmployeeId, DateOnly OccurredOn, TransactionType Type, ExpenseCategory? Category, Money Amount)> Movements { get; } = new();
+
+    public void Income(Guid employeeId, DateOnly occurredOn, decimal amount, Currency currency = Currency.ARS) =>
+        Movements.Add((employeeId, occurredOn, TransactionType.Income, null, Money.From(amount, currency)));
+
+    public void Expense(Guid employeeId, DateOnly occurredOn, decimal amount, ExpenseCategory category, Currency currency = Currency.ARS) =>
+        Movements.Add((employeeId, occurredOn, TransactionType.Expense, category, Money.From(amount, currency)));
+
+    public Task<IReadOnlyList<MonthlyMovementTotal>> ListMonthlyTotalsAsync(
+        Guid employeeId,
+        Currency currency,
+        DateOnly fromDate,
+        DateOnly toDate,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<MonthlyMovementTotal>>(Movements
+            .Where(movement => movement.EmployeeId == employeeId
+                && movement.Amount.Currency == currency
+                && movement.OccurredOn >= fromDate
+                && movement.OccurredOn <= toDate)
+            .GroupBy(movement => (movement.OccurredOn.Year, movement.OccurredOn.Month, movement.Type, movement.Category))
+            .Select(group => new MonthlyMovementTotal(
+                group.Key.Year,
+                group.Key.Month,
+                group.Key.Type,
+                group.Key.Category,
+                group.Sum(movement => movement.Amount.Amount)))
+            .ToList());
+
+    public Task<IReadOnlyList<MonthlyActivity>> ListMonthlyActivityAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<MonthlyActivity>>(Movements
+            .Where(movement => movement.EmployeeId == employeeId)
+            .GroupBy(movement => (movement.OccurredOn.Year, movement.OccurredOn.Month))
+            .Select(group => new MonthlyActivity(
+                group.Key.Year,
+                group.Key.Month,
+                group.Count(),
+                group.Any(movement => movement.Type == TransactionType.Income)))
+            .ToList());
 }
 
 public sealed class FakeAchievementRepository : IAchievementRepository
