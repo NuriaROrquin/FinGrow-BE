@@ -867,6 +867,18 @@ public sealed class FakeInvestmentRepository : IInvestmentRepository
                 && investment.Symbol is not null)
             .ToList());
 
+    public Task<IReadOnlyList<Guid>> ListEmployeesWithAccruingInvestmentsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>(Investments
+            .Where(investment => investment.AnnualRate is not null)
+            .Select(investment => investment.EmployeeId)
+            .Distinct()
+            .ToList());
+
+    public Task<IReadOnlyList<Investment>> ListAccruingByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Investment>>(Investments
+            .Where(investment => investment.EmployeeId == employeeId && investment.AnnualRate is not null)
+            .ToList());
+
     public Task<IReadOnlyList<Investment>> ListImportedAsync(Guid employeeId, InvestmentSource source, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Investment>>(Investments
             .Where(investment => investment.EmployeeId == employeeId && investment.Source == source)
