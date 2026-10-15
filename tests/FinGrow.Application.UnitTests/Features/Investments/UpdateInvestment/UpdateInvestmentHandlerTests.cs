@@ -89,6 +89,57 @@ public class UpdateInvestmentHandlerTests
         investment.Quantity.ShouldBeNull();
     }
 
+    [Fact]
+    public async Task Changing_the_rate_of_a_deposit_recalculates_its_value()
+    {
+        var deposit = StoredDeposit();
+
+        var result = await _handler.Handle(DepositCommand(deposit) with { AnnualRate = 36.5m }, CancellationToken.None);
+
+        result.Value.AnnualRate.ShouldBe(36.5m);
+        result.Value.CurrentValue.ShouldBe(1_015_000m);
+        deposit.Valuations.Count.ShouldBe(2);
+        _unitOfWork.SaveCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task The_capital_of_a_deposit_can_be_corrected_after_it_accrued()
+    {
+        var deposit = StoredDeposit();
+
+        var result = await _handler.Handle(DepositCommand(deposit) with { InvestedAmount = 2_000_000m }, CancellationToken.None);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.InvestedAmount.ShouldBe(2_000_000m);
+        result.Value.CurrentValue.ShouldBe(2_024_657.53m);
+    }
+
+    private static UpdateInvestmentCommand DepositCommand(Investment deposit) => new(
+        deposit.Id,
+        EmployeeId,
+        deposit.AssetName,
+        deposit.Type,
+        deposit.InvestedAmount.Amount,
+        deposit.InvestedAmount.Currency,
+        deposit.PurchasedOn,
+        AnnualRate: deposit.AnnualRate,
+        TermDays: deposit.TermDays);
+
+    private Investment StoredDeposit()
+    {
+        var deposit = Investment.Create(
+            EmployeeId,
+            "Plazo fijo Banco Nacion",
+            InvestmentType.FixedTermDeposit,
+            Money.From(1_000_000m, Currency.ARS),
+            new DateOnly(2026, 9, 12),
+            Now);
+        deposit.AgreeRate(30m, 30, new DateOnly(2026, 9, 26), Now.AddDays(-1));
+        _investments.Add(deposit);
+
+        return deposit;
+    }
+
     private Investment StoredInvestment(Guid employeeId)
     {
         var investment = Investment.Create(

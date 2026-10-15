@@ -81,6 +81,42 @@ public class CreateInvestmentHandlerTests
         result.Value.Quantity.ShouldBeNull();
     }
 
+    [Fact]
+    public async Task A_fixed_term_deposit_is_valued_with_the_interest_accrued_up_to_today()
+    {
+        var command = ValidCommand() with
+        {
+            AssetName = "Plazo fijo Banco Nacion",
+            Type = InvestmentType.FixedTermDeposit,
+            InvestedAmount = 1_000_000m,
+            Currency = Currency.ARS,
+            PurchasedOn = new DateOnly(2026, 9, 12),
+            AnnualRate = 30m,
+            TermDays = 30,
+        };
+
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        result.Value.AnnualRate.ShouldBe(30m);
+        result.Value.TermDays.ShouldBe(30);
+        result.Value.MaturesOn.ShouldBe(new DateOnly(2026, 10, 12));
+        result.Value.HasMarketValuation.ShouldBeTrue();
+        result.Value.ValuedOn.ShouldBe(new DateOnly(2026, 9, 27));
+        result.Value.CurrentValue.ShouldBe(1_012_328.77m);
+        result.Value.ReturnAmount.ShouldBe(12_328.77m);
+    }
+
+    [Fact]
+    public async Task An_investment_without_a_rate_has_no_term_nor_maturity()
+    {
+        var result = await _handler.Handle(ValidCommand(), CancellationToken.None);
+
+        result.Value.AnnualRate.ShouldBeNull();
+        result.Value.TermDays.ShouldBeNull();
+        result.Value.MaturesOn.ShouldBeNull();
+        result.Value.HasMarketValuation.ShouldBeFalse();
+    }
+
     private static CreateInvestmentCommand ValidCommand() => new(
         Guid.CreateVersion7(),
         AssetName: "S&P 500 ETF",
