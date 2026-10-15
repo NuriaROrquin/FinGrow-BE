@@ -236,6 +236,12 @@ Clase A"), no por un símbolo.
   con origen `Accrued`; una vencida queda valuada a la fecha de vencimiento. Para el rendimiento
   cuenta como cotizada, y como se deriva de capital, fecha, TNA y plazo, se recalcula cuando cambia
   cualquiera de ellos.
+- **La evolución del portafolio (HU-33).** `GET /api/investments/evolution?currency=ARS&range=ThreeMonths`
+  (`OneMonth`, `ThreeMonths`, `SixMonths`, `OneYear` o `All`) devuelve, para una moneda, el valor y
+  el capital invertido de cada día del rango, o de cada semana si el rango pasa de un año. Empieza
+  como mucho en la primera compra y termina hoy, así que el último punto coincide con el valor
+  total del resumen. No consulta ninguna fuente: en cada fecha, cada inversión vale su última
+  valuación conocida, y las que tienen TNA, lo devengado ese día.
 
 ### Comprobantes (Cloudflare R2)
 

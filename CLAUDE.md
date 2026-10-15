@@ -180,6 +180,21 @@ rompen sin querer:
   el resumen, el filtro de cotizadas y el front leen como "cotizada"; si lo restringís a `Feed`,
   los plazos fijos vuelven a "Sin cotizar".
 
+**La evolución del portafolio (HU-33) no tiene tabla propia**: `GET /api/investments/evolution`
+la arma con `Investment.ValueOn`, que en cada fecha toma la última valuación conocida (el costo
+si todavía no hay ninguna, como una importada de IOL antes de su primera sincronización) y, en
+las que tienen TNA, lo devengado ese día hasta la última fecha ya devengada. Tres cosas a
+propósito:
+
+- **Una serie por moneda, sin convertir**: no guardamos el MEP histórico, y convertir el pasado
+  con la cotización de hoy deformaría la curva.
+- **El capital de cada punto es el `InvestedAmount` de hoy desde la fecha de compra**: es exacto
+  en las manuales (el capital solo se corrige mientras no hay valuaciones posteriores) y
+  aproximado en una posición de IOL que compró o vendió parte. No hay historial de capital: si
+  hace falta, es una tabla nueva, no un cálculo sobre las valuaciones.
+- **Una inversión borrada desaparece también del pasado**: la cascada se lleva sus valuaciones,
+  así que la curva es la del portafolio actual.
+
 ## Aislamiento de datos (T-10)
 
 **Entre empresas, lo garantiza la base de datos de EF**: `FinGrowDbContext.Tenancy.cs` registra un

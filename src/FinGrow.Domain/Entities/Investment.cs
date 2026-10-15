@@ -251,6 +251,26 @@ public sealed class Investment : AggregateRoot
 
     public bool IsValuedAtMaturity => MaturesOn is { } maturesOn && ValuedOn >= maturesOn;
 
+    public Money ValueOn(DateOnly date)
+    {
+        if (date < PurchasedOn)
+        {
+            throw new DomainException("Una inversion no tiene valor antes de haberse comprado.");
+        }
+
+        if (AnnualRate is { } annualRate && date <= ValuedOn)
+        {
+            return AccruedValueOn(annualRate, date);
+        }
+
+        return _valuations
+            .Where(valuation => valuation.ValuedOn <= date)
+            .OrderByDescending(valuation => valuation.ValuedOn)
+            .ThenByDescending(valuation => valuation.CreatedAt)
+            .Select(valuation => valuation.Value)
+            .FirstOrDefault() ?? InvestedAmount;
+    }
+
     public InvestmentValuation RecordValuation(
         Money value,
         DateOnly valuedOn,
@@ -429,9 +449,8 @@ public sealed class Investment : AggregateRoot
             return;
         }
 
-        var valuedOn = MaturesOn is { } maturesOn && maturesOn < today ? maturesOn : today;
-        var days = valuedOn.DayNumber - PurchasedOn.DayNumber;
-        var value = Money.From(InvestedAmount.Amount * GrowthFactor(annualRate, days), InvestedAmount.Currency);
+        var valuedOn = AccruesUntil(today);
+        var value = AccruedValueOn(annualRate, valuedOn);
 
         var sameDay = _valuations.SingleOrDefault(valuation =>
             valuation.Source == ValuationSource.Accrued && valuation.ValuedOn == valuedOn);
@@ -511,6 +530,15 @@ public sealed class Investment : AggregateRoot
         {
             throw new DomainException(TermOutOfRangeMessage);
         }
+    }
+
+    private DateOnly AccruesUntil(DateOnly date) => MaturesOn is { } maturesOn && maturesOn < date ? maturesOn : date;
+
+    private Money AccruedValueOn(decimal annualRate, DateOnly date)
+    {
+        var days = AccruesUntil(date).DayNumber - PurchasedOn.DayNumber;
+
+        return Money.From(InvestedAmount.Amount * GrowthFactor(annualRate, days), InvestedAmount.Currency);
     }
 
     private decimal GrowthFactor(decimal annualRate, int days)
