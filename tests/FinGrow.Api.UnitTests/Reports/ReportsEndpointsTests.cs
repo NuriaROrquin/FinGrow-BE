@@ -6,7 +6,9 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using FinGrow.Application.Common;
 using FinGrow.Application.Interfaces;
+using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
+using FinGrow.Domain.Repositories;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -19,7 +21,7 @@ public class ReportsEndpointsTests
     private static readonly Guid EmployeeId = Guid.CreateVersion7();
 
     [Fact]
-    public async Task The_monthly_summary_comes_month_by_month_with_its_categories()
+    public async Task The_monthly_summary_comes_month_by_month_from_the_first_month_with_movements()
     {
         using var factory = new ReportsWebApplicationFactory();
         factory.Summary.Totals.Add(new MonthlyMovementTotal(2026, 9, TransactionType.Income, null, 1000m));
@@ -30,11 +32,16 @@ public class ReportsEndpointsTests
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("months").GetArrayLength().ShouldBe(2);
-        var september = body.GetProperty("months")[1];
+        body.GetProperty("months").GetArrayLength().ShouldBe(1);
+        var september = body.GetProperty("months")[0];
+        september.GetProperty("month").GetInt32().ShouldBe(9);
         september.GetProperty("income").GetDecimal().ShouldBe(1000m);
         september.GetProperty("savings").GetDecimal().ShouldBe(600m);
         september.GetProperty("expensesByCategory")[0].GetProperty("category").GetString().ShouldBe("Alimentos");
+        body.GetProperty("averageMonthlySavings").GetDecimal().ShouldBe(600m);
+        var highlights = body.GetProperty("highlights");
+        highlights.GetProperty("highestIncomeMonth").GetProperty("month").GetInt32().ShouldBe(9);
+        highlights.GetProperty("bestSavingsMonth").GetProperty("amount").GetDecimal().ShouldBe(600m);
     }
 
     [Fact]
@@ -54,6 +61,7 @@ public class ReportsEndpointsTests
         eligibility.GetProperty("requiredActiveMonths").GetInt32().ShouldBe(2);
         eligibility.GetProperty("requiredTransactions").GetInt32().ShouldBe(10);
         body.GetProperty("highlights").ValueKind.ShouldBe(JsonValueKind.Null);
+        body.GetProperty("achievements").GetArrayLength().ShouldBe(0);
         body.GetProperty("recommendations").GetArrayLength().ShouldBe(0);
     }
 
@@ -110,8 +118,27 @@ public class ReportsEndpointsTests
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<MonthlyMovementTotal>>(Totals.ToList());
 
+        public Task<DateOnly?> FindFirstMovementDateAsync(Guid employeeId, Currency currency, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Totals
+                .Select(total => (DateOnly?)new DateOnly(total.Year, total.Month, 1))
+                .Min());
+
         public Task<IReadOnlyList<MonthlyActivity>> ListMonthlyActivityAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<MonthlyActivity>>(Activity.ToList());
+    }
+
+    // Sin empleado habilitado, insights igual lista los logros del período: no tiene que ir a la base.
+    private sealed class EmptyAchievementRepository : IAchievementRepository
+    {
+        public void Add(EmployeeAchievement achievement)
+        {
+        }
+
+        public Task<IReadOnlyList<EmployeeAchievement>> ListByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<EmployeeAchievement>>(Array.Empty<EmployeeAchievement>());
+
+        public Task<IReadOnlyList<EmployeeAchievement>> ListUncelebratedAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<EmployeeAchievement>>(Array.Empty<EmployeeAchievement>());
     }
 
     private sealed class ReportsWebApplicationFactory : WebApplicationFactory<Program>
@@ -145,6 +172,8 @@ public class ReportsEndpointsTests
             {
                 services.RemoveAll<IMonthlySummaryReadRepository>();
                 services.AddSingleton<IMonthlySummaryReadRepository>(Summary);
+                services.RemoveAll<IAchievementRepository>();
+                services.AddSingleton<IAchievementRepository>(new EmptyAchievementRepository());
             });
         }
     }

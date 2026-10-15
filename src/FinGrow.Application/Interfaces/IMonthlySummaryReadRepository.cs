@@ -11,6 +11,12 @@ public interface IMonthlySummaryReadRepository
         DateOnly toDate,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Fecha del primer movimiento confirmado del empleado en esa moneda, en todo su historial.</summary>
+    Task<DateOnly?> FindFirstMovementDateAsync(
+        Guid employeeId,
+        Currency currency,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<MonthlyActivity>> ListMonthlyActivityAsync(
         Guid employeeId,
         CancellationToken cancellationToken = default);

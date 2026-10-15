@@ -43,6 +43,19 @@ internal sealed class MonthlySummaryReadRepository(FinGrowDbContext dbContext) :
             .ToList();
     }
 
+    public Task<DateOnly?> FindFirstMovementDateAsync(
+        Guid employeeId,
+        Currency currency,
+        CancellationToken cancellationToken = default) =>
+        dbContext.Transactions
+            .AsNoTracking()
+            .Where(transaction =>
+                transaction.EmployeeId == employeeId
+                && transaction.Status == TransactionStatus.Confirmed
+                && transaction.Amount.Currency == currency)
+            .Select(transaction => (DateOnly?)transaction.OccurredOn)
+            .MinAsync(cancellationToken);
+
     public async Task<IReadOnlyList<MonthlyActivity>> ListMonthlyActivityAsync(
         Guid employeeId,
         CancellationToken cancellationToken = default)

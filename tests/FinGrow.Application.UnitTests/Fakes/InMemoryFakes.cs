@@ -1324,6 +1324,12 @@ public sealed class FakeMonthlySummaryReadRepository : IMonthlySummaryReadReposi
                 group.Sum(movement => movement.Amount.Amount)))
             .ToList());
 
+    public Task<DateOnly?> FindFirstMovementDateAsync(Guid employeeId, Currency currency, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Movements
+            .Where(movement => movement.EmployeeId == employeeId && movement.Amount.Currency == currency)
+            .Select(movement => (DateOnly?)movement.OccurredOn)
+            .Min());
+
     public Task<IReadOnlyList<MonthlyActivity>> ListMonthlyActivityAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<MonthlyActivity>>(Movements
             .Where(movement => movement.EmployeeId == employeeId)
