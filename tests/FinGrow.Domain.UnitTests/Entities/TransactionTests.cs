@@ -454,7 +454,7 @@ public class TransactionTests
     }
 
     [Fact]
-    public void A_transaction_registered_as_confirmed_has_nothing_to_announce()
+    public void A_transaction_registered_as_confirmed_announces_its_confirmation()
     {
         var transaction = Transaction.RegisterIncome(
             EmployeeId,
@@ -467,7 +467,29 @@ public class TransactionTests
             TransactionStatus.Confirmed,
             Now);
 
-        transaction.DequeueDomainEvents().ShouldBeEmpty();
+        var confirmed = transaction.DequeueDomainEvents().ShouldHaveSingleItem().ShouldBeOfType<TransactionConfirmed>();
+        confirmed.TransactionId.ShouldBe(transaction.Id);
+        confirmed.EmployeeId.ShouldBe(EmployeeId);
+        confirmed.ExpenseCategory.ShouldBeNull();
+        confirmed.Amount.ShouldBe(850000m);
+        confirmed.Currency.ShouldBe(Currency.ARS);
+        confirmed.OccurredOn.ShouldBe(Today);
+        confirmed.OccurredAt.ShouldBe(Now);
+    }
+
+    [Fact]
+    public void A_discarded_proposal_announces_it_so_its_receipt_can_be_released()
+    {
+        var transaction = RegisterExpense(Money.From(4500m, Currency.ARS));
+        _ = transaction.DequeueDomainEvents();
+        var discardedAt = Now.AddMinutes(5);
+
+        transaction.Discard(discardedAt);
+
+        var discarded = transaction.DequeueDomainEvents().ShouldHaveSingleItem().ShouldBeOfType<TransactionDiscarded>();
+        discarded.TransactionId.ShouldBe(transaction.Id);
+        discarded.EmployeeId.ShouldBe(EmployeeId);
+        discarded.OccurredAt.ShouldBe(discardedAt);
     }
 
     private static Transaction RegisterExpense(Money amount) => Transaction.RegisterExpense(

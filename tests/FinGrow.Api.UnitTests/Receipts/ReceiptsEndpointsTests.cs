@@ -160,6 +160,70 @@ public class ReceiptsEndpointsTests
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
+    [Fact]
+    public async Task Scanning_a_receipt_proposes_a_pending_expense_with_its_confidence()
+    {
+        using var factory = new ReceiptsWebApplicationFactory();
+        var receipt = factory.AddStoredReceipt(factory.EmployeeId, Jpeg);
+        var client = CreateAuthenticatedClient(factory);
+
+        var response = await client.PostAsync(ScanPath(receipt.Id), content: null);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var transaction = factory.Transactions.ShouldHaveSingleItem();
+        transaction.Status.ShouldBe(TransactionStatus.Pending);
+        transaction.Source.ShouldBe(TransactionSource.ReceiptScan);
+        transaction.Description.ShouldBe("Supermercado Día");
+        receipt.TransactionId.ShouldBe(transaction.Id);
+        factory.Ai.Scanned.ShouldHaveSingleItem().ShouldBe(Jpeg);
+        var body = await response.Content.ReadAsStringAsync();
+        body.ShouldContain("\"status\":\"Pending\"");
+        body.ShouldContain("\"aiConfidenceLevel\":\"High\"");
+        body.ShouldContain($"\"receiptId\":\"{receipt.Id}\"");
+    }
+
+    [Fact]
+    public async Task Scanning_a_receipt_the_ocr_cannot_read_responds_400_and_keeps_the_image()
+    {
+        using var factory = new ReceiptsWebApplicationFactory();
+        factory.Ai.Result = ReceiptScan.Of(ReceiptScanOutcome.Unreadable);
+        var receipt = factory.AddStoredReceipt(factory.EmployeeId, Jpeg);
+        var client = CreateAuthenticatedClient(factory);
+
+        var response = await client.PostAsync(ScanPath(receipt.Id), content: null);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync()).ShouldContain("Receipt.Unreadable");
+        factory.Transactions.ShouldBeEmpty();
+        factory.Storage.Files.ShouldContainKey(receipt.StorageKey);
+    }
+
+    [Fact]
+    public async Task Scanning_a_receipt_of_another_employee_responds_403()
+    {
+        using var factory = new ReceiptsWebApplicationFactory();
+        var receipt = factory.AddStoredReceipt(Guid.CreateVersion7(), Jpeg);
+        var client = CreateAuthenticatedClient(factory);
+
+        var response = await client.PostAsync(ScanPath(receipt.Id), content: null);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        factory.Ai.Scanned.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Scanning_requires_a_session()
+    {
+        using var factory = new ReceiptsWebApplicationFactory();
+        var receipt = factory.AddStoredReceipt(factory.EmployeeId, Jpeg);
+
+        var response = await factory.CreateClient().PostAsync(ScanPath(receipt.Id), content: null);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    private static Uri ScanPath(Guid id) => new($"{ReceiptsPath}/{id}/scan", UriKind.Relative);
+
     private static Uri FilePath(Guid id) => new($"{ReceiptsPath}/{id}/file", UriKind.Relative);
 
     private static MultipartFormDataContent Upload(byte[] bytes, string contentType)
@@ -191,6 +255,8 @@ public class ReceiptsEndpointsTests
         public List<Transaction> Transactions { get; } = new();
 
         public InMemoryFileStorage Storage { get; } = new();
+
+        public ScanningAiService Ai { get; } = new();
 
         public TransactionReceipt AddStoredReceipt(Guid employeeId, byte[] content)
         {
@@ -230,8 +296,12 @@ public class ReceiptsEndpointsTests
                     ["Twilio:AuthToken"] = "unit-test-twilio-auth-token",
                     ["Telegram:BotToken"] = "unit-test-telegram-bot-token",
                     ["Telegram:WebhookSecret"] = "unit-test-telegram-secret",
+                    ["Email:ResendApiKey"] = "re_unit_test_key",
                     ["MercadoPago:ClientId"] = "unit-test-mp-client-id",
                     ["MercadoPago:ClientSecret"] = "unit-test-mp-client-secret",
+                    ["Gmail:ClientId"] = "unit-test-gmail-client-id",
+                    ["Gmail:ClientSecret"] = "unit-test-gmail-client-secret",
+                    ["Gmail:RedirectUri"] = "https://api.test/api/integrations/gmail/oauth/callback",
                     ["MercadoPago:RedirectUri"] = "https://api.test/api/integrations/mercadopago/oauth/callback",
                     ["TokenEncryption:Key"] = "dW5pdC10ZXN0LXRva2VuLWVuY3J5cHRpb24ta2V5ISE=",
                     ["Jobs:ApiKey"] = "unit-test-jobs-api-key",
@@ -243,6 +313,7 @@ public class ReceiptsEndpointsTests
                 services.AddScoped<ITransactionRepository>(_ => new InMemoryTransactionRepository(Transactions));
                 services.AddSingleton<IFileStorage>(Storage);
                 services.AddScoped<IUnitOfWork, NoOpUnitOfWork>();
+                services.AddSingleton<IAiService>(Ai);
             });
         }
     }
@@ -290,6 +361,8 @@ public class ReceiptsEndpointsTests
     {
         public void Add(TransactionReceipt receipt) => receipts.Add(receipt);
 
+        public void Remove(TransactionReceipt receipt) => receipts.Remove(receipt);
+
         public Task<TransactionReceipt?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
             Task.FromResult(receipts.FirstOrDefault(receipt => receipt.Id == id));
 
@@ -304,6 +377,9 @@ public class ReceiptsEndpointsTests
                 .ToDictionary(receipt => receipt.TransactionId!.Value, receipt => receipt.Id));
 
         public Task<IReadOnlyList<string>> ListStorageKeysByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<TransactionReceipt>> ListDetachedUploadedBeforeAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
     }
 
@@ -326,6 +402,64 @@ public class ReceiptsEndpointsTests
             IReadOnlyCollection<string> externalReferences,
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlySet<string>>(new HashSet<string>(StringComparer.Ordinal));
+    }
+
+    private sealed class ScanningAiService : IAiService
+    {
+        public ReceiptScan Result { get; set; } = new(
+            ReceiptScanOutcome.Scanned,
+            new ScannedReceipt(
+                "Supermercado Día",
+                1250.50m,
+                Currency.ARS,
+                new DateOnly(2026, 10, 3),
+                ExpenseCategory.Alimentos,
+                PaymentMethod.DebitCard,
+                0.93),
+            "fake-ocr");
+
+        public List<byte[]> Scanned { get; } = new();
+
+        public Task<bool> IsHealthyAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
+
+        public Task<IReadOnlyList<CategorizedExpense>> CategorizeExpensesAsync(
+            IReadOnlyList<ExpenseToCategorize> expenses,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<ParsedMessage> ParseTransactionMessageAsync(
+            string text,
+            Currency defaultCurrency,
+            DateOnly today,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<ParsedBillEmail> ParseBillEmailAsync(
+            BillEmail email,
+            Currency defaultCurrency,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<AudioTranscription> TranscribeAudioAsync(
+            ReadOnlyMemory<byte> audio,
+            string contentType,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<ReceiptScan> ScanReceiptAsync(
+            ReadOnlyMemory<byte> document,
+            string contentType,
+            Currency defaultCurrency,
+            CancellationToken cancellationToken = default)
+        {
+            Scanned.Add(document.ToArray());
+            return Task.FromResult(Result);
+        }
+
+        public Task<FinancialRecommendations> RecommendAsync(
+            RecommendationsInput input,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class NoOpUnitOfWork : IUnitOfWork

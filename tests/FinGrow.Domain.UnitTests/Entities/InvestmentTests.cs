@@ -352,6 +352,279 @@ public class InvestmentTests
             investment.RecordMarketValuation(Money.From(1700000m, Currency.ARS), valuedOn.AddDays(1), Now));
     }
 
+    [Fact]
+    public void A_fixed_term_deposit_accrues_simple_interest_on_the_capital()
+    {
+        var deposit = CreateDeposit(InvestmentType.FixedTermDeposit, 1_000_000m);
+
+        deposit.AgreeRate(30m, 30, PurchasedOn.AddDays(15), Now);
+
+        deposit.AnnualRate.ShouldBe(30m);
+        deposit.TermDays.ShouldBe(30);
+        deposit.CurrentValue.Amount.ShouldBe(1_012_328.77m);
+        deposit.ValuedOn.ShouldBe(PurchasedOn.AddDays(15));
+        deposit.LatestValuation.Source.ShouldBe(ValuationSource.Accrued);
+        deposit.HasMarketValuation.ShouldBeTrue();
+        deposit.IsValuedAtMaturity.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void A_fixed_term_deposit_stops_accruing_at_maturity()
+    {
+        var deposit = CreateDeposit(InvestmentType.FixedTermDeposit, 1_000_000m);
+
+        deposit.AgreeRate(30m, 30, PurchasedOn.AddDays(64), Now);
+
+        deposit.MaturesOn.ShouldBe(PurchasedOn.AddDays(30));
+        deposit.ValuedOn.ShouldBe(PurchasedOn.AddDays(30));
+        deposit.CurrentValue.Amount.ShouldBe(1_024_657.53m);
+        deposit.ReturnPercentage.ShouldBe(2.47m);
+        deposit.IsValuedAtMaturity.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void A_repo_accrues_like_a_fixed_term_deposit()
+    {
+        var repo = CreateDeposit(InvestmentType.Repo, 100_000m);
+
+        repo.AgreeRate(36.5m, 7, PurchasedOn.AddDays(10), Now);
+
+        repo.ValuedOn.ShouldBe(PurchasedOn.AddDays(7));
+        repo.CurrentValue.Amount.ShouldBe(100_700m);
+    }
+
+    [Fact]
+    public void A_remunerated_account_compounds_daily_and_never_matures()
+    {
+        var account = CreateDeposit(InvestmentType.RemuneratedAccount, 100_000m);
+
+        account.AgreeRate(36.5m, null, PurchasedOn.AddDays(10), Now);
+
+        account.MaturesOn.ShouldBeNull();
+        account.CurrentValue.Amount.ShouldBe(101_004.51m);
+        account.IsValuedAtMaturity.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void A_rate_agreed_on_the_purchase_day_shows_a_known_return_of_zero()
+    {
+        var deposit = CreateDeposit(InvestmentType.FixedTermDeposit, 1_000_000m);
+
+        deposit.AgreeRate(30m, 30, PurchasedOn, Now);
+
+        deposit.HasMarketValuation.ShouldBeTrue();
+        deposit.ReturnAmount.ShouldBe(0m);
+    }
+
+    [Fact]
+    public void Accruing_twice_on_the_same_day_keeps_a_single_valuation_and_each_day_adds_one()
+    {
+        var deposit = CreateDeposit(InvestmentType.FixedTermDeposit, 1_000_000m);
+        deposit.AgreeRate(30m, 30, PurchasedOn.AddDays(15), Now);
+
+        deposit.Accrue(PurchasedOn.AddDays(15), Now.AddHours(1));
+        deposit.Valuations.Count.ShouldBe(2);
+
+        deposit.Accrue(PurchasedOn.AddDays(16), Now.AddDays(1));
+        deposit.Valuations.Count.ShouldBe(3);
+        deposit.CurrentValue.Amount.ShouldBe(1_013_150.68m);
+    }
+
+    [Fact]
+    public void After_maturity_accruing_again_does_not_add_valuations()
+    {
+        var deposit = CreateDeposit(InvestmentType.FixedTermDeposit, 1_000_000m);
+        deposit.AgreeRate(30m, 30, PurchasedOn.AddDays(40), Now);
+
+        deposit.Accrue(PurchasedOn.AddDays(41), Now.AddDays(1));
+
+        deposit.Valuations.Count.ShouldBe(2);
+        deposit.ValuedOn.ShouldBe(PurchasedOn.AddDays(30));
+    }
+
+    [Fact]
+    public void Changing_the_rate_recalculates_the_accrued_value_from_scratch()
+    {
+        var deposit = CreateDeposit(InvestmentType.FixedTermDeposit, 1_000_000m);
+        deposit.AgreeRate(30m, 30, PurchasedOn.AddDays(14), Now);
+        deposit.Accrue(PurchasedOn.AddDays(15), Now.AddDays(1));
+
+        deposit.AgreeRate(36.5m, 30, PurchasedOn.AddDays(15), Now.AddDays(1));
+
+        deposit.Valuations.Count.ShouldBe(2);
+        deposit.CurrentValue.Amount.ShouldBe(1_015_000m);
+    }
+
+    [Fact]
+    public void Agreeing_the_same_rate_again_keeps_the_accrued_history()
+    {
+        var deposit = CreateDeposit(InvestmentType.FixedTermDeposit, 1_000_000m);
+        deposit.AgreeRate(30m, 30, PurchasedOn.AddDays(14), Now);
+
+        deposit.AgreeRate(30m, 30, PurchasedOn.AddDays(15), Now.AddDays(1));
+
+        deposit.Valuations.Count.ShouldBe(3);
+    }
+
+    [Fact]
+    public void Correcting_the_capital_of_an_accruing_investment_drops_its_accrued_valuations()
+    {
+        var deposit = CreateDeposit(InvestmentType.FixedTermDeposit, 1_000_000m);
+        deposit.AgreeRate(30m, 30, PurchasedOn.AddDays(14), Now);
+        deposit.Accrue(PurchasedOn.AddDays(15), Now.AddDays(1));
+
+        deposit.Correct(deposit.AssetName, deposit.Type, Money.From(2_000_000m, Currency.ARS), PurchasedOn, Now.AddDays(1));
+        deposit.Valuations.ShouldHaveSingleItem().Source.ShouldBe(ValuationSource.Manual);
+
+        deposit.AgreeRate(30m, 30, PurchasedOn.AddDays(15), Now.AddDays(1));
+        deposit.CurrentValue.Amount.ShouldBe(2_024_657.53m);
+    }
+
+    [Fact]
+    public void Clearing_the_rate_of_a_type_that_does_not_accrue_leaves_it_at_cost()
+    {
+        var investment = CreateInvestment();
+
+        investment.AgreeRate(null, null, PurchasedOn.AddDays(15), Now);
+
+        investment.AnnualRate.ShouldBeNull();
+        investment.HasMarketValuation.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Only_fixed_term_deposits_repos_and_remunerated_accounts_take_a_rate()
+    {
+        var investment = CreateInvestment();
+
+        Should.Throw<DomainException>(() => investment.AgreeRate(30m, null, PurchasedOn, Now))
+            .Message.ShouldBe(Investment.NotAccruingMessage);
+    }
+
+    [Theory]
+    [InlineData(InvestmentType.FixedTermDeposit)]
+    [InlineData(InvestmentType.Repo)]
+    [InlineData(InvestmentType.RemuneratedAccount)]
+    public void An_investment_that_accrues_interest_requires_its_rate(InvestmentType type)
+    {
+        var deposit = CreateDeposit(type, 1_000m);
+
+        Should.Throw<DomainException>(() => deposit.AgreeRate(null, null, PurchasedOn, Now))
+            .Message.ShouldBe(Investment.RateRequiredMessage);
+    }
+
+    [Theory]
+    [InlineData(InvestmentType.FixedTermDeposit, null, Investment.TermRequiredMessage)]
+    [InlineData(InvestmentType.Repo, null, Investment.TermRequiredMessage)]
+    [InlineData(InvestmentType.RemuneratedAccount, 30, Investment.TermNotAllowedMessage)]
+    public void Only_fixed_term_deposits_and_repos_have_a_term(InvestmentType type, int? termDays, string message)
+    {
+        var deposit = CreateDeposit(type, 1_000m);
+
+        Should.Throw<DomainException>(() => deposit.AgreeRate(30m, termDays, PurchasedOn, Now))
+            .Message.ShouldBe(message);
+    }
+
+    [Theory]
+    [InlineData(0, Investment.RateOutOfRangeMessage)]
+    [InlineData(-5, Investment.RateOutOfRangeMessage)]
+    [InlineData(1000, Investment.RateOutOfRangeMessage)]
+    [InlineData(30.125, Investment.RateDecimalsMessage)]
+    public void A_rate_out_of_range_or_with_more_than_two_decimals_is_rejected(double annualRate, string message)
+    {
+        var deposit = CreateDeposit(InvestmentType.FixedTermDeposit, 1_000m);
+
+        Should.Throw<DomainException>(() => deposit.AgreeRate((decimal)annualRate, 30, PurchasedOn, Now))
+            .Message.ShouldBe(message);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(Investment.MaxTermDays + 1)]
+    public void A_term_out_of_range_is_rejected(int termDays)
+    {
+        var deposit = CreateDeposit(InvestmentType.FixedTermDeposit, 1_000m);
+
+        Should.Throw<DomainException>(() => deposit.AgreeRate(30m, termDays, PurchasedOn, Now))
+            .Message.ShouldBe(Investment.TermOutOfRangeMessage);
+    }
+
+    [Fact]
+    public void A_term_without_a_rate_is_rejected()
+    {
+        var investment = CreateInvestment();
+
+        Should.Throw<DomainException>(() => investment.AgreeRate(null, 30, PurchasedOn, Now));
+    }
+
+    [Fact]
+    public void The_value_on_a_day_is_the_latest_valuation_up_to_that_day()
+    {
+        var investment = CreateInvestment();
+        investment.RecordValuation(Money.From(1100m, Currency.USD), new DateOnly(2026, 2, 10), ValuationSource.Feed, Now);
+        investment.RecordValuation(Money.From(1250m, Currency.USD), new DateOnly(2026, 3, 10), ValuationSource.Feed, Now);
+
+        investment.ValueOn(PurchasedOn).Amount.ShouldBe(1000m);
+        investment.ValueOn(new DateOnly(2026, 2, 9)).Amount.ShouldBe(1000m);
+        investment.ValueOn(new DateOnly(2026, 2, 10)).Amount.ShouldBe(1100m);
+        investment.ValueOn(new DateOnly(2026, 3, 9)).Amount.ShouldBe(1100m);
+        investment.ValueOn(new DateOnly(2026, 12, 31)).ShouldBe(investment.CurrentValue);
+    }
+
+    [Fact]
+    public void Two_valuations_on_the_same_day_are_settled_by_the_last_one_recorded()
+    {
+        var investment = CreateInvestment();
+        investment.RecordValuation(Money.From(1200m, Currency.USD), PurchasedOn, ValuationSource.Feed, Now.AddMinutes(1));
+
+        investment.ValueOn(PurchasedOn).Amount.ShouldBe(1200m);
+    }
+
+    [Fact]
+    public void An_accruing_investment_is_worth_its_accrued_interest_on_every_day_already_accrued()
+    {
+        var deposit = CreateDeposit(InvestmentType.FixedTermDeposit, 1_000_000m);
+        deposit.AgreeRate(30m, 30, PurchasedOn.AddDays(15), Now);
+
+        deposit.ValueOn(PurchasedOn).Amount.ShouldBe(1_000_000m);
+        deposit.ValueOn(PurchasedOn.AddDays(10)).Amount.ShouldBe(1_008_219.18m);
+        deposit.ValueOn(PurchasedOn.AddDays(15)).ShouldBe(deposit.CurrentValue);
+    }
+
+    [Fact]
+    public void After_its_last_accrual_an_investment_keeps_the_last_accrued_value()
+    {
+        var deposit = CreateDeposit(InvestmentType.FixedTermDeposit, 1_000_000m);
+        deposit.AgreeRate(30m, 30, PurchasedOn.AddDays(15), Now);
+
+        deposit.ValueOn(PurchasedOn.AddDays(20)).ShouldBe(deposit.CurrentValue);
+    }
+
+    [Fact]
+    public void A_matured_deposit_is_worth_its_value_at_maturity_from_then_on()
+    {
+        var deposit = CreateDeposit(InvestmentType.FixedTermDeposit, 1_000_000m);
+        deposit.AgreeRate(30m, 30, PurchasedOn.AddDays(64), Now);
+
+        deposit.ValueOn(PurchasedOn.AddDays(45)).Amount.ShouldBe(1_024_657.53m);
+        deposit.ValueOn(PurchasedOn.AddDays(64)).Amount.ShouldBe(1_024_657.53m);
+    }
+
+    [Fact]
+    public void An_investment_has_no_value_before_it_was_bought()
+    {
+        var investment = CreateInvestment();
+
+        Should.Throw<DomainException>(() => investment.ValueOn(PurchasedOn.AddDays(-1)));
+    }
+
+    private static Investment CreateDeposit(InvestmentType type, decimal amount) => Investment.Create(
+        EmployeeId,
+        "Plazo fijo Banco Nacion",
+        type,
+        Money.From(amount, Currency.ARS),
+        PurchasedOn,
+        Now);
+
     private static Investment CreateInvestment() => Investment.Create(
         EmployeeId,
         "S&P 500 ETF",

@@ -30,6 +30,17 @@ internal sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
             .HasMaxLength(Email.MaxLength)
             .IsRequired();
 
+        builder.Property(company => company.Industry)
+            .HasMaxLength(Company.MaxIndustryLength);
+
+        builder.Property(company => company.PhoneNumber)
+            .HasMaxLength(Company.MaxPhoneNumberLength);
+
+        builder.Property(company => company.FiscalAddress)
+            .HasMaxLength(Company.MaxFiscalAddressLength);
+
+        builder.Property(company => company.FoundedYear);
+
         builder.Property(company => company.PasswordHash)
             .HasMaxLength(200)
             .IsRequired();
@@ -43,6 +54,19 @@ internal sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
         builder.Property(company => company.DefaultCurrency)
             .HasConversion<string>()
             .HasMaxLength(3)
+            .IsRequired();
+
+        builder.Property(company => company.Theme)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
+        builder.Property(company => company.Language)
+            .HasConversion<string>()
+            .HasMaxLength(5)
+            .IsRequired();
+
+        builder.Property(company => company.FiscalYearStartMonth)
             .IsRequired();
 
         builder.Property(company => company.IsActive).IsRequired();

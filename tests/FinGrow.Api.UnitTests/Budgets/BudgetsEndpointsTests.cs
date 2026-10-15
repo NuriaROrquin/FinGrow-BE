@@ -264,52 +264,6 @@ public async Task Editing_a_limit_of_a_month_without_a_budget_responds_404()
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
-    [Fact]
-    public async Task Changing_the_currency_keeps_the_amounts_and_returns_the_budget_in_the_new_one()
-    {
-        using var factory = new BudgetsWebApplicationFactory();
-        var client = CreateAuthenticatedClient(factory, Rol.Empleado);
-        await client.PostAsJsonAsync(new Uri(BudgetsPath, UriKind.Relative), SeptemberBudget());
-
-        var response = await client.PutAsJsonAsync(
-            new Uri(BudgetsPath + "/2026/9/currency", UriKind.Relative),
-            new { currency = "USD" });
-
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var stored = factory.Budgets.Single();
-        stored.Currency.ShouldBe(Currency.USD);
-        stored.LimitFor(ExpenseCategory.Alimentos)!.Amount.ShouldBe(150000m);
-        (await response.Content.ReadAsStringAsync()).ShouldContain("\"currency\":\"USD\"");
-    }
-
-    [Fact]
-    public async Task An_unknown_currency_responds_400()
-    {
-        using var factory = new BudgetsWebApplicationFactory();
-        var client = CreateAuthenticatedClient(factory, Rol.Empleado);
-        await client.PostAsJsonAsync(new Uri(BudgetsPath, UriKind.Relative), SeptemberBudget());
-
-        var response = await client.PutAsJsonAsync(
-            new Uri(BudgetsPath + "/2026/9/currency", UriKind.Relative),
-            new { currency = "XYZ" });
-
-        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        factory.Budgets.Single().Currency.ShouldBe(Currency.ARS);
-    }
-
-    [Fact]
-    public async Task Changing_the_currency_of_a_month_without_a_budget_responds_404()
-    {
-        using var factory = new BudgetsWebApplicationFactory();
-        var client = CreateAuthenticatedClient(factory, Rol.Empleado);
-
-        var response = await client.PutAsJsonAsync(
-            new Uri(BudgetsPath + "/2026/9/currency", UriKind.Relative),
-            new { currency = "USD" });
-
-        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
-    }
-
     private static object SeptemberBudget() => new
     {
         year = 2026,
@@ -354,9 +308,13 @@ public async Task Editing_a_limit_of_a_month_without_a_budget_responds_404()
                     ["Twilio:AuthToken"] = "unit-test-twilio-auth-token",
                     ["Telegram:BotToken"] = "unit-test-telegram-bot-token",
                     ["Telegram:WebhookSecret"] = "unit-test-telegram-secret",
+                    ["Email:ResendApiKey"] = "re_unit_test_key",
                     ["MercadoPago:ClientId"] = "unit-test-mp-client-id",
                     ["MercadoPago:ClientSecret"] = "unit-test-mp-client-secret",
                     ["MercadoPago:RedirectUri"] = "https://api.test/api/integrations/mercadopago/oauth/callback",
+                    ["Gmail:ClientId"] = "unit-test-gmail-client-id",
+                    ["Gmail:ClientSecret"] = "unit-test-gmail-client-secret",
+                    ["Gmail:RedirectUri"] = "https://api.test/api/integrations/gmail/oauth/callback",
                     ["TokenEncryption:Key"] = "dW5pdC10ZXN0LXRva2VuLWVuY3J5cHRpb24ta2V5ISE=",
                     ["Jobs:ApiKey"] = "unit-test-jobs-api-key",
                 }));

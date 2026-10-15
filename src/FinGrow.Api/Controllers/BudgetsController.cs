@@ -13,7 +13,6 @@ using Application.Features.Budgets.GetBudget;
 using Application.Features.Budgets.SetCategoryLimit;
 using Application.Features.Budgets.DeleteBudget;
 using Application.Features.Budgets.RemoveCategoryLimit;
-using Application.Features.Budgets.ChangeCurrency;
 using Domain.Enums;
 
 [ApiController]
@@ -61,21 +60,6 @@ public sealed class BudgetsController(ISender sender, ICurrentUser currentUser) 
         int year,
         int month,
         SetBudgetCategoryLimitCommand command,
-        CancellationToken cancellationToken)
-    {
-        command = command with { EmployeeId = currentUser.UserId!.Value, Year = year, Month = month };
-
-        return (await sender.Send(command, cancellationToken)).ToActionResult();
-    }
-
-    [HttpPut("{year:int}/{month:int}/currency")]
-    [ProducesResponseType<BudgetResponse>(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> ChangeCurrency(
-        int year,
-        int month,
-        ChangeBudgetCurrencyCommand command,
         CancellationToken cancellationToken)
     {
         command = command with { EmployeeId = currentUser.UserId!.Value, Year = year, Month = month };

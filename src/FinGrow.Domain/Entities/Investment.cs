@@ -3,6 +3,7 @@ namespace FinGrow.Domain.Entities;
 using FinGrow.Domain.Common;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.Errors;
+using FinGrow.Domain.Events;
 using FinGrow.Domain.ValueObjects;
 
 /// <summary>
@@ -16,9 +17,35 @@ public sealed class Investment : AggregateRoot
 
     public const int MaxFundNameLength = 150;
 
+    public const int MaxExternalReferenceLength = 200;
+
     public const string NotQuotedMessage =
         "Solo se cotizan por simbolo las acciones, los CEDEAR, los ETF, los bonos, las obligaciones negociables, "
         + "las letras, los fondos comunes y las criptomonedas.";
+
+    public const decimal MaxAnnualRate = 999.99m;
+
+    public const int AnnualRateDecimals = 2;
+
+    public const int MaxTermDays = 3650;
+
+    public const string RateRequiredMessage =
+        "La TNA es obligatoria en los plazos fijos, las cauciones y las cuentas remuneradas.";
+
+    public const string NotAccruingMessage =
+        "Solo los plazos fijos, las cauciones y las cuentas remuneradas llevan TNA.";
+
+    public const string TermRequiredMessage = "El plazo en dias es obligatorio en los plazos fijos y las cauciones.";
+
+    public const string TermNotAllowedMessage = "Solo los plazos fijos y las cauciones llevan plazo.";
+
+    public const string RateOutOfRangeMessage = "La TNA tiene que ser mayor a cero y no superar el 999.99%.";
+
+    public const string RateDecimalsMessage = "La TNA admite hasta dos decimales.";
+
+    public const string TermOutOfRangeMessage = "El plazo tiene que estar entre 1 y 3650 dias.";
+
+    private const int DaysPerYear = 365;
 
     private readonly List<InvestmentValuation> _valuations = new();
 
@@ -41,6 +68,7 @@ public sealed class Investment : AggregateRoot
         Type = type;
         InvestedAmount = investedAmount;
         PurchasedOn = purchasedOn;
+        Source = InvestmentSource.Manual;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
     }
@@ -61,6 +89,14 @@ public sealed class Investment : AggregateRoot
 
     public decimal? Quantity { get; private set; }
 
+    public decimal? AnnualRate { get; private set; }
+
+    public int? TermDays { get; private set; }
+
+    public InvestmentSource Source { get; private set; }
+
+    public string? ExternalReference { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -77,17 +113,7 @@ public sealed class Investment : AggregateRoot
         DateOnly purchasedOn,
         DateTimeOffset createdAt)
     {
-        ArgumentNullException.ThrowIfNull(investedAmount);
-
-        if (employeeId == Guid.Empty)
-        {
-            throw new DomainException("Una inversion siempre pertenece a un empleado.");
-        }
-
-        if (investedAmount.IsZero)
-        {
-            throw new DomainException("El capital invertido tiene que ser mayor a cero.");
-        }
+        EnsureCanBeCreated(employeeId, investedAmount);
 
         var investment = new Investment(
             Guid.CreateVersion7(),
@@ -105,8 +131,101 @@ public sealed class Investment : AggregateRoot
             purchasedOn,
             ValuationSource.Manual,
             createdAt));
+        investment.Raise(new InvestmentAdded(investment.Id, employeeId, investment.Source, createdAt));
 
         return investment;
+    }
+
+
+    public static Investment Import(
+        Guid employeeId,
+        InvestmentSource source,
+        string externalReference,
+        string assetName,
+        InvestmentType type,
+        string symbol,
+        decimal quantity,
+        Money investedAmount,
+        DateOnly purchasedOn,
+        Money marketValue,
+        DateOnly valuedOn,
+        DateTimeOffset createdAt)
+    {
+        ArgumentNullException.ThrowIfNull(marketValue);
+        EnsureCanBeCreated(employeeId, investedAmount);
+
+        if (source == InvestmentSource.Manual)
+        {
+            throw new DomainException("Una inversion importada tiene que venir de una integracion.");
+        }
+
+        var reference = EnsureValidExternalReference(externalReference);
+        var investment = new Investment(
+            Guid.CreateVersion7(),
+            employeeId,
+            EnsureValidAssetName(assetName),
+            type,
+            investedAmount,
+            purchasedOn,
+            createdAt);
+
+        investment.Track(symbol, quantity, createdAt);
+        investment.Source = source;
+        investment.ExternalReference = reference;
+        investment.RecordValuation(marketValue, valuedOn, ValuationSource.Feed, createdAt);
+        investment.Raise(new InvestmentAdded(investment.Id, employeeId, source, createdAt));
+
+        return investment;
+    }
+
+    public bool UpdatePosition(
+        decimal quantity,
+        Money investedAmount,
+        Money marketValue,
+        DateOnly valuedOn,
+        DateTimeOffset updatedAt)
+    {
+        ArgumentNullException.ThrowIfNull(investedAmount);
+        ArgumentNullException.ThrowIfNull(marketValue);
+
+        if (Source == InvestmentSource.Manual)
+        {
+            throw new DomainException("Una inversion cargada a mano no se actualiza con la posicion de una integracion.");
+        }
+
+        if (quantity <= 0m)
+        {
+            throw new DomainException("La cantidad tiene que ser mayor a cero.");
+        }
+
+        if (investedAmount.IsZero)
+        {
+            throw new DomainException("El capital invertido tiene que ser mayor a cero.");
+        }
+
+        if (investedAmount.Currency != InvestedAmount.Currency)
+        {
+            throw new DomainException("El capital invertido tiene que seguir en la misma moneda.");
+        }
+
+        var changed = false;
+
+        // El broker informa el capital con su precio promedio de compra: solo una compra o una venta lo mueve.
+        if (quantity != Quantity)
+        {
+            Quantity = quantity;
+            InvestedAmount = investedAmount;
+            UpdatedAt = updatedAt;
+            changed = true;
+        }
+
+        if (marketValue != CurrentValue)
+        {
+            RecordMarketValuation(marketValue, valuedOn, updatedAt);
+            changed = true;
+        }
+
+        return changed;
     }
 
     public InvestmentValuation LatestValuation => _valuations
@@ -126,7 +245,31 @@ public sealed class Investment : AggregateRoot
         ? 0m
         : decimal.Round(ReturnAmount / InvestedAmount.Amount * 100m, 2, MidpointRounding.ToEven);
 
-    public bool HasMarketValuation => _valuations.Any(valuation => valuation.Source == ValuationSource.Feed);
+    public bool HasMarketValuation => _valuations.Any(valuation => valuation.Source != ValuationSource.Manual);
+
+    public DateOnly? MaturesOn => TermDays is { } termDays ? PurchasedOn.AddDays(termDays) : null;
+
+    public bool IsValuedAtMaturity => MaturesOn is { } maturesOn && ValuedOn >= maturesOn;
+
+    public Money ValueOn(DateOnly date)
+    {
+        if (date < PurchasedOn)
+        {
+            throw new DomainException("Una inversion no tiene valor antes de haberse comprado.");
+        }
+
+        if (AnnualRate is { } annualRate && date <= ValuedOn)
+        {
+            return AccruedValueOn(annualRate, date);
+        }
+
+        return _valuations
+            .Where(valuation => valuation.ValuedOn <= date)
+            .OrderByDescending(valuation => valuation.ValuedOn)
+            .ThenByDescending(valuation => valuation.CreatedAt)
+            .Select(valuation => valuation.Value)
+            .FirstOrDefault() ?? InvestedAmount;
+    }
 
     public InvestmentValuation RecordValuation(
         Money value,
@@ -195,15 +338,25 @@ public sealed class Investment : AggregateRoot
 
         var validAssetName = EnsureValidAssetName(assetName);
 
+        if (Source != InvestmentSource.Manual
+            && (type != Type || investedAmount != InvestedAmount || purchasedOn != PurchasedOn))
+        {
+            throw new DomainException(
+                "De una inversion importada solo se puede cambiar el nombre: el resto lo informa la integracion.");
+        }
+
         if (investedAmount != InvestedAmount || purchasedOn != PurchasedOn)
         {
-            if (_valuations.Count > 1)
+            var recorded = _valuations.Where(valuation => valuation.Source != ValuationSource.Accrued).ToList();
+
+            if (recorded.Count > 1)
             {
                 throw new DomainException(
                     "La inversion ya tiene valuaciones posteriores a la compra: solo se puede corregir el nombre y el tipo.");
             }
 
-            _valuations.Single().Correct(investedAmount, purchasedOn);
+            _valuations.RemoveAll(valuation => valuation.Source == ValuationSource.Accrued);
+            recorded.Single().Correct(investedAmount, purchasedOn);
             InvestedAmount = investedAmount;
             PurchasedOn = purchasedOn;
         }
@@ -240,6 +393,12 @@ public sealed class Investment : AggregateRoot
             throw new DomainException("La cantidad tiene que ser mayor a cero.");
         }
 
+        if (Source != InvestmentSource.Manual && (normalizedSymbol != Symbol || quantity != Quantity))
+        {
+            throw new DomainException(
+                "El simbolo y la cantidad de una inversion importada los informa la integracion: no se cambian a mano.");
+        }
+
         Symbol = normalizedSymbol;
         Quantity = quantity;
         UpdatedAt = updatedAt;
@@ -268,10 +427,156 @@ public sealed class Investment : AggregateRoot
         return sameDay;
     }
 
+    public void AgreeRate(decimal? annualRate, int? termDays, DateOnly today, DateTimeOffset updatedAt)
+    {
+        EnsureValidRate(annualRate, termDays);
+
+        if (annualRate != AnnualRate || termDays != TermDays)
+        {
+            AnnualRate = annualRate;
+            TermDays = termDays;
+            _valuations.RemoveAll(valuation => valuation.Source == ValuationSource.Accrued);
+            UpdatedAt = updatedAt;
+        }
+
+        Accrue(today, updatedAt);
+    }
+
+    public void Accrue(DateOnly today, DateTimeOffset recordedAt)
+    {
+        if (AnnualRate is not { } annualRate || today < PurchasedOn)
+        {
+            return;
+        }
+
+        var valuedOn = AccruesUntil(today);
+        var value = AccruedValueOn(annualRate, valuedOn);
+
+        var sameDay = _valuations.SingleOrDefault(valuation =>
+            valuation.Source == ValuationSource.Accrued && valuation.ValuedOn == valuedOn);
+
+        if (sameDay is null)
+        {
+            RecordValuation(value, valuedOn, ValuationSource.Accrued, recordedAt);
+            return;
+        }
+
+        if (sameDay.Value != value)
+        {
+            sameDay.Correct(value, valuedOn);
+            UpdatedAt = recordedAt;
+        }
+    }
+
     public void Rename(string assetName, DateTimeOffset updatedAt)
     {
         AssetName = EnsureValidAssetName(assetName);
         UpdatedAt = updatedAt;
+    }
+
+    private static void EnsureCanBeCreated(Guid employeeId, Money investedAmount)
+    {
+        ArgumentNullException.ThrowIfNull(investedAmount);
+
+        if (employeeId == Guid.Empty)
+        {
+            throw new DomainException("Una inversion siempre pertenece a un empleado.");
+        }
+
+        if (investedAmount.IsZero)
+        {
+            throw new DomainException("El capital invertido tiene que ser mayor a cero.");
+        }
+    }
+
+    private void EnsureValidRate(decimal? annualRate, int? termDays)
+    {
+        if (annualRate is not { } rate)
+        {
+            if (termDays is not null)
+            {
+                throw new DomainException("El plazo va con la TNA: se cargan los dos o ninguno.");
+            }
+
+            if (Type.AccruesInterest() && Source == InvestmentSource.Manual)
+            {
+                throw new DomainException(RateRequiredMessage);
+            }
+
+            return;
+        }
+
+        if (!Type.AccruesInterest())
+        {
+            throw new DomainException(NotAccruingMessage);
+        }
+
+        if (rate <= 0m || rate > MaxAnnualRate)
+        {
+            throw new DomainException(RateOutOfRangeMessage);
+        }
+
+        if (decimal.Round(rate, AnnualRateDecimals) != rate)
+        {
+            throw new DomainException(RateDecimalsMessage);
+        }
+
+        if (Type.HasTerm() != termDays.HasValue)
+        {
+            throw new DomainException(Type.HasTerm() ? TermRequiredMessage : TermNotAllowedMessage);
+        }
+
+        if (termDays is < 1 or > MaxTermDays)
+        {
+            throw new DomainException(TermOutOfRangeMessage);
+        }
+    }
+
+    private DateOnly AccruesUntil(DateOnly date) => MaturesOn is { } maturesOn && maturesOn < date ? maturesOn : date;
+
+    private Money AccruedValueOn(decimal annualRate, DateOnly date)
+    {
+        var days = AccruesUntil(date).DayNumber - PurchasedOn.DayNumber;
+
+        return Money.From(InvestedAmount.Amount * GrowthFactor(annualRate, days), InvestedAmount.Currency);
+    }
+
+    private decimal GrowthFactor(decimal annualRate, int days)
+    {
+        var dailyRate = annualRate / 100m / DaysPerYear;
+
+        return Type.CompoundsDaily() ? Power(1m + dailyRate, days) : 1m + (dailyRate * days);
+    }
+
+    private static decimal Power(decimal factor, int exponent)
+    {
+        var result = 1m;
+
+        while (exponent > 0)
+        {
+            if ((exponent & 1) == 1)
+            {
+                result *= factor;
+            }
+
+            factor *= factor;
+            exponent >>= 1;
+        }
+
+        return result;
+    }
+
+    private static string EnsureValidExternalReference(string externalReference)
+    {
+        var trimmed = (externalReference ?? string.Empty).Trim();
+
+        return trimmed.Length switch
+        {
+            0 => throw new DomainException("Una inversion importada necesita la referencia de la integracion."),
+            > MaxExternalReferenceLength => throw new DomainException(
+                $"La referencia externa no puede superar los {MaxExternalReferenceLength} caracteres."),
+            _ => trimmed
+        };
     }
 
     private static string EnsureValidAssetName(string assetName)

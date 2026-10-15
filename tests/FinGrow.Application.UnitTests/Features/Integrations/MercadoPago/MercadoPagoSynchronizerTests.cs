@@ -278,6 +278,7 @@ public class MercadoPagoSynchronizerTests
         var result = await Sync();
 
         result.Error.ShouldBe(MercadoPagoSynchronizer.GrantExpired);
+        result.Error.Type.ShouldBe(ErrorType.Conflict);
         _payments.Searches.ShouldBeEmpty();
     }
 

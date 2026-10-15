@@ -13,7 +13,7 @@ public class MetricsSnapshotTests
     public void A_company_snapshot_keeps_the_period_and_the_metrics()
     {
         var companyId = Guid.CreateVersion7();
-        var metrics = PeriodMetrics.From(5, 3, 12, 2, 1, 0, 4);
+        var metrics = PeriodMetrics.From(5, 3, 12, 2, 1, 0, 4, 2, 130);
 
         var snapshot = CompanyMetricsSnapshot.Take(companyId, August, metrics, ComputedAt);
 
@@ -28,7 +28,7 @@ public class MetricsSnapshotTests
     public void Refreshing_replaces_the_metrics_and_the_computation_time()
     {
         var snapshot = CompanyMetricsSnapshot.Take(Guid.CreateVersion7(), August, PeriodMetrics.Empty, ComputedAt);
-        var updated = PeriodMetrics.From(5, 4, 20, 2, 1, 0, 4);
+        var updated = PeriodMetrics.From(5, 4, 20, 2, 1, 0, 4, 3, 190);
 
         snapshot.Refresh(updated, ComputedAt.AddDays(2));
 

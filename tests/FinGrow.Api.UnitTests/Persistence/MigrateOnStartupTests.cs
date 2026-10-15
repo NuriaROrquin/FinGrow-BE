@@ -42,9 +42,13 @@ public class MigrateOnStartupTests
             ["Twilio:AuthToken"] = "unit-test-twilio-auth-token",
             ["Telegram:BotToken"] = "unit-test-telegram-bot-token",
             ["Telegram:WebhookSecret"] = "unit-test-telegram-secret",
+            ["Email:ResendApiKey"] = "re_unit_test_key",
             ["MercadoPago:ClientId"] = "unit-test-mp-client-id",
             ["MercadoPago:ClientSecret"] = "unit-test-mp-client-secret",
             ["MercadoPago:RedirectUri"] = "https://api.test/api/integrations/mercadopago/oauth/callback",
+            ["Gmail:ClientId"] = "unit-test-gmail-client-id",
+            ["Gmail:ClientSecret"] = "unit-test-gmail-client-secret",
+            ["Gmail:RedirectUri"] = "https://api.test/api/integrations/gmail/oauth/callback",
             ["TokenEncryption:Key"] = "dW5pdC10ZXN0LXRva2VuLWVuY3J5cHRpb24ta2V5ISE=",
         });
         builder.Services.AddApplication();

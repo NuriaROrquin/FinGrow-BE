@@ -12,13 +12,18 @@ internal enum ProposalOutcome
 {
     Proposed,
     AlreadyProposed,
+    TooLong,
     MissingAmount,
     MultipleTransactions,
     NotATransaction,
     AiUnavailable
 }
 
-internal sealed record Proposal(ProposalOutcome Outcome, Transaction? Transaction = null, bool AsksPaymentMethod = false)
+internal sealed record Proposal(
+    ProposalOutcome Outcome,
+    Transaction? Transaction = null,
+    bool AsksPaymentMethod = false,
+    bool DateIsEstimate = false)
 {
     public static Proposal Of(ProposalOutcome outcome) => new(outcome);
 }
@@ -28,6 +33,8 @@ internal sealed partial class ChatTransactionProposer
     public const Currency DefaultCurrency = Currency.ARS;
 
     public const PaymentMethod DefaultPaymentMethod = PaymentMethod.Cash;
+
+    public const int MaxTextLength = 1000;
 
     private readonly IAiService _ai;
     private readonly ITransactionRepository _transactions;
@@ -64,6 +71,11 @@ internal sealed partial class ChatTransactionProposer
             return Proposal.Of(ProposalOutcome.AlreadyProposed);
         }
 
+        if (text.Length > MaxTextLength)
+        {
+            return Proposal.Of(ProposalOutcome.TooLong);
+        }
+
         var parsed = await ParseAsync(employeeId, text, cancellationToken);
 
         if (parsed is null)
@@ -89,12 +101,17 @@ internal sealed partial class ChatTransactionProposer
         var paymentMethod = ChatTransactionText.IsAllowed(proposed.Type, proposed.PaymentMethod)
             ? proposed.PaymentMethod
             : null;
-        var transaction = Register(employeeId, source, externalReference, proposed, paymentMethod, parsed.Model);
+        var (occurredOn, dateIsEstimate) = ResolveOccurredOn(proposed);
+        var transaction = Register(employeeId, source, externalReference, proposed, occurredOn, paymentMethod, parsed.Model);
 
         _transactions.Add(transaction);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return new Proposal(ProposalOutcome.Proposed, transaction, AsksPaymentMethod: paymentMethod is null);
+        return new Proposal(
+            ProposalOutcome.Proposed,
+            transaction,
+            AsksPaymentMethod: paymentMethod is null,
+            DateIsEstimate: dateIsEstimate);
     }
 
     private Transaction Register(
@@ -102,6 +119,7 @@ internal sealed partial class ChatTransactionProposer
         TransactionSource source,
         string externalReference,
         ParsedTransaction proposed,
+        DateOnly occurredOn,
         PaymentMethod? paymentMethod,
         string? model)
     {
@@ -116,7 +134,7 @@ internal sealed partial class ChatTransactionProposer
                 amount,
                 expenseCategory,
                 proposed.Description,
-                _clock.Today,
+                occurredOn,
                 paymentMethod ?? DefaultPaymentMethod,
                 source,
                 TransactionStatus.Pending,
@@ -133,7 +151,7 @@ internal sealed partial class ChatTransactionProposer
             amount,
             incomeCategory,
             proposed.Description,
-            _clock.Today,
+            occurredOn,
             paymentMethod ?? DefaultPaymentMethod,
             source,
             TransactionStatus.Pending,
@@ -144,6 +162,15 @@ internal sealed partial class ChatTransactionProposer
         return income;
     }
 
+    private (DateOnly OccurredOn, bool IsEstimate) ResolveOccurredOn(ParsedTransaction proposed)
+    {
+        var today = _clock.Today;
+
+        return proposed.OccurredOn is { } date && date <= today
+            ? (date, proposed.OccurredOnIsEstimate)
+            : (today, false);
+    }
+
     private static InvalidOperationException MissingCategory() =>
         new("FinGrow-AI propuso un movimiento sin la categoria que corresponde a su tipo.");
 
@@ -151,7 +178,7 @@ internal sealed partial class ChatTransactionProposer
     {
         try
         {
-            return await _ai.ParseTransactionMessageAsync(text, DefaultCurrency, cancellationToken);
+            return await _ai.ParseTransactionMessageAsync(text, DefaultCurrency, _clock.Today, cancellationToken);
         }
         catch (HttpRequestException exception)
         {

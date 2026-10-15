@@ -19,7 +19,7 @@ internal sealed partial class MercadoPagoSynchronizer
     internal static readonly Error NotAuthorized = Error.NotFound(
         "Integrations.MercadoPago.NotLinked", "No tenes Mercado Pago vinculado.");
 
-    internal static readonly Error GrantExpired = Error.Failure(
+    internal static readonly Error GrantExpired = Error.Conflict(
         "Integrations.MercadoPago.GrantExpired", "La autorizacion de Mercado Pago vencio: volve a vincular la cuenta.");
 
     private readonly IMercadoPagoPaymentsClient _payments;

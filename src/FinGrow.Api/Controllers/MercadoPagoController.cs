@@ -57,6 +57,7 @@ public sealed class MercadoPagoController : ControllerBase
     [Authorize]
     [ProducesResponseType<MercadoPagoSyncSummary>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Sync(CancellationToken cancellationToken) =>
         (await _sender.Send(new SyncMyMercadoPagoCommand(), cancellationToken)).ToActionResult();
 }

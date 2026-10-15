@@ -7,6 +7,9 @@ internal static class GoalErrors
     public static Error NotFound(Guid goalId) =>
         Error.NotFound("Goal.NotFound", $"No existe una meta con id '{goalId}'.");
 
+    public static Error NotOwned() =>
+        Error.Forbidden("Goal.NotOwned", "La meta no pertenece al usuario autenticado.");
+
     public static Error ContributionNotFound(Guid contributionId) =>
         Error.NotFound("Goal.ContributionNotFound", $"No existe un aporte con id '{contributionId}' en esta meta.");
 

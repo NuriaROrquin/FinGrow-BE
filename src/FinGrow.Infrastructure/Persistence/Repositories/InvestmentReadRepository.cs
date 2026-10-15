@@ -36,10 +36,10 @@ internal sealed class InvestmentReadRepository(FinGrowDbContext dbContext) : IIn
         .FirstOrDefault() < investment.InvestedAmount.Amount;
 
     private static readonly Expression<Func<Investment, bool>> IsQuoted = investment =>
-        investment.Valuations.Any(valuation => valuation.Source == ValuationSource.Feed);
+        investment.Valuations.Any(valuation => valuation.Source != ValuationSource.Manual);
 
     private static readonly Expression<Func<Investment, bool>> IsUnquoted = investment =>
-        !investment.Valuations.Any(valuation => valuation.Source == ValuationSource.Feed);
+        !investment.Valuations.Any(valuation => valuation.Source != ValuationSource.Manual);
 
     public async Task<PagedResult<Investment>> GetPageAsync(
         Guid employeeId,

@@ -12,12 +12,19 @@ internal sealed class ListGoalContributionsHandler(IGoalRepository goalRepositor
         ListGoalContributionsQuery request,
         CancellationToken cancellationToken)
     {
-        var goal = await goalRepository.GetByIdAsync(request.GoalId, cancellationToken);
+        var owned = Ownership.Require(
+            await goalRepository.GetByIdAsync(request.GoalId, cancellationToken),
+            goal => goal.EmployeeId,
+            request.EmployeeId,
+            GoalErrors.NotFound(request.GoalId),
+            GoalErrors.NotOwned());
 
-        if (goal is null || goal.EmployeeId != request.EmployeeId)
+        if (owned.IsFailure)
         {
-            return Result.Failure<IReadOnlyList<GoalContributionResponse>>(GoalErrors.NotFound(request.GoalId));
+            return Result.Failure<IReadOnlyList<GoalContributionResponse>>(owned.Error);
         }
+
+        var goal = owned.Value;
 
         IReadOnlyList<GoalContributionResponse> history = goal.Contributions
             .OrderByDescending(contribution => contribution.ContributedOn)

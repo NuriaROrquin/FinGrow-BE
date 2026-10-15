@@ -14,14 +14,12 @@ internal static class ReceiptAttachment
     {
         var receipt = await receipts.GetByIdAsync(receiptId, cancellationToken);
 
-        if (receipt is null)
-        {
-            return Result.Failure<TransactionReceipt>(ReceiptErrors.NotFound(receiptId));
-        }
-
-        return receipt.EmployeeId == employeeId
-            ? Result.Success(receipt)
-            : Result.Failure<TransactionReceipt>(ReceiptErrors.NotOwned);
+        return Ownership.Require(
+            receipt,
+            found => found.EmployeeId,
+            employeeId,
+            ReceiptErrors.NotFound(receiptId),
+            ReceiptErrors.NotOwned);
     }
 
     public static Guid? ReceiptOf(this IReadOnlyDictionary<Guid, Guid> receiptIds, Guid transactionId) =>

@@ -7,6 +7,7 @@ using FinGrow.Api.Jobs;
 using FinGrow.Application.Interfaces;
 using FinGrow.Application.Jobs;
 using FinGrow.Domain.Entities;
+using FinGrow.Domain.Enums;
 using FinGrow.Domain.Repositories;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -154,9 +155,13 @@ public class JobsEndpointsTests
                     ["Twilio:AuthToken"] = "unit-test-twilio-auth-token",
                     ["Telegram:BotToken"] = "unit-test-telegram-bot-token",
                     ["Telegram:WebhookSecret"] = "unit-test-telegram-secret",
+                    ["Email:ResendApiKey"] = "re_unit_test_key",
                     ["MercadoPago:ClientId"] = "unit-test-mp-client-id",
                     ["MercadoPago:ClientSecret"] = "unit-test-mp-client-secret",
                     ["MercadoPago:RedirectUri"] = "https://api.test/api/integrations/mercadopago/oauth/callback",
+                    ["Gmail:ClientId"] = "unit-test-gmail-client-id",
+                    ["Gmail:ClientSecret"] = "unit-test-gmail-client-secret",
+                    ["Gmail:RedirectUri"] = "https://api.test/api/integrations/gmail/oauth/callback",
                     ["TokenEncryption:Key"] = "dW5pdC10ZXN0LXRva2VuLWVuY3J5cHRpb24ta2V5ISE=",
                     ["Jobs:ApiKey"] = ApiKey,
                 }));
@@ -199,6 +204,9 @@ public class JobsEndpointsTests
 
         public Task<JobRun?> FindLastAsync(string jobName, CancellationToken cancellationToken = default) =>
             Task.FromResult(Runs.Where(run => run.JobName == jobName).OrderByDescending(run => run.StartedAt).FirstOrDefault());
+
+        public Task<bool> HasSucceededAsync(string jobName, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Runs.Any(run => run.JobName == jobName && run.Status == JobRunStatus.Succeeded));
 
         public Task<IReadOnlyList<JobRun>> ListRecentAsync(string jobName, int take, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<JobRun>>(Runs.Where(run => run.JobName == jobName).OrderByDescending(run => run.StartedAt).Take(take).ToList());

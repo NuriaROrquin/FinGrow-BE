@@ -17,4 +17,7 @@ public sealed class AiServiceOptions
 
     [Range(1, 300)]
     public int TimeoutSeconds { get; init; } = 30;
+
+    [Range(0, 168)]
+    public int RecommendationsCacheHours { get; init; } = 6;
 }

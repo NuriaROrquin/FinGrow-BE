@@ -2,6 +2,7 @@ namespace FinGrow.Application.UnitTests.Features.Receipts;
 
 using FinGrow.Application.Common;
 using FinGrow.Application.DTOs;
+using FinGrow.Application.Features.Receipts.Storing;
 using FinGrow.Application.Features.Receipts.UploadReceipt;
 using FinGrow.Application.Interfaces;
 using FinGrow.Application.UnitTests.Fakes;
@@ -77,9 +78,7 @@ public class UploadReceiptHandlerTests
     [Fact]
     public async Task Deletes_the_stored_file_when_the_database_fails()
     {
-        var handler = new UploadReceiptHandler(
-            _receipts, _storage, new FailingUnitOfWork(), _user, new FakeDateTimeProvider(Now),
-            NullLogger<UploadReceiptHandler>.Instance);
+        var handler = new UploadReceiptHandler(Storer(new FailingUnitOfWork()), _user);
         using var content = new MemoryStream(Png);
 
         await Should.ThrowAsync<InvalidOperationException>(() =>
@@ -106,15 +105,16 @@ public class UploadReceiptHandlerTests
         string? fileName = null,
         long? declaredLength = null)
     {
-        var handler = new UploadReceiptHandler(
-            _receipts, _storage, _unitOfWork, _user, new FakeDateTimeProvider(Now),
-            NullLogger<UploadReceiptHandler>.Instance);
+        var handler = new UploadReceiptHandler(Storer(_unitOfWork), _user);
         using var content = new MemoryStream(bytes);
 
         return await handler.Handle(
             new UploadReceiptCommand(content, contentType, declaredLength ?? bytes.Length, fileName),
             CancellationToken.None);
     }
+
+    private ReceiptStorer Storer(IUnitOfWork unitOfWork) => new(
+        _receipts, _storage, unitOfWork, new FakeDateTimeProvider(Now), NullLogger<ReceiptStorer>.Instance);
 
     private sealed class FailingUnitOfWork : IUnitOfWork
     {
