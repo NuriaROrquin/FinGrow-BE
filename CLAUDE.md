@@ -253,16 +253,6 @@ ante un recurso de otra empresa, para no confirmar que existe.
   Las respuestas de departamentos se arman en `DepartmentResponseBuilder`, que trae el nombre
   del responsable y la cantidad de empleados.
 
-- **Las métricas del panel son agregadas y nunca llevan datos de un empleado** (HU-56).
-  `GET api/company/metrics/participation` calcula en vivo el mes en curso con la misma lectura
-  que `metrics-snapshot` (`IPeriodActivityReadRepository`), así el panel y las fotos no pueden
-  definir "participar" de dos maneras: total = todos los empleados dados de alta, activos = los
-  que tienen el acceso habilitado, tasa = participantes sobre activos. Con menos de
-  `AggregatePrivacy.MinimumGroupSize` activos la participación viaja en `null` con
-  `isParticipationHidden`, porque en un grupo chico la tasa delata a cada uno. Ese piso es
-  provisorio: la capa de anonimización de T-11 lo reemplaza, y toda métrica nueva por grupo
-  (departamento incluido) tiene que pasar por él.
-
 ## Contenido educativo e inversiones
 
 Artículos y cursos se vinculan a un tipo de activo con `RelatedInvestmentType`, y
@@ -342,6 +332,14 @@ Application, antes de serializar la respuesta, y no escondiendo columnas en el f
   `GET /api/company/metrics` y `GET /api/company/departments/{departmentId}/metrics` leen
   `CompanyMetricsSnapshot` o `DepartmentMetricsSnapshot`; no consultan ni proyectan empleados,
   movimientos, metas o inversiones individuales.
+- **La participación del mes en curso se calcula en vivo** (HU-56).
+  `GET /api/company/metrics/participation` no tiene foto: agrega en el handler la misma lectura
+  que usa `metrics-snapshot` (`IPeriodActivityReadRepository`), así el panel y las fotos no pueden
+  definir "participar" de dos maneras. Total = todos los empleados dados de alta, activos = los
+  que tienen el acceso habilitado, tasa = participantes sobre activos. Con menos activos que
+  `Metrics:CompanyMinimumEmployees` no se rechaza la respuesta entera: participantes y tasa
+  viajan en `null` con `isParticipationHidden`, y total y activos se mantienen porque son la
+  nómina que la empresa ya ve en Gestión de Empleados.
 - **El umbral mínimo es configurable por alcance y por defecto es de tres empleados activos.**
   `MetricsAnonymizationPolicy` (`Application/Features/Metrics/`) lee
   `Metrics:CompanyMinimumEmployees` para métricas de empresa y
@@ -352,9 +350,9 @@ Application, antes de serializar la respuesta, y no escondiendo columnas en el f
   valor predeterminado 3. Cada handler rechaza la métrica si el período tiene menos empleados
   que su umbral. No devuelvas el dato parcialmente ni completes el resultado con ceros para
   ocultarlo.
-- **Las respuestas usan DTOs exclusivos del panel.** `CompanyMetricsResponse` y
-  `DepartmentMetricsResponse` solo pueden contener períodos, conteos, tasas y promedios
-  agregados. No agregues `EmployeeId`, `UserId`, nombres, emails, `TransactionId`, `GoalId`,
+- **Las respuestas usan DTOs exclusivos del panel.** `CompanyMetricsResponse`,
+  `DepartmentMetricsResponse` y `CompanyParticipationResponse` solo pueden contener períodos,
+  conteos, tasas y promedios agregados. No agregues `EmployeeId`, `UserId`, nombres, emails, `TransactionId`, `GoalId`,
   `InvestmentId` ni colecciones de entidades personales.
 - **El mapeo al DTO es explícito.** No serialices snapshots, entidades ni `PeriodMetrics`
   directamente desde un controller o handler. Si se agrega un campo al modelo, debe evaluarse
