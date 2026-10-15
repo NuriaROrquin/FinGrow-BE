@@ -101,6 +101,7 @@ public static class DependencyInjection
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<ITransactionReceiptRepository, TransactionReceiptRepository>();
         services.AddScoped<ITransactionReadRepository, TransactionReadRepository>();
+        services.AddScoped<IMonthlySummaryReadRepository, MonthlySummaryReadRepository>();
         services.AddScoped<ITransactionExcelExporter, TransactionExcelExporter>();
         services.AddScoped<IGoalRepository, GoalRepository>();
         services.AddScoped<IInvestmentRepository, InvestmentRepository>();
@@ -136,6 +137,8 @@ public static class DependencyInjection
 
     private static IServiceCollection AddAiService(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddMemoryCache();
+
         services.AddOptions<AiServiceOptions>()
             .Bind(configuration.GetSection(AiServiceOptions.SectionName))
             .ValidateDataAnnotations()
