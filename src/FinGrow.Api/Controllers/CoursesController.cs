@@ -5,6 +5,7 @@ using Extensions;
 using Application.Common;
 using Application.Features.Courses.CompleteLesson;
 using Application.Features.Courses.GetCourse;
+using Application.Features.Courses.GetLearningProgress;
 using Application.Features.Courses.ListCourses;
 using Application.Features.Courses.RateCourse;
 using Application.Interfaces;
@@ -28,6 +29,10 @@ public sealed class CoursesController(ISender sender, ICurrentUser currentUser) 
         (await sender.Send(
             new ListCoursesQuery(currentUser.UserId!.Value, level, maxDuration, status, investmentType),
             cancellationToken)).ToActionResult();
+
+    [HttpGet("progress")]
+    public async Task<IActionResult> GetProgress(CancellationToken cancellationToken) =>
+        (await sender.Send(new GetLearningProgressQuery(currentUser.UserId!.Value), cancellationToken)).ToActionResult();
 
     [HttpGet("{slug}")]
     public async Task<IActionResult> Get(string slug, CancellationToken cancellationToken) =>
