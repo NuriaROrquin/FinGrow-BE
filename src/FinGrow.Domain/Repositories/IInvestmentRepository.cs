@@ -20,6 +20,10 @@ public interface IInvestmentRepository
 
     Task<IReadOnlyList<Investment>> ListTrackedByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<Guid>> ListEmployeesWithAccruingInvestmentsAsync(CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Investment>> ListAccruingByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<Investment>> ListImportedAsync(
         Guid employeeId,
         InvestmentSource source,

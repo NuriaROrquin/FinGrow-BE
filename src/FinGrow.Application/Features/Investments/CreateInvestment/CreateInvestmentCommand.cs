@@ -13,4 +13,6 @@ public sealed record CreateInvestmentCommand(
     Currency Currency,
     DateOnly PurchasedOn,
     string? Symbol = null,
-    decimal? Quantity = null) : IRequest<Result<InvestmentResponse>>, IInvestmentTracking;
+    decimal? Quantity = null,
+    decimal? AnnualRate = null,
+    int? TermDays = null) : IRequest<Result<InvestmentResponse>>, IInvestmentTracking;

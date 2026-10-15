@@ -1127,6 +1127,11 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<decimal?>("AnnualRate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("annual_rate");
+
                     b.Property<string>("AssetName")
                         .IsRequired()
                         .HasMaxLength(120)
@@ -1166,6 +1171,10 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(150)")
                         .HasColumnName("symbol");
 
+                    b.Property<int?>("TermDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("term_days");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -1189,6 +1198,8 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
 
                     b.ToTable("investments", null, t =>
                         {
+                            t.HasCheckConstraint("ck_investments_annual_rate_positive", "annual_rate IS NULL OR annual_rate > 0");
+
                             t.HasCheckConstraint("ck_investments_external_reference_when_imported", "(source = 'Manual') = (external_reference IS NULL)");
 
                             t.HasCheckConstraint("ck_investments_invested_positive", "invested_amount > 0");
@@ -1196,6 +1207,8 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_investments_quantity_positive", "quantity IS NULL OR quantity > 0");
 
                             t.HasCheckConstraint("ck_investments_symbol_with_quantity", "(symbol IS NULL) = (quantity IS NULL)");
+
+                            t.HasCheckConstraint("ck_investments_term_with_rate", "term_days IS NULL OR (annual_rate IS NOT NULL AND term_days > 0)");
                         });
                 });
 
@@ -1744,7 +1757,7 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_transactions_amount_positive", "amount > 0");
 
-                            t.HasCheckConstraint("ck_transactions_category_matches_type", "(type = 'Expense' AND expense_category IS NOT NULL AND income_category IS NULL)\nOR (type = 'Income' AND income_category IS NOT NULL AND expense_category IS NULL)");
+                            t.HasCheckConstraint("ck_transactions_category_matches_type", "(type = 'Expense' AND expense_category IS NOT NULL AND income_category IS NULL)\r\nOR (type = 'Income' AND income_category IS NOT NULL AND expense_category IS NULL)");
                         });
                 });
 

@@ -23,6 +23,30 @@ public sealed class Investment : AggregateRoot
         "Solo se cotizan por simbolo las acciones, los CEDEAR, los ETF, los bonos, las obligaciones negociables, "
         + "las letras, los fondos comunes y las criptomonedas.";
 
+    public const decimal MaxAnnualRate = 999.99m;
+
+    public const int AnnualRateDecimals = 2;
+
+    public const int MaxTermDays = 3650;
+
+    public const string RateRequiredMessage =
+        "La TNA es obligatoria en los plazos fijos, las cauciones y las cuentas remuneradas.";
+
+    public const string NotAccruingMessage =
+        "Solo los plazos fijos, las cauciones y las cuentas remuneradas llevan TNA.";
+
+    public const string TermRequiredMessage = "El plazo en dias es obligatorio en los plazos fijos y las cauciones.";
+
+    public const string TermNotAllowedMessage = "Solo los plazos fijos y las cauciones llevan plazo.";
+
+    public const string RateOutOfRangeMessage = "La TNA tiene que ser mayor a cero y no superar el 999.99%.";
+
+    public const string RateDecimalsMessage = "La TNA admite hasta dos decimales.";
+
+    public const string TermOutOfRangeMessage = "El plazo tiene que estar entre 1 y 3650 dias.";
+
+    private const int DaysPerYear = 365;
+
     private readonly List<InvestmentValuation> _valuations = new();
 
     private Investment()
@@ -64,6 +88,10 @@ public sealed class Investment : AggregateRoot
     public string? Symbol { get; private set; }
 
     public decimal? Quantity { get; private set; }
+
+    public decimal? AnnualRate { get; private set; }
+
+    public int? TermDays { get; private set; }
 
     public InvestmentSource Source { get; private set; }
 
@@ -217,7 +245,11 @@ public sealed class Investment : AggregateRoot
         ? 0m
         : decimal.Round(ReturnAmount / InvestedAmount.Amount * 100m, 2, MidpointRounding.ToEven);
 
-    public bool HasMarketValuation => _valuations.Any(valuation => valuation.Source == ValuationSource.Feed);
+    public bool HasMarketValuation => _valuations.Any(valuation => valuation.Source != ValuationSource.Manual);
+
+    public DateOnly? MaturesOn => TermDays is { } termDays ? PurchasedOn.AddDays(termDays) : null;
+
+    public bool IsValuedAtMaturity => MaturesOn is { } maturesOn && ValuedOn >= maturesOn;
 
     public InvestmentValuation RecordValuation(
         Money value,
@@ -295,13 +327,16 @@ public sealed class Investment : AggregateRoot
 
         if (investedAmount != InvestedAmount || purchasedOn != PurchasedOn)
         {
-            if (_valuations.Count > 1)
+            var recorded = _valuations.Where(valuation => valuation.Source != ValuationSource.Accrued).ToList();
+
+            if (recorded.Count > 1)
             {
                 throw new DomainException(
                     "La inversion ya tiene valuaciones posteriores a la compra: solo se puede corregir el nombre y el tipo.");
             }
 
-            _valuations.Single().Correct(investedAmount, purchasedOn);
+            _valuations.RemoveAll(valuation => valuation.Source == ValuationSource.Accrued);
+            recorded.Single().Correct(investedAmount, purchasedOn);
             InvestedAmount = investedAmount;
             PurchasedOn = purchasedOn;
         }
@@ -372,6 +407,48 @@ public sealed class Investment : AggregateRoot
         return sameDay;
     }
 
+    public void AgreeRate(decimal? annualRate, int? termDays, DateOnly today, DateTimeOffset updatedAt)
+    {
+        EnsureValidRate(annualRate, termDays);
+
+        if (annualRate != AnnualRate || termDays != TermDays)
+        {
+            AnnualRate = annualRate;
+            TermDays = termDays;
+            _valuations.RemoveAll(valuation => valuation.Source == ValuationSource.Accrued);
+            UpdatedAt = updatedAt;
+        }
+
+        Accrue(today, updatedAt);
+    }
+
+    public void Accrue(DateOnly today, DateTimeOffset recordedAt)
+    {
+        if (AnnualRate is not { } annualRate || today < PurchasedOn)
+        {
+            return;
+        }
+
+        var valuedOn = MaturesOn is { } maturesOn && maturesOn < today ? maturesOn : today;
+        var days = valuedOn.DayNumber - PurchasedOn.DayNumber;
+        var value = Money.From(InvestedAmount.Amount * GrowthFactor(annualRate, days), InvestedAmount.Currency);
+
+        var sameDay = _valuations.SingleOrDefault(valuation =>
+            valuation.Source == ValuationSource.Accrued && valuation.ValuedOn == valuedOn);
+
+        if (sameDay is null)
+        {
+            RecordValuation(value, valuedOn, ValuationSource.Accrued, recordedAt);
+            return;
+        }
+
+        if (sameDay.Value != value)
+        {
+            sameDay.Correct(value, valuedOn);
+            UpdatedAt = recordedAt;
+        }
+    }
+
     public void Rename(string assetName, DateTimeOffset updatedAt)
     {
         AssetName = EnsureValidAssetName(assetName);
@@ -391,6 +468,74 @@ public sealed class Investment : AggregateRoot
         {
             throw new DomainException("El capital invertido tiene que ser mayor a cero.");
         }
+    }
+
+    private void EnsureValidRate(decimal? annualRate, int? termDays)
+    {
+        if (annualRate is not { } rate)
+        {
+            if (termDays is not null)
+            {
+                throw new DomainException("El plazo va con la TNA: se cargan los dos o ninguno.");
+            }
+
+            if (Type.AccruesInterest() && Source == InvestmentSource.Manual)
+            {
+                throw new DomainException(RateRequiredMessage);
+            }
+
+            return;
+        }
+
+        if (!Type.AccruesInterest())
+        {
+            throw new DomainException(NotAccruingMessage);
+        }
+
+        if (rate <= 0m || rate > MaxAnnualRate)
+        {
+            throw new DomainException(RateOutOfRangeMessage);
+        }
+
+        if (decimal.Round(rate, AnnualRateDecimals) != rate)
+        {
+            throw new DomainException(RateDecimalsMessage);
+        }
+
+        if (Type.HasTerm() != termDays.HasValue)
+        {
+            throw new DomainException(Type.HasTerm() ? TermRequiredMessage : TermNotAllowedMessage);
+        }
+
+        if (termDays is < 1 or > MaxTermDays)
+        {
+            throw new DomainException(TermOutOfRangeMessage);
+        }
+    }
+
+    private decimal GrowthFactor(decimal annualRate, int days)
+    {
+        var dailyRate = annualRate / 100m / DaysPerYear;
+
+        return Type.CompoundsDaily() ? Power(1m + dailyRate, days) : 1m + (dailyRate * days);
+    }
+
+    private static decimal Power(decimal factor, int exponent)
+    {
+        var result = 1m;
+
+        while (exponent > 0)
+        {
+            if ((exponent & 1) == 1)
+            {
+                result *= factor;
+            }
+
+            factor *= factor;
+            exponent >>= 1;
+        }
+
+        return result;
     }
 
     private static string EnsureValidExternalReference(string externalReference)

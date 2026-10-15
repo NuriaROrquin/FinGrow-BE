@@ -86,6 +86,55 @@ public class CreateInvestmentValidatorTests
         result.Errors.ShouldContain(error => error.ErrorMessage.Contains("letras y numeros", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData(InvestmentType.FixedTermDeposit)]
+    [InlineData(InvestmentType.Repo)]
+    [InlineData(InvestmentType.RemuneratedAccount)]
+    public void A_type_that_accrues_interest_without_its_rate_is_rejected(InvestmentType type)
+    {
+        var result = _validator.Validate(ValidCommand() with { Type = type, TermDays = type.HasTerm() ? 30 : null });
+
+        result.Errors.ShouldHaveSingleItem().ErrorMessage.ShouldBe(Investment.RateRequiredMessage);
+    }
+
+    [Fact]
+    public void A_rate_on_a_type_that_does_not_accrue_interest_is_rejected()
+    {
+        var result = _validator.Validate(ValidCommand() with { AnnualRate = 30m });
+
+        result.Errors.ShouldHaveSingleItem().ErrorMessage.ShouldBe(Investment.NotAccruingMessage);
+    }
+
+    [Theory]
+    [InlineData(InvestmentType.FixedTermDeposit, null, Investment.TermRequiredMessage)]
+    [InlineData(InvestmentType.Repo, null, Investment.TermRequiredMessage)]
+    [InlineData(InvestmentType.RemuneratedAccount, 30, Investment.TermNotAllowedMessage)]
+    [InlineData(InvestmentType.FixedTermDeposit, 0, Investment.TermOutOfRangeMessage)]
+    [InlineData(InvestmentType.FixedTermDeposit, Investment.MaxTermDays + 1, Investment.TermOutOfRangeMessage)]
+    public void A_missing_unexpected_or_out_of_range_term_is_rejected(InvestmentType type, int? termDays, string message)
+    {
+        var result = _validator.Validate(ValidCommand() with { Type = type, AnnualRate = 30m, TermDays = termDays });
+
+        result.Errors.ShouldHaveSingleItem().ErrorMessage.ShouldBe(message);
+    }
+
+    [Theory]
+    [InlineData(0, Investment.RateOutOfRangeMessage)]
+    [InlineData(-1, Investment.RateOutOfRangeMessage)]
+    [InlineData(1000, Investment.RateOutOfRangeMessage)]
+    [InlineData(30.125, Investment.RateDecimalsMessage)]
+    public void A_rate_out_of_range_or_with_more_than_two_decimals_is_rejected(double annualRate, string message)
+    {
+        var result = _validator.Validate(ValidCommand() with
+        {
+            Type = InvestmentType.FixedTermDeposit,
+            AnnualRate = (decimal)annualRate,
+            TermDays = 30,
+        });
+
+        result.Errors.ShouldHaveSingleItem().ErrorMessage.ShouldBe(message);
+    }
+
     private static CreateInvestmentCommand ValidCommand() => new(
         Guid.CreateVersion7(),
         AssetName: "S&P 500 ETF",
@@ -116,7 +165,12 @@ public class CreateInvestmentValidatorTests
     [InlineData(InvestmentType.RemuneratedAccount)]
     public void Every_supported_asset_type_is_accepted(InvestmentType type)
     {
-        var result = _validator.Validate(ValidCommand() with { Type = type });
+        var result = _validator.Validate(ValidCommand() with
+        {
+            Type = type,
+            AnnualRate = type.AccruesInterest() ? 32.5m : null,
+            TermDays = type.HasTerm() ? 30 : null,
+        });
 
         result.IsValid.ShouldBeTrue();
     }
