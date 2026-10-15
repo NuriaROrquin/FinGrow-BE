@@ -4,10 +4,12 @@ using Contracts;
 using Extensions;
 using Application.Features.Investments.CreateInvestment;
 using Application.Features.Investments.DeleteInvestment;
+using Application.Features.Investments.GetPortfolioEvolution;
 using Application.Features.Investments.GetPortfolioSummary;
 using Application.Features.Investments.ListInvestments;
 using Application.Features.Investments.UpdateInvestment;
 using Application.Interfaces;
+using Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -26,6 +28,15 @@ public sealed class InvestmentsController(ISender sender, ICurrentUser currentUs
     [HttpGet("summary")]
     public async Task<IActionResult> Summary(CancellationToken cancellationToken) =>
         (await sender.Send(new GetPortfolioSummaryQuery(currentUser.UserId!.Value), cancellationToken)).ToActionResult();
+
+    [HttpGet("evolution")]
+    public async Task<IActionResult> Evolution(
+        [FromQuery] Currency currency = Currency.ARS,
+        [FromQuery] PortfolioEvolutionRange range = PortfolioEvolutionRange.ThreeMonths,
+        CancellationToken cancellationToken = default) =>
+        (await sender.Send(
+            new GetPortfolioEvolutionQuery(currentUser.UserId!.Value, currency, range),
+            cancellationToken)).ToActionResult();
 
     [HttpPost]
     public async Task<IActionResult> Create(CreateInvestmentCommand command, CancellationToken cancellationToken)
