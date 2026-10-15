@@ -82,6 +82,7 @@ variables de entorno usando `__` como separador de sección.
 | `AiService:BaseUrl` | `AiService__BaseUrl` | URL base de FinGrow-AI |
 | `AiService:ApiKey` | `AiService__ApiKey` | Secreto compartido con FinGrow-AI; viaja en el header `X-API-Key` y tiene que ser el mismo valor que `API_KEY` en ese servicio |
 | `AiService:TimeoutSeconds` | `AiService__TimeoutSeconds` | Timeout de las llamadas a IA (default 30) |
+| `AiService:RecommendationsCacheHours` | `AiService__RecommendationsCacheHours` | Horas que la API reutiliza las recomendaciones del reporte para un mismo resumen financiero antes de volver a pedirlas a la IA (default 6; `0` las pide siempre) |
 | `Twilio:AccountSid` | `Twilio__AccountSid` | Account SID de la cuenta de Twilio; autentica la descarga de adjuntos |
 | `Twilio:AuthToken` | `Twilio__AuthToken` | Auth Token de Twilio; valida la firma de cada webhook y autentica la descarga de adjuntos |
 | `Twilio:PublicBaseUrl` | `Twilio__PublicBaseUrl` | URL pública de la API tal como está cargada en Twilio (ej. `https://api.fingrow.app`). Solo hace falta detrás de un proxy o un túnel; en local se deja vacía |
@@ -553,6 +554,27 @@ Las fotos guardan `employees_with_score` y `financial_health_score_sum`; el prom
 (`PeriodMetrics.AverageFinancialHealthScore`) y el umbral mínimo de anonimización de T-11 se
 aplica al mostrarlo. La fórmula vive en `FinancialHealthFactors` (`Domain/ValueObjects/`): pesos
 y umbrales son constantes de esa clase.
+
+### Reportes: hitos y recomendaciones (HU-44)
+
+`GET /api/reports/monthly-summary?currency&from&to` devuelve, mes por mes, ingresos, gastos, ahorro
+y gasto por categoría de los movimientos confirmados de una moneda. Es la base que reutilizan los
+reportes del empleado (HU-41 y HU-42). El ahorro cuenta lo destinado a `ahorro_inversion` como
+ahorro, igual que el puntaje de salud financiera.
+
+`GET /api/reports/insights?currency&from&to` arma las dos tarjetas de la pestaña Resumen:
+
+| Parte | De dónde sale |
+|---|---|
+| Habilitación | Al menos 2 meses con actividad suficiente (10 movimientos confirmados y algún ingreso) en todo el historial, sin importar el filtro. Vale el mes en curso y no tienen que ser seguidos. Si no alcanza, la respuesta trae cuántos meses activos hay y cómo va el mes en curso |
+| Hitos | Calculados con reglas fijas sobre el período: totales, tasa de ahorro, mes con mayor ingreso, mes con mayor gasto y mejor mes de ahorro, más los logros ganados en el período |
+| Recomendaciones | Tres, generadas por FinGrow-AI. Recibe los meses del período, los 3 meses anteriores como referencia, los topes del último mes contra lo gastado y las metas de la moneda con su nombre, y responde en el idioma de las preferencias del empleado |
+
+Si la IA no responde, los hitos salen igual y `recommendationsAvailable` viene en `false`. Un período sin
+movimientos en la moneda no llama a la IA. El mismo resumen se contesta desde una caché en memoria
+durante `AiService:RecommendationsCacheHours`: la clave es el contenido completo del pedido, así que
+cualquier movimiento nuevo genera recomendaciones nuevas. La aclaración de que no es asesoramiento
+financiero certificado la muestra el front.
 
 ### Logros
 

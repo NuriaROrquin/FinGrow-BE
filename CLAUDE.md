@@ -379,6 +379,23 @@ la aplica `FinancialHealthScorer` (`Application/Features/Metrics/FinancialHealth
   fallida y la siguiente genera la foto que falta. No conviertas con una cotización inventada ni
   guardes una foto con parte de la plantilla sin puntuar.
 
+## Reportes del empleado
+
+`api/reports/monthly-summary` e `api/reports/insights` (HU-44) son solo para el rol `Empleado`. Lo que
+no se deduce leyendo:
+
+- **El resumen mensual es la base de los reportes.** `IMonthlySummaryReadRepository` agrupa los
+  confirmados por mes, tipo y categoría y `MonthlySummaryBuilder` arma los meses, incluso los vacíos.
+  HU-41 y HU-42 deberían leer de ahí en lugar de sumar otra consulta.
+- **La habilitación mira todo el historial y el contenido mira el período.** Que el empleado vea
+  hitos y recomendaciones depende de `AchievementCatalog.IsActiveMonth` en 2 meses cualesquiera; el
+  filtro de fechas solo cambia qué se calcula.
+- **Los hitos son reglas, las recomendaciones son IA.** No le pidas a FinGrow-AI que elija el mejor
+  mes ni que diga qué logros hay: eso sale de los datos. A la IA le llegan solo agregados y el nombre
+  de las metas, nunca movimientos ni el puntaje de salud financiera.
+- **Si la IA falla, el reporte no falla**: el handler atrapa el error y responde los hitos con
+  `RecommendationsAvailable = false`.
+
 ## Logros
 
 El catálogo vive en `AchievementCatalog` y lo carga la migración con `HasData`: sumar un logro
