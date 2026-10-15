@@ -36,10 +36,11 @@ internal sealed partial class GetFinancialInsightsHandler(
         CancellationToken cancellationToken)
     {
         var eligibility = await EvaluateEligibilityAsync(request.EmployeeId, cancellationToken);
+        var achievements = await ListAchievementsAsync(request, cancellationToken);
 
         if (!eligibility.IsEligible)
         {
-            return Result.Success(FinancialInsightsResponse.NotEligible(request, eligibility));
+            return Result.Success(FinancialInsightsResponse.NotEligible(request, eligibility, achievements));
         }
 
         var periodMonths = ReportPeriod.Months(request.From, request.To);
@@ -62,7 +63,6 @@ internal sealed partial class GetFinancialInsightsHandler(
         var months = MonthlySummaryBuilder.Build(periodTotals, periodMonths);
         var referenceMonths = MonthlySummaryBuilder.Build(referenceTotals, ReportPeriod.Months(referenceStart, referenceEnd));
         var highlights = FinancialHighlights.From(months);
-        var achievements = await ListAchievementsAsync(request, cancellationToken);
 
         if (!highlights.HasMovements)
         {

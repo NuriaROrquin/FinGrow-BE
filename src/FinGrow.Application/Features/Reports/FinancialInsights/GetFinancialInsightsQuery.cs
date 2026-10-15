@@ -20,7 +20,11 @@ public sealed record FinancialInsightsResponse(
     IReadOnlyList<FinancialRecommendation> Recommendations,
     bool RecommendationsAvailable)
 {
-    public static FinancialInsightsResponse NotEligible(GetFinancialInsightsQuery query, InsightsEligibility eligibility)
+    // Los logros del período no dependen del historial: sin la habilitación solo faltan hitos y recomendaciones.
+    public static FinancialInsightsResponse NotEligible(
+        GetFinancialInsightsQuery query,
+        InsightsEligibility eligibility,
+        IReadOnlyList<AchievementResponse> achievements)
     {
         ArgumentNullException.ThrowIfNull(query);
 
@@ -30,7 +34,7 @@ public sealed record FinancialInsightsResponse(
             query.To,
             eligibility,
             null,
-            Array.Empty<AchievementResponse>(),
+            achievements,
             Array.Empty<FinancialRecommendation>(),
             false);
     }
@@ -61,6 +65,7 @@ public sealed record FinancialHighlights(
 
         var totalIncome = months.Sum(month => month.Income);
         var totalSavings = months.Sum(month => month.Savings);
+        var monthHighlights = MonthHighlights.From(months);
 
         return new FinancialHighlights(
             months.Count,
@@ -69,19 +74,8 @@ public sealed record FinancialHighlights(
             months.Sum(month => month.Expenses),
             totalSavings,
             totalIncome > 0m ? decimal.Round(totalSavings / totalIncome * 100m, 1) : null,
-            Highest(months, month => month.Income),
-            Highest(months, month => month.Expenses),
-            Highest(months.Where(month => month.HasMovements), month => month.Savings));
+            monthHighlights.HighestIncomeMonth,
+            monthHighlights.HighestExpenseMonth,
+            monthHighlights.BestSavingsMonth);
     }
-
-    private static MonthAmount? Highest(IEnumerable<MonthlySummaryMonth> months, Func<MonthlySummaryMonth, decimal> amount) =>
-        months
-            .Where(month => amount(month) > 0m)
-            .OrderByDescending(amount)
-            .ThenByDescending(month => month.Year)
-            .ThenByDescending(month => month.Month)
-            .Select(month => new MonthAmount(month.Year, month.Month, amount(month)))
-            .FirstOrDefault();
 }
-
-public sealed record MonthAmount(int Year, int Month, decimal Amount);

@@ -1,5 +1,6 @@
 namespace FinGrow.Application.UnitTests.Features.Reports.FinancialInsights;
 
+using FinGrow.Application.Features.Reports;
 using FinGrow.Application.Features.Reports.FinancialInsights;
 using FinGrow.Application.Interfaces;
 using FinGrow.Application.UnitTests.Fakes;
@@ -176,6 +177,20 @@ public class GetFinancialInsightsHandlerTests
 
         insights.Achievements.Select(achievement => achievement.Code).ShouldBe(new[] { AchievementCode.Saver });
         insights.Achievements[0].Name.ShouldBe("Ahorrador");
+    }
+
+    [Fact]
+    public async Task Achievements_of_the_period_are_shown_even_without_enough_history()
+    {
+        ActiveMonth(2026, 10);
+        _achievements.Add(EmployeeAchievement.Backfill(_employeeId, AchievementCode.FirstTransaction, new DateTimeOffset(2026, 10, 2, 12, 0, 0, TimeSpan.Zero), Now));
+
+        var insights = await RunAsync(new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 15));
+
+        insights.Eligibility.IsEligible.ShouldBeFalse();
+        insights.Highlights.ShouldBeNull();
+        insights.Achievements.Select(achievement => achievement.Code).ShouldBe(new[] { AchievementCode.FirstTransaction });
+        _ai.RecommendationRequests.ShouldBeEmpty();
     }
 
     [Fact]
