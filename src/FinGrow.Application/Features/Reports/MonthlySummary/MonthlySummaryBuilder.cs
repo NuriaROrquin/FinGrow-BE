@@ -16,6 +16,33 @@ internal static class MonthlySummaryBuilder
             .ToList();
     }
 
+    // HU-41: la serie no se rellena con ceros antes de que el empleado empezara a registrar movimientos en la
+    // moneda (mirando todo su historial, no solo el período) ni con el mes en curso (o uno futuro) todavía vacío.
+    // Un mes vacío después del primer movimiento sí queda: es un cero real y cuenta para el promedio.
+    public static IReadOnlyList<MonthlySummaryMonth> TrimToHistory(
+        IReadOnlyList<MonthlySummaryMonth> months,
+        DateOnly? firstMovement,
+        DateOnly today)
+    {
+        ArgumentNullException.ThrowIfNull(months);
+
+        if (firstMovement is null)
+        {
+            return Array.Empty<MonthlySummaryMonth>();
+        }
+
+        var firstMonth = ReportPeriod.StartOfMonth(firstMovement.Value);
+        var currentMonth = ReportPeriod.StartOfMonth(today);
+        var trimmed = months.Where(month => StartOf(month) >= firstMonth).ToList();
+
+        while (trimmed.Count > 0 && !trimmed[^1].HasMovements && StartOf(trimmed[^1]) >= currentMonth)
+        {
+            trimmed.RemoveAt(trimmed.Count - 1);
+        }
+
+        return trimmed;
+    }
+
     public static IReadOnlyList<CategoryAmount> Combine(IEnumerable<IReadOnlyList<CategoryAmount>> categories) =>
         categories
             .SelectMany(amounts => amounts)
@@ -24,6 +51,8 @@ internal static class MonthlySummaryBuilder
             .OrderByDescending(amount => amount.Amount)
             .ThenBy(amount => amount.Category)
             .ToList();
+
+    private static DateOnly StartOf(MonthlySummaryMonth month) => new(month.Year, month.Month, 1);
 
     private static MonthlySummaryMonth BuildMonth(DateOnly month, IReadOnlyCollection<MonthlyMovementTotal> totals)
     {

@@ -15,7 +15,9 @@ public sealed record MonthlySummaryResponse(
     decimal TotalIncome,
     decimal TotalExpenses,
     decimal TotalSavings,
-    IReadOnlyList<CategoryAmount> ExpensesByCategory);
+    decimal? AverageMonthlySavings,
+    IReadOnlyList<CategoryAmount> ExpensesByCategory,
+    MonthHighlights Highlights);
 
 public sealed record MonthlySummaryMonth(
     int Year,

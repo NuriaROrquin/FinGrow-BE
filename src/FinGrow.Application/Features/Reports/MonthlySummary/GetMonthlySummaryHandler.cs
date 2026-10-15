@@ -4,7 +4,9 @@ using Common;
 using Interfaces;
 using MediatR;
 
-internal sealed class GetMonthlySummaryHandler(IMonthlySummaryReadRepository monthlySummaryReadRepository)
+internal sealed class GetMonthlySummaryHandler(
+    IMonthlySummaryReadRepository monthlySummaryReadRepository,
+    IDateTimeProvider dateTimeProvider)
     : IRequestHandler<GetMonthlySummaryQuery, Result<MonthlySummaryResponse>>
 {
     public async Task<Result<MonthlySummaryResponse>> Handle(GetMonthlySummaryQuery request, CancellationToken cancellationToken)
@@ -15,8 +17,16 @@ internal sealed class GetMonthlySummaryHandler(IMonthlySummaryReadRepository mon
             request.From,
             request.To,
             cancellationToken);
+        var firstMovement = await monthlySummaryReadRepository.FindFirstMovementDateAsync(
+            request.EmployeeId,
+            request.Currency,
+            cancellationToken);
 
-        var months = MonthlySummaryBuilder.Build(totals, ReportPeriod.Months(request.From, request.To));
+        var months = MonthlySummaryBuilder.TrimToHistory(
+            MonthlySummaryBuilder.Build(totals, ReportPeriod.Months(request.From, request.To)),
+            firstMovement,
+            dateTimeProvider.Today);
+        var totalSavings = months.Sum(month => month.Savings);
 
         return Result.Success(new MonthlySummaryResponse(
             request.Currency,
@@ -25,7 +35,9 @@ internal sealed class GetMonthlySummaryHandler(IMonthlySummaryReadRepository mon
             months,
             months.Sum(month => month.Income),
             months.Sum(month => month.Expenses),
-            months.Sum(month => month.Savings),
-            MonthlySummaryBuilder.Combine(months.Select(month => month.ExpensesByCategory))));
+            totalSavings,
+            months.Count > 0 ? decimal.Round(totalSavings / months.Count, 2) : null,
+            MonthlySummaryBuilder.Combine(months.Select(month => month.ExpensesByCategory)),
+            MonthHighlights.From(months)));
     }
 }
