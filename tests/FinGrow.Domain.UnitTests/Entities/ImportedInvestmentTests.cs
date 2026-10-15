@@ -56,6 +56,16 @@ public class ImportedInvestmentTests
     }
 
     [Fact]
+    public void Before_the_broker_first_valued_it_an_imported_position_is_worth_its_cost()
+    {
+        var investment = Import();
+
+        investment.ValueOn(PurchasedOn).ShouldBe(Money.From(50_000m, Currency.ARS));
+        investment.ValueOn(Today.AddDays(-1)).ShouldBe(Money.From(50_000m, Currency.ARS));
+        investment.ValueOn(Today).ShouldBe(Money.From(56_000m, Currency.ARS));
+    }
+
+    [Fact]
     public void An_import_has_to_come_from_an_integration()
     {
         Should.Throw<DomainException>(() => Import(source: InvestmentSource.Manual));
