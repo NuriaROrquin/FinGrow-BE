@@ -13,6 +13,7 @@ using Features.Integrations.Iol.Sync;
 using Features.Integrations.Linking;
 using Features.Integrations.MercadoPago.Sync;
 using Features.Integrations.WhatsApp;
+using Features.Investments.AccrueInvestments;
 using Features.Investments.QuoteInvestments;
 using Features.Metrics.FinancialHealth;
 using Features.Metrics;
@@ -77,6 +78,7 @@ public static class DependencyInjection
         services.AddScoped<IScheduledJob, IolTokenRefreshJob>();
         services.AddScoped<IScheduledJob, GmailSyncJob>();
         services.AddScoped<IScheduledJob, InvestmentQuotesJob>();
+        services.AddScoped<IScheduledJob, InvestmentAccrualsJob>();
         services.AddScoped<IScheduledJob, GoalProgressAlertsJob>();
         services.AddScoped<IScheduledJob, EmailDeliveryJob>();
         services.AddScoped<IScheduledJob, ReceiptsCleanupJob>();

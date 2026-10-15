@@ -35,6 +35,18 @@ internal sealed class InvestmentRepository(FinGrowDbContext dbContext) : IInvest
                 && investment.Symbol != null)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<Guid>> ListEmployeesWithAccruingInvestmentsAsync(CancellationToken cancellationToken = default) =>
+        await dbContext.Investments
+            .Where(investment => investment.AnnualRate != null)
+            .Select(investment => investment.EmployeeId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Investment>> ListAccruingByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+        await dbContext.Investments
+            .Where(investment => investment.EmployeeId == employeeId && investment.AnnualRate != null)
+            .ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<Investment>> ListImportedAsync(
         Guid employeeId,
         InvestmentSource source,
