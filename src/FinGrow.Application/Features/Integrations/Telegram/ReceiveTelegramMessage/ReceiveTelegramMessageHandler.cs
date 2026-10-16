@@ -28,6 +28,7 @@ internal sealed partial class ReceiveTelegramMessageHandler : IRequestHandler<Re
 
     private readonly IEmployeeIntegrationRepository _integrations;
     private readonly LinkCodeRedeemer _linker;
+    private readonly ChatActivityRecorder _activity;
     private readonly ChatVoiceNoteTranscriber _voiceNotes;
     private readonly ChatTransactionProposer _proposer;
     private readonly ReceiptStorer _receipts;
@@ -38,6 +39,7 @@ internal sealed partial class ReceiveTelegramMessageHandler : IRequestHandler<Re
     public ReceiveTelegramMessageHandler(
         IEmployeeIntegrationRepository integrations,
         LinkCodeRedeemer linker,
+        ChatActivityRecorder activity,
         ChatVoiceNoteTranscriber voiceNotes,
         ChatTransactionProposer proposer,
         ReceiptStorer receipts,
@@ -47,6 +49,7 @@ internal sealed partial class ReceiveTelegramMessageHandler : IRequestHandler<Re
     {
         _integrations = integrations;
         _linker = linker;
+        _activity = activity;
         _voiceNotes = voiceNotes;
         _proposer = proposer;
         _receipts = receipts;
@@ -67,6 +70,7 @@ internal sealed partial class ReceiveTelegramMessageHandler : IRequestHandler<Re
         }
         else
         {
+            await _activity.RecordAsync(integration, cancellationToken);
             await HandleLinkedMessageAsync(integration.EmployeeId, request, cancellationToken);
         }
 

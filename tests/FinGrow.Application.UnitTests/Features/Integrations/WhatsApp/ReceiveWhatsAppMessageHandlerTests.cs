@@ -285,7 +285,18 @@ public class ReceiveWhatsAppMessageHandlerTests
 
         result.Value.Text.ShouldBe(expectedReply);
         _transactions.Transactions.ShouldBeEmpty();
-        _unitOfWork.SaveCount.ShouldBe(0);
+        _unitOfWork.SaveCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task A_message_from_a_linked_phone_is_recorded_as_its_last_activity()
+    {
+        LinkPhone();
+        _ai.ParseResult = ParsedMessage.Of(MessageParsingOutcome.NotATransaction);
+
+        await Handle(Phone, "hola");
+
+        _integrations.Integrations.ShouldHaveSingleItem().LastSyncedAt.ShouldBe(Now);
     }
 
     [Fact]
@@ -442,7 +453,7 @@ public class ReceiveWhatsAppMessageHandlerTests
         var reviewer = new WhatsAppProposalReviewer(
             _transactions, new ChatTransactionReviewer(_transactions, _unitOfWork, _clock), _clock);
         var handler = new ReceiveWhatsAppMessageHandler(
-            _integrations, linker, _media, voiceNotes, proposer, reviewer, NullLogger<ReceiveWhatsAppMessageHandler>.Instance)
+            _integrations, linker, new ChatActivityRecorder(_unitOfWork, _clock), _media, voiceNotes, proposer, reviewer, NullLogger<ReceiveWhatsAppMessageHandler>.Instance)
         {
             ProcessingBudget = TimeSpan.FromMilliseconds(200)
         };

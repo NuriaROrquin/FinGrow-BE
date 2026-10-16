@@ -30,6 +30,47 @@ public class GetIntegrationHandlerTests
     }
 
     [Fact]
+    public async Task A_synced_integration_reports_when_it_last_synced()
+    {
+        _currentUser.UserId = _employeeId;
+        var integration = EmployeeIntegration.Create(_employeeId, IntegrationProvider.MercadoPago, "1234", Now);
+        integration.MarkSynced(Now.AddHours(2));
+        _integrations.Integrations.Add(integration);
+
+        var result = await Handle(IntegrationProvider.MercadoPago);
+
+        result.Value.Status.ShouldBe(IntegrationStatus.Active);
+        result.Value.LastSyncedAt.ShouldBe(Now.AddHours(2));
+    }
+
+    [Fact]
+    public async Task An_integration_that_never_synced_has_no_last_sync()
+    {
+        _currentUser.UserId = _employeeId;
+        _integrations.Integrations.Add(
+            EmployeeIntegration.Create(_employeeId, IntegrationProvider.Gmail, "ana@example.com", Now));
+
+        var result = await Handle(IntegrationProvider.Gmail);
+
+        result.Value.LastSyncedAt.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task A_failing_integration_reports_the_error_and_its_reason()
+    {
+        _currentUser.UserId = _employeeId;
+        var integration = EmployeeIntegration.Create(_employeeId, IntegrationProvider.Gmail, "ana@example.com", Now);
+        integration.MarkFailed("Google rechazo el acceso.", Now.AddHours(1));
+        _integrations.Integrations.Add(integration);
+
+        var result = await Handle(IntegrationProvider.Gmail);
+
+        result.Value.Linked.ShouldBeTrue();
+        result.Value.Status.ShouldBe(IntegrationStatus.Error);
+        result.Value.ErrorReason.ShouldBe("Google rechazo el acceso.");
+    }
+
+    [Fact]
     public async Task Each_provider_is_reported_separately()
     {
         _currentUser.UserId = _employeeId;

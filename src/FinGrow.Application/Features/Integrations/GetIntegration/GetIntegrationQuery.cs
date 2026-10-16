@@ -12,10 +12,11 @@ public sealed record IntegrationResponse(
     string? ExternalAccountId,
     DateTimeOffset? LinkedAt,
     IntegrationStatus? Status = null,
-    string? ErrorReason = null)
+    string? ErrorReason = null,
+    DateTimeOffset? LastSyncedAt = null)
 {
     public static readonly IntegrationResponse NotLinked = new(false, null, null);
 
     public static IntegrationResponse From(EmployeeIntegration integration) =>
-        new(true, integration.ExternalAccountId, integration.LinkedAt, integration.Status, integration.ErrorReason);
+        new(true, integration.ExternalAccountId, integration.LinkedAt, integration.Status, integration.ErrorReason, integration.LastSyncedAt);
 }

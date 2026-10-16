@@ -45,6 +45,7 @@ public static class DependencyInjection
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
         services.AddScoped<LinkCodeIssuer>();
         services.AddScoped<LinkCodeRedeemer>();
+        services.AddScoped<ChatActivityRecorder>();
         services.AddScoped<ChatTransactionProposer>();
         services.AddScoped<ChatTransactionReviewer>();
         services.AddScoped<ChatVoiceNoteTranscriber>();

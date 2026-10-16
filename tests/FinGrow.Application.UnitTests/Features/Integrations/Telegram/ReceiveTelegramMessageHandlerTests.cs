@@ -165,7 +165,26 @@ public class ReceiveTelegramMessageHandlerTests
         transaction.ExternalReference.ShouldBe("telegram:123456789:42");
         transaction.AiConfidence.ShouldBe(0.9);
         transaction.AiModel.ShouldBe("fake-model");
-        _unitOfWork.SaveCount.ShouldBe(1);
+        _unitOfWork.SaveCount.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task A_message_from_a_linked_chat_is_recorded_as_its_last_activity()
+    {
+        LinkChat();
+        _ai.ParseResult = ParsedMessage.Of(MessageParsingOutcome.NotATransaction);
+
+        await Handle("hola");
+
+        _integrations.Integrations.ShouldHaveSingleItem().LastSyncedAt.ShouldBe(Now);
+    }
+
+    [Fact]
+    public async Task A_message_from_an_unlinked_chat_records_no_activity()
+    {
+        await Handle("hola");
+
+        _integrations.Integrations.ShouldBeEmpty();
     }
 
     [Fact]
@@ -304,7 +323,7 @@ public class ReceiveTelegramMessageHandlerTests
         _bot.Sent.ShouldHaveSingleItem().ShouldBe((ChatId, expectedReply));
         _bot.SentWithButtons.ShouldBeEmpty();
         _transactions.Transactions.ShouldBeEmpty();
-        _unitOfWork.SaveCount.ShouldBe(0);
+        _unitOfWork.SaveCount.ShouldBe(1);
     }
 
     [Fact]
@@ -620,6 +639,7 @@ public class ReceiveTelegramMessageHandlerTests
         var handler = new ReceiveTelegramMessageHandler(
             _integrations,
             linker,
+            new ChatActivityRecorder(_unitOfWork, _clock),
             voiceNotes,
             proposer,
             storer,

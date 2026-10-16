@@ -27,6 +27,7 @@ internal sealed partial class ReceiveWhatsAppMessageHandler
 
     private readonly IEmployeeIntegrationRepository _integrations;
     private readonly LinkCodeRedeemer _linker;
+    private readonly ChatActivityRecorder _activity;
     private readonly ITwilioMediaClient _media;
     private readonly ChatVoiceNoteTranscriber _voiceNotes;
     private readonly ChatTransactionProposer _proposer;
@@ -36,6 +37,7 @@ internal sealed partial class ReceiveWhatsAppMessageHandler
     public ReceiveWhatsAppMessageHandler(
         IEmployeeIntegrationRepository integrations,
         LinkCodeRedeemer linker,
+        ChatActivityRecorder activity,
         ITwilioMediaClient media,
         ChatVoiceNoteTranscriber voiceNotes,
         ChatTransactionProposer proposer,
@@ -44,6 +46,7 @@ internal sealed partial class ReceiveWhatsAppMessageHandler
     {
         _integrations = integrations;
         _linker = linker;
+        _activity = activity;
         _media = media;
         _voiceNotes = voiceNotes;
         _proposer = proposer;
@@ -88,6 +91,9 @@ internal sealed partial class ReceiveWhatsAppMessageHandler
         CancellationToken cancellationToken)
     {
         var employeeId = integration.EmployeeId;
+
+        await _activity.RecordAsync(integration, cancellationToken);
+
         var voiceNote = request.Media.FirstOrDefault(IsVoiceNote);
 
         LogMessage(_logger, employeeId, request.Body.Length, request.Media.Count, request.MessageSid);

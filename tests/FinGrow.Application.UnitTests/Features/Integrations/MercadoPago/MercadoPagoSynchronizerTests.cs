@@ -280,6 +280,8 @@ public class MercadoPagoSynchronizerTests
         result.Error.ShouldBe(MercadoPagoSynchronizer.GrantExpired);
         result.Error.Type.ShouldBe(ErrorType.Conflict);
         _payments.Searches.ShouldBeEmpty();
+        _integration.Status.ShouldBe(IntegrationStatus.Error);
+        _integration.ErrorReason.ShouldBe(MercadoPagoSynchronizer.GrantExpiredReason);
     }
 
     [Fact]
@@ -310,6 +312,7 @@ public class MercadoPagoSynchronizerTests
         result.Error.ShouldBe(MercadoPagoSynchronizer.GrantExpired);
         _transactions.Transactions.ShouldBeEmpty();
         _integration.LastSyncedAt.ShouldBeNull();
+        _integration.Status.ShouldBe(IntegrationStatus.Error);
     }
 
     [Fact]
@@ -324,7 +327,9 @@ public class MercadoPagoSynchronizerTests
         result.Error.ShouldBe(MercadoPagoSynchronizer.GrantExpired);
         _transactions.Transactions.ShouldBeEmpty();
         _integration.LastSyncedAt.ShouldBeNull();
-        _unitOfWork.SaveCount.ShouldBe(0);
+        _integration.Status.ShouldBe(IntegrationStatus.Error);
+        _integration.ErrorReason.ShouldBe(MercadoPagoSynchronizer.GrantExpiredReason);
+        _unitOfWork.SaveCount.ShouldBe(1);
     }
 
     [Fact]

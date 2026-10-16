@@ -22,6 +22,9 @@ internal sealed partial class MercadoPagoSynchronizer
     internal static readonly Error GrantExpired = Error.Conflict(
         "Integrations.MercadoPago.GrantExpired", "La autorizacion de Mercado Pago vencio: volve a vincular la cuenta.");
 
+    internal const string GrantExpiredReason =
+        "Mercado Pago rechazo el acceso a tu cuenta: quitaste el permiso o vencio. Volve a vincularla.";
+
     private readonly IMercadoPagoPaymentsClient _payments;
     private readonly IMercadoPagoOAuthClient _oauth;
     private readonly IAiService _ai;
@@ -60,7 +63,7 @@ internal sealed partial class MercadoPagoSynchronizer
 
         if (grant is null)
         {
-            return Result.Failure<MercadoPagoSyncSummary>(GrantExpired);
+            return await LoseAccessAsync(integration, now, cancellationToken);
         }
 
         var from = (integration.LastSyncedAt ?? now.Subtract(InitialLookback)).Subtract(Overlap);
@@ -68,7 +71,7 @@ internal sealed partial class MercadoPagoSynchronizer
 
         if (payments is null)
         {
-            return Result.Failure<MercadoPagoSyncSummary>(GrantExpired);
+            return await LoseAccessAsync(integration, now, cancellationToken);
         }
 
         var importable = payments.Where(MercadoPagoPaymentMapper.IsImportable).ToList();
@@ -98,6 +101,19 @@ internal sealed partial class MercadoPagoSynchronizer
         LogSynced(_logger, integration.EmployeeId, summary.Imported, summary.AlreadyKnown, summary.Ignored);
 
         return Result.Success(summary);
+    }
+
+    // Sin la marca de error la card seguiria diciendo "vinculado" y el trabajo programado reintentaria
+    // para siempre con una autorizacion que ya no sirve.
+    private async Task<Result<MercadoPagoSyncSummary>> LoseAccessAsync(
+        EmployeeIntegration integration,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        integration.MarkFailed(GrantExpiredReason, now);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return Result.Failure<MercadoPagoSyncSummary>(GrantExpired);
     }
 
     private async Task<OAuthGrant?> EnsureFreshGrantAsync(EmployeeIntegration integration, DateTimeOffset now, CancellationToken cancellationToken)
