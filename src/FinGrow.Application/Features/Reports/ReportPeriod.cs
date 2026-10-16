@@ -17,4 +17,22 @@ internal static class ReportPeriod
             .Select(offset => first.AddMonths(offset))
             .ToList();
     }
+
+    public static (DateOnly From, DateOnly To) Previous(DateOnly from, DateOnly to)
+    {
+        var months = MonthCount(from, to);
+
+        return (ShiftMonths(from, -months), ShiftMonths(to, -months));
+    }
+
+    private static DateOnly ShiftMonths(DateOnly date, int months)
+    {
+        var shifted = date.AddMonths(months);
+
+        return IsEndOfMonth(date)
+            ? new DateOnly(shifted.Year, shifted.Month, DateTime.DaysInMonth(shifted.Year, shifted.Month))
+            : shifted;
+    }
+
+    private static bool IsEndOfMonth(DateOnly date) => date.Day == DateTime.DaysInMonth(date.Year, date.Month);
 }
