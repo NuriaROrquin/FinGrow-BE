@@ -65,10 +65,38 @@ public class ReportsEndpointsTests
         body.GetProperty("recommendations").GetArrayLength().ShouldBe(0);
     }
 
+    [Fact]
+    public async Task The_expense_breakdown_separates_savings_from_the_ranking()
+    {
+        using var factory = new ReportsWebApplicationFactory();
+        factory.Summary.Totals.Add(new MonthlyMovementTotal(2026, 9, TransactionType.Expense, ExpenseCategory.Alimentos, 300m));
+        factory.Summary.Totals.Add(new MonthlyMovementTotal(2026, 9, TransactionType.Expense, ExpenseCategory.Vivienda, 100m));
+        factory.Summary.Totals.Add(new MonthlyMovementTotal(2026, 9, TransactionType.Expense, ExpenseCategory.AhorroInversion, 600m));
+        var client = AuthenticatedClient(factory, Rol.Empleado);
+
+        var response = await client.GetAsync(new Uri("/api/reports/expense-breakdown?currency=ARS&from=2026-09-01&to=2026-09-30", UriKind.Relative));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("previousFrom").GetString().ShouldBe("2026-08-01");
+        body.GetProperty("previousTo").GetString().ShouldBe("2026-08-31");
+        body.GetProperty("hasPreviousPeriod").GetBoolean().ShouldBeFalse();
+        var categories = body.GetProperty("categories");
+        categories.GetArrayLength().ShouldBe(2);
+        categories[0].GetProperty("category").GetString().ShouldBe("Alimentos");
+        categories[0].GetProperty("percentage").GetDecimal().ShouldBe(75.0m);
+        categories[0].GetProperty("comparison").ValueKind.ShouldBe(JsonValueKind.Null);
+        body.GetProperty("consumption").GetProperty("amount").GetDecimal().ShouldBe(400m);
+        body.GetProperty("savings").GetProperty("amount").GetDecimal().ShouldBe(600m);
+        body.GetProperty("total").GetProperty("amount").GetDecimal().ShouldBe(1000m);
+    }
+
     [Theory]
     [InlineData("/api/reports/insights?currency=ARS&to=2026-10-15")]
     [InlineData("/api/reports/insights?currency=ARS&from=2026-10-15&to=2026-10-01")]
     [InlineData("/api/reports/monthly-summary?currency=ARS&from=2020-01-01&to=2026-10-15")]
+    [InlineData("/api/reports/expense-breakdown?currency=ARS&from=2026-09-01")]
+    [InlineData("/api/reports/expense-breakdown?currency=ARS&from=2026-09-30&to=2026-09-01")]
     public async Task A_missing_or_invalid_period_is_rejected(string url)
     {
         using var factory = new ReportsWebApplicationFactory();
@@ -82,6 +110,7 @@ public class ReportsEndpointsTests
     [Theory]
     [InlineData("/api/reports/insights?from=2026-10-01&to=2026-10-15")]
     [InlineData("/api/reports/monthly-summary?from=2026-10-01&to=2026-10-15")]
+    [InlineData("/api/reports/expense-breakdown?from=2026-10-01&to=2026-10-15")]
     public async Task A_company_cannot_read_an_employee_report(string url)
     {
         using var factory = new ReportsWebApplicationFactory();
