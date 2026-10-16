@@ -2,6 +2,7 @@ namespace FinGrow.Api.Controllers;
 
 using Extensions;
 using Application.Common;
+using Application.Features.Reports.ExpenseBreakdown;
 using Application.Features.Reports.FinancialInsights;
 using Application.Features.Reports.MonthlySummary;
 using Application.Features.Reports.SavingsVsGoals;
@@ -46,5 +47,16 @@ public sealed class ReportsController(ISender sender, ICurrentUser currentUser) 
         CancellationToken cancellationToken = default) =>
         (await sender.Send(
             new GetFinancialInsightsQuery(currentUser.UserId!.Value, currency, fromDate, toDate),
+            cancellationToken)).ToActionResult();
+
+    [HttpGet("expense-breakdown")]
+    [Authorize(Roles = Rol.Empleado)]
+    public async Task<IActionResult> GetExpenseBreakdown(
+        [FromQuery(Name = "from"), BindRequired] DateOnly fromDate,
+        [FromQuery(Name = "to"), BindRequired] DateOnly toDate,
+        [FromQuery] Currency currency = Currency.ARS,
+        CancellationToken cancellationToken = default) =>
+        (await sender.Send(
+            new GetExpenseBreakdownQuery(currentUser.UserId!.Value, currency, fromDate, toDate),
             cancellationToken)).ToActionResult();
 }
