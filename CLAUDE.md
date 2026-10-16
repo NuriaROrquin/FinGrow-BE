@@ -389,8 +389,8 @@ la aplica `FinancialHealthScorer` (`Application/Features/Metrics/FinancialHealth
 
 ## Reportes del empleado
 
-`api/reports/monthly-summary` e `api/reports/insights` (HU-44) son solo para el rol `Empleado`. Lo que
-no se deduce leyendo:
+`api/reports/monthly-summary`, `api/reports/insights` (HU-44) y `api/reports/expense-breakdown` (HU-42)
+son solo para el rol `Empleado`. Lo que no se deduce leyendo:
 
 - **El resumen mensual es la base de los reportes.** `IMonthlySummaryReadRepository` agrupa los
   confirmados por mes, tipo y categoría y `MonthlySummaryBuilder.Build` arma los meses, incluso los
@@ -413,6 +413,19 @@ no se deduce leyendo:
   de las metas, nunca movimientos ni el puntaje de salud financiera.
 - **Si la IA falla, el reporte no falla**: el handler atrapa el error y responde los hitos con
   `RecommendationsAvailable = false`.
+- **El desglose de gastos (HU-42) saca `ahorro_inversion` del ranking**, con el mismo criterio que
+  el puntaje de salud: es ahorro, no gasto. Los porcentajes se calculan sobre `Consumption` (el total
+  sin ahorro) y el ahorro viaja aparte en `Savings`. `Consumption + Savings = Total`, y `Total` es igual
+  a `TotalExpenses` de `monthly-summary` para el mismo período: hay un test que lo verifica. Los montos
+  por categoría salen de `MonthlySummaryBuilder`, igual que en HU-41.
+- **El período anterior tiene la misma cantidad de meses, justo antes** (`ReportPeriod.Previous`):
+  corre las dos fechas esos meses, y un fin de mes cae en el fin de mes (31/3 → 28/2). Si el período
+  termina a mitad de mes, el anterior también, así no se compara medio mes contra uno completo. Hay
+  comparación (`HasPreviousPeriod`) si el empleado tiene algún movimiento en la moneda antes de que
+  termine el período anterior. Un período anterior con historia pero sin gastos se compara contra cero,
+  y uno con historia parcial se compara con lo que tenga. Sin gasto antes, la categoría es `IsNew` y no
+  tiene porcentaje de variación. Una categoría que bajó a cero sigue en la lista, con `Amount = 0` y
+  −100 %.
 
 ## Logros
 
