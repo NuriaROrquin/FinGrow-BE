@@ -17,6 +17,7 @@ public class NotifierTests
 
     private readonly FakeNotificationRepository _notifications = new();
     private readonly FakeNotificationChannelSettingRepository _channelSettings = new();
+    private readonly FakeNotificationTypeSettingRepository _typeSettings = new();
     private readonly FakeEmployeeIntegrationRepository _integrations = new();
     private readonly FakeTelegramBotClient _bot = new();
     private readonly FakeUnitOfWork _unitOfWork = new();
@@ -60,6 +61,53 @@ public class NotifierTests
 
         _notifications.Notifications.ShouldHaveSingleItem();
         _bot.Sent.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task When_the_employee_turned_the_alert_type_off_nothing_is_stored_or_sent()
+    {
+        LinkTelegram();
+        _typeSettings.Add(NotificationTypeSetting.Create(EmployeeId, NotificationType.TransactionsToReview, isEnabled: false, Now));
+
+        var notification = await Notify(Request());
+
+        notification.ShouldBeNull();
+        _notifications.Notifications.ShouldBeEmpty();
+        _bot.Sent.ShouldBeEmpty();
+        _unitOfWork.SaveCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Turning_off_one_alert_type_does_not_silence_the_others()
+    {
+        _typeSettings.Add(NotificationTypeSetting.Create(EmployeeId, NotificationType.GoalStalled, isEnabled: false, Now));
+
+        var notification = await Notify(Request());
+
+        notification.ShouldNotBeNull();
+        _notifications.Notifications.ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task An_alert_type_turned_back_on_is_notified_again()
+    {
+        var setting = NotificationTypeSetting.Create(EmployeeId, NotificationType.TransactionsToReview, isEnabled: false, Now);
+        setting.Change(isEnabled: true, Now);
+        _typeSettings.Add(setting);
+
+        var notification = await Notify(Request());
+
+        notification.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public async Task A_company_alert_ignores_the_employee_type_choices()
+    {
+        _typeSettings.Add(NotificationTypeSetting.Create(EmployeeId, NotificationType.TransactionsToReview, isEnabled: false, Now));
+
+        var notification = await Notify(Request() with { Recipient = NotificationRecipient.Company(EmployeeId) });
+
+        notification.ShouldNotBeNull();
     }
 
     [Fact]
@@ -184,6 +232,7 @@ public class NotifierTests
         new Notifier(
             _notifications,
             _channelSettings,
+            _typeSettings,
             new INotificationSender[] { new TelegramNotificationSender(_integrations, _bot) },
             _unitOfWork,
             _clock,

@@ -48,6 +48,7 @@ public class NotifyIntegrationAccessLostHandlerTests
         var notifier = new Notifier(
             _notifications,
             new FakeNotificationChannelSettingRepository(),
+            new FakeNotificationTypeSettingRepository(),
             Array.Empty<INotificationSender>(),
             new FakeUnitOfWork(),
             _clock,

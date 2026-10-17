@@ -17,7 +17,7 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.11")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -1472,6 +1472,41 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("FinGrow.Domain.Entities.NotificationTypeSetting", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("employee_id");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_enabled");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("type");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_notification_type_settings");
+
+                    b.HasIndex("EmployeeId", "Type")
+                        .IsUnique()
+                        .HasDatabaseName("ix_notification_type_settings_employee_id_type");
+
+                    b.ToTable("notification_type_settings", (string)null);
+                });
+
             modelBuilder.Entity("FinGrow.Domain.Entities.OutboundEmail", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2399,6 +2434,16 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_notification_channel_settings_employees_employee_id");
+                });
+
+            modelBuilder.Entity("FinGrow.Domain.Entities.NotificationTypeSetting", b =>
+                {
+                    b.HasOne("FinGrow.Domain.Entities.Employee", null)
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_notification_type_settings_employees_employee_id");
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.RefreshToken", b =>

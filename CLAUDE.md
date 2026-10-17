@@ -479,6 +479,11 @@ necesita `IDomainEventDispatcher`, `AddInfrastructure()` solo arranca junto a `A
   `Notifications/Alerts/` que implementa `INotificationHandler<DomainEventEnvelope<TEvento>>`.
   El criterio de deduplicación es lo que hace que "la misma condición" no se repita: incluí en
   la clave lo que distingue una alerta de otra (categoría, período, meta).
+- **El empleado también apaga alertas por tipo (HU-05)**, además de por canal: `NotificationTypeSetting`
+  (`notification_type_settings`). `Notifier` corta antes de crear la notificación si el tipo está
+  apagado, así que no queda en la bandeja ni sale por ningún canal. Sin preferencia guardada el tipo
+  está activo, y las alertas a la empresa no tienen preferencias. Un `NotificationType` nuevo ya
+  aparece en `GET /api/notifications/types` sin tocar nada más.
 - **La bandeja de la app no es un canal configurable**: es el historial de las alertas. Hay un
   `CHECK` que impide guardar una preferencia para `InApp`.
 - **El tiempo real es el sender de `InApp`.** `SignalRNotificationSender` (`Api/Notifications/`)

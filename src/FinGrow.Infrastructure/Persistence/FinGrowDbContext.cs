@@ -74,6 +74,8 @@ public sealed partial class FinGrowDbContext : DbContext, IUnitOfWork
 
     public DbSet<NotificationChannelSetting> NotificationChannelSettings => Set<NotificationChannelSetting>();
 
+    public DbSet<NotificationTypeSetting> NotificationTypeSettings => Set<NotificationTypeSetting>();
+
     public DbSet<OutboundEmail> OutboundEmails => Set<OutboundEmail>();
 
     public DbSet<Achievement> Achievements => Set<Achievement>();

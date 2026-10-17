@@ -68,6 +68,7 @@ public class NotifyTransactionsToReviewHandlerTests
         var notifier = new Notifier(
             _notifications,
             new FakeNotificationChannelSettingRepository(),
+            new FakeNotificationTypeSettingRepository(),
             Array.Empty<INotificationSender>(),
             new FakeUnitOfWork(),
             _clock,

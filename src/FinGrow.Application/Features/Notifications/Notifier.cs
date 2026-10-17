@@ -12,6 +12,7 @@ internal sealed partial class Notifier
 {
     private readonly INotificationRepository _notifications;
     private readonly INotificationChannelSettingRepository _channelSettings;
+    private readonly INotificationTypeSettingRepository _typeSettings;
     private readonly IEnumerable<INotificationSender> _senders;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _clock;
@@ -20,6 +21,7 @@ internal sealed partial class Notifier
     public Notifier(
         INotificationRepository notifications,
         INotificationChannelSettingRepository channelSettings,
+        INotificationTypeSettingRepository typeSettings,
         IEnumerable<INotificationSender> senders,
         IUnitOfWork unitOfWork,
         IDateTimeProvider clock,
@@ -27,6 +29,7 @@ internal sealed partial class Notifier
     {
         _notifications = notifications;
         _channelSettings = channelSettings;
+        _typeSettings = typeSettings;
         _senders = senders;
         _unitOfWork = unitOfWork;
         _clock = clock;
@@ -37,6 +40,13 @@ internal sealed partial class Notifier
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentOutOfRangeException.ThrowIfLessThan(request.DeduplicationWindow, TimeSpan.Zero);
+
+        if (await IsTypeDisabledAsync(request.Recipient, request.Type, cancellationToken))
+        {
+            LogTypeDisabled(_logger, request.Type, request.Recipient.Id);
+
+            return null;
+        }
 
         var now = _clock.UtcNow;
         var notification = Notification.Create(
@@ -60,6 +70,21 @@ internal sealed partial class Notifier
         await DeliverAsync(notification, cancellationToken);
 
         return notification;
+    }
+
+    private async Task<bool> IsTypeDisabledAsync(
+        NotificationRecipient recipient,
+        NotificationType type,
+        CancellationToken cancellationToken)
+    {
+        if (recipient.Type != NotificationRecipientType.Employee)
+        {
+            return false;
+        }
+
+        var settings = await _typeSettings.ListByEmployeeAsync(recipient.Id, cancellationToken);
+
+        return settings.Any(setting => setting.Type == type && !setting.IsEnabled);
     }
 
     private async Task DeliverAsync(Notification notification, CancellationToken cancellationToken)
@@ -102,6 +127,9 @@ internal sealed partial class Notifier
             .Select(setting => setting.Channel)
             .ToHashSet();
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Alerta {Type} omitida para {RecipientId}: el empleado desactivo ese tipo de alerta.")]
+    private static partial void LogTypeDisabled(ILogger logger, NotificationType type, Guid recipientId);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Alerta {Type} omitida para {RecipientId}: ya se aviso '{DeduplicationKey}' dentro de la ventana de deduplicacion.")]
     private static partial void LogDeduplicated(ILogger logger, NotificationType type, string deduplicationKey, Guid recipientId);

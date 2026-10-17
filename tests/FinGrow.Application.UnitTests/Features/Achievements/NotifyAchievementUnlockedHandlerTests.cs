@@ -44,6 +44,7 @@ public class NotifyAchievementUnlockedHandlerTests
         var notifier = new Notifier(
             _notifications,
             new FakeNotificationChannelSettingRepository(),
+            new FakeNotificationTypeSettingRepository(),
             Array.Empty<INotificationSender>(),
             new FakeUnitOfWork(),
             new FakeDateTimeProvider(Now),

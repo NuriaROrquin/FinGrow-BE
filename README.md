@@ -670,9 +670,16 @@ sola vez hasta que el empleado la vuelva a autorizar.
 | `POST /api/notifications/read-all` | Empleado y empresa | Marca todas como leídas y devuelve cuántas marcó |
 | `GET /api/notifications/channels` | Empleado | Cada canal con `isEnabled`, `isConfigurable` y `isConnected` (Telegram vinculado) |
 | `PUT /api/notifications/channels/{canal}` | Empleado | Activa o desactiva un canal externo: `{ "isEnabled": false }`. `400` para `InApp` |
+| `GET /api/notifications/types` | Empleado | Cada tipo de alerta con su `isEnabled` |
+| `PUT /api/notifications/types/{tipo}` | Empleado | Activa o desactiva un tipo de alerta: `{ "isEnabled": false }`. `400` si el tipo no existe |
 
 Un canal sin preferencia guardada está activo: quien vincula Telegram empieza a recibir alertas
 por ahí hasta que lo apague.
+
+Las preferencias por tipo y por canal conviven: el tipo decide si la alerta existe y el canal
+decide por dónde viaja. Un tipo desactivado (HU-05) corta en `Notifier` antes de crear la
+notificación, así que no queda en la bandeja ni sale por Telegram o correo. Un tipo sin
+preferencia guardada está activo. Las alertas a la empresa no tienen preferencias.
 
 **Tiempo real.** El frontend escucha el hub de SignalR `/hubs/notifications`
 (`Api/Notifications/`) en lugar de consultar el contador cada tanto. Cada notificación nueva

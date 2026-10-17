@@ -34,6 +34,7 @@ public class GoalProgressAlertsJobTests
         services.AddSingleton<IGoalRepository>(_goals);
         services.AddSingleton<INotificationRepository>(_notifications);
         services.AddSingleton<INotificationChannelSettingRepository>(new FakeNotificationChannelSettingRepository());
+        services.AddSingleton<INotificationTypeSettingRepository>(new FakeNotificationTypeSettingRepository());
         services.AddSingleton<IUnitOfWork>(new FakeUnitOfWork());
         services.AddSingleton<IDateTimeProvider>(_clock);
         services.AddSingleton<IEnumerable<INotificationSender>>(Array.Empty<INotificationSender>());
