@@ -459,8 +459,9 @@ primer intento durante `OutboundEmail.FirstAttemptGrace`: así el trabajo no lo 
 
 - **El cuerpo va cifrado y se borra cuando el correo deja de esperar envío**: puede llevar
   credenciales. Un `CHECK` impide que un correo enviado o abandonado conserve el cuerpo.
-- **En `Development` todo correo va a `Email:RedirectAllTo`**, no a su destinatario: lo resuelve
-  `ResendEmailSender`, no quien encola.
+- **Si `Email:RedirectAllTo` tiene valor, todo correo va ahí** y no a su destinatario: lo resuelve
+  `ResendEmailSender`, no quien encola. Solo lo define el `docker-compose.yml` local; `dev-be`
+  manda a los destinatarios reales.
 - **El cliente de Resend no reintenta**: repetir el `POST` cuando Resend ya lo recibió duplica el
   correo. Los reintentos son de `outbound_emails`.
 
