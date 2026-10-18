@@ -465,6 +465,58 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("FinGrow.Domain.Entities.CompanyNotificationSetting", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Cadence")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("cadence");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_enabled");
+
+                    b.Property<DateTimeOffset?>("LastEvaluatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_evaluated_at");
+
+                    b.Property<decimal?>("Threshold")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("threshold");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("type");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_company_notification_settings");
+
+                    b.HasIndex("CompanyId", "Type")
+                        .IsUnique()
+                        .HasDatabaseName("ix_company_notification_settings_company_id_type");
+
+                    b.ToTable("company_notification_settings", (string)null);
+                });
+
             modelBuilder.Entity("FinGrow.Domain.Entities.Course", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1972,6 +2024,16 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
 
                     b.Navigation("Metrics")
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("FinGrow.Domain.Entities.CompanyNotificationSetting", b =>
+                {
+                    b.HasOne("FinGrow.Domain.Entities.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_company_notification_settings_companies_company_id");
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.CourseRating", b =>

@@ -1182,6 +1182,16 @@ public sealed class FakeNotificationTypeSettingRepository : INotificationTypeSet
         Task.FromResult<IReadOnlyList<NotificationTypeSetting>>(Settings.Where(setting => setting.EmployeeId == employeeId).ToList());
 }
 
+public sealed class FakeCompanyNotificationSettingRepository : ICompanyNotificationSettingRepository
+{
+    public List<CompanyNotificationSetting> Settings { get; } = new();
+
+    public void Add(CompanyNotificationSetting setting) => Settings.Add(setting);
+
+    public Task<IReadOnlyList<CompanyNotificationSetting>> ListByCompanyAsync(Guid companyId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<CompanyNotificationSetting>>(Settings.Where(setting => setting.CompanyId == companyId).ToList());
+}
+
 public sealed class FakeTransactionReceiptRepository : ITransactionReceiptRepository
 {
     public List<TransactionReceipt> Receipts { get; } = new();

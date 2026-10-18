@@ -233,6 +233,7 @@ public class NotifierTests
             _notifications,
             _channelSettings,
             _typeSettings,
+            new FakeCompanyNotificationSettingRepository(),
             new INotificationSender[] { new TelegramNotificationSender(_integrations, _bot) },
             _unitOfWork,
             _clock,

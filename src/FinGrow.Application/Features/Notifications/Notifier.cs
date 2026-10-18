@@ -13,6 +13,7 @@ internal sealed partial class Notifier
     private readonly INotificationRepository _notifications;
     private readonly INotificationChannelSettingRepository _channelSettings;
     private readonly INotificationTypeSettingRepository _typeSettings;
+    private readonly ICompanyNotificationSettingRepository _companyTypeSettings;
     private readonly IEnumerable<INotificationSender> _senders;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _clock;
@@ -22,6 +23,7 @@ internal sealed partial class Notifier
         INotificationRepository notifications,
         INotificationChannelSettingRepository channelSettings,
         INotificationTypeSettingRepository typeSettings,
+        ICompanyNotificationSettingRepository companyTypeSettings,
         IEnumerable<INotificationSender> senders,
         IUnitOfWork unitOfWork,
         IDateTimeProvider clock,
@@ -30,6 +32,7 @@ internal sealed partial class Notifier
         _notifications = notifications;
         _channelSettings = channelSettings;
         _typeSettings = typeSettings;
+        _companyTypeSettings = companyTypeSettings;
         _senders = senders;
         _unitOfWork = unitOfWork;
         _clock = clock;
@@ -77,6 +80,12 @@ internal sealed partial class Notifier
         NotificationType type,
         CancellationToken cancellationToken)
     {
+        if (recipient.Type == NotificationRecipientType.Company)
+        {
+            var companySettings = await _companyTypeSettings.ListByCompanyAsync(recipient.Id, cancellationToken);
+            return companySettings.Any(setting => setting.Type == type && !setting.IsEnabled);
+        }
+
         if (recipient.Type != NotificationRecipientType.Employee)
         {
             return false;

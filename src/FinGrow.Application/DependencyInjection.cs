@@ -20,6 +20,7 @@ using Features.Metrics;
 using Features.Metrics.SnapshotMetrics;
 using Features.Notifications;
 using Features.Notifications.Alerts.GoalProgress;
+using Features.Notifications.Alerts.Company;
 using Features.Notifications.Delivery;
 using Features.OutboundEmails;
 using Features.OutboundEmails.DeliverDueEmails;
@@ -67,6 +68,7 @@ public static class DependencyInjection
 
         services.AddSingleton<IDomainEventDispatcher, DomainEventDispatcher>();
         services.AddScoped<Notifier>();
+        services.AddScoped<CompanyAlertsEvaluator>();
         services.AddScoped<INotificationSender, EmailNotificationSender>();
         services.AddScoped<INotificationSender, TelegramNotificationSender>();
         services.AddScoped<OutboundEmailDispatcher>();
@@ -81,6 +83,7 @@ public static class DependencyInjection
         services.AddScoped<IScheduledJob, InvestmentQuotesJob>();
         services.AddScoped<IScheduledJob, InvestmentAccrualsJob>();
         services.AddScoped<IScheduledJob, GoalProgressAlertsJob>();
+        services.AddScoped<IScheduledJob, CompanyAlertsJob>();
         services.AddScoped<IScheduledJob, EmailDeliveryJob>();
         services.AddScoped<IScheduledJob, ReceiptsCleanupJob>();
         services.AddScoped<IScheduledJob, AchievementsEvaluationJob>();

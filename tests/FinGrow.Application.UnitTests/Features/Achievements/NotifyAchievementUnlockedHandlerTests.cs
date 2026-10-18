@@ -45,6 +45,7 @@ public class NotifyAchievementUnlockedHandlerTests
             _notifications,
             new FakeNotificationChannelSettingRepository(),
             new FakeNotificationTypeSettingRepository(),
+            new FakeCompanyNotificationSettingRepository(),
             Array.Empty<INotificationSender>(),
             new FakeUnitOfWork(),
             new FakeDateTimeProvider(Now),

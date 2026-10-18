@@ -196,14 +196,14 @@ public class NotificationsEndpointsTests
     }
 
     [Fact]
-    public async Task A_company_has_no_alert_types_to_configure()
+    public async Task A_company_can_list_its_alert_types()
     {
         using var factory = new NotificationsWebApplicationFactory();
         var client = CreateClient(factory, Rol.Empresa);
 
         var response = await client.GetAsync(new Uri(NotificationsPath + "/types", UriKind.Relative));
 
-        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
     private static HttpClient CreateClient(NotificationsWebApplicationFactory factory, string role)
@@ -227,6 +227,8 @@ public class NotificationsEndpointsTests
         public List<NotificationChannelSetting> ChannelSettings { get; } = new();
 
         public List<NotificationTypeSetting> TypeSettings { get; } = new();
+
+        public List<CompanyNotificationSetting> CompanyTypeSettings { get; } = new();
 
         public Notification Store(NotificationRecipient recipient)
         {
@@ -270,6 +272,7 @@ public class NotificationsEndpointsTests
                 services.AddScoped<INotificationRepository>(_ => new InMemoryNotificationRepository(Notifications));
                 services.AddScoped<INotificationChannelSettingRepository>(_ => new InMemoryChannelSettingRepository(ChannelSettings));
                 services.AddScoped<INotificationTypeSettingRepository>(_ => new InMemoryTypeSettingRepository(TypeSettings));
+                services.AddScoped<ICompanyNotificationSettingRepository>(_ => new InMemoryCompanyTypeSettingRepository(CompanyTypeSettings));
                 services.AddScoped<IEmployeeIntegrationRepository, NoIntegrationsRepository>();
                 services.AddScoped<IUnitOfWork, NoOpUnitOfWork>();
             });
@@ -327,6 +330,18 @@ public class NotificationsEndpointsTests
 
         public Task<IReadOnlyList<NotificationTypeSetting>> ListByEmployeeAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<NotificationTypeSetting>>(settings.Where(setting => setting.EmployeeId == employeeId).ToList());
+    }
+
+    private sealed class InMemoryCompanyTypeSettingRepository(List<CompanyNotificationSetting> settings)
+        : ICompanyNotificationSettingRepository
+    {
+        public void Add(CompanyNotificationSetting setting) => settings.Add(setting);
+
+        public Task<IReadOnlyList<CompanyNotificationSetting>> ListByCompanyAsync(
+            Guid companyId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<CompanyNotificationSetting>>(
+                settings.Where(setting => setting.CompanyId == companyId).ToList());
     }
 
     private sealed class NoIntegrationsRepository : IEmployeeIntegrationRepository

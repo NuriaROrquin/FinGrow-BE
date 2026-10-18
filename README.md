@@ -464,6 +464,7 @@ siguiente.
 | Trabajo | Cron sugerido (UTC) | Qué hace |
 |---|---|---|
 | `metrics-snapshot` | `0 4 1 * *` (el 1 de cada mes, 01:00 de Argentina) | Genera las fotos mensuales de métricas por empresa y por departamento (`company_metrics_snapshots` y `department_metrics_snapshots`) del último mes cerrado, y completa las de los meses anteriores que falten desde el alta de cada empresa. En la misma pasada calcula el puntaje de salud financiera de cada empleado (ver más abajo). Es idempotente: correrlo de nuevo actualiza la foto del último mes cerrado en lugar de duplicarla. Si un mes necesita el dólar MEP y DolarApi no responde, esa foto queda pendiente y la corrida, fallida |
+| `company-alerts` | `0 5 1 * *` (el 1 de cada mes, después de `metrics-snapshot`) | Evalúa la configuración de alertas de cada empresa sobre `company_metrics_snapshots`. Avisa si el bienestar financiero promedio o la participación quedaron por debajo del umbral configurado, y si la plantilla activa aumentó o disminuyó respecto de la foto mensual anterior. Solo expone períodos, porcentajes y cantidades agregadas |
 | `mercadopago-sync` | `0 * * * *` (cada hora) | Recorre las cuentas de Mercado Pago vinculadas y trae los movimientos nuevos como pendientes de revisión. Mercado Pago no avisa por webhook lo que un usuario paga, por eso se consulta |
 | `iol-token-refresh` | `*/5 * * * *` (cada 5 minutos, todo el día) | Renueva la autorización de cada cuenta de IOL vinculada a la que le quedan menos de 10 minutos, para que el refresh token (que dura 20) no venza. Si IOL la rechaza (el empleado cambió la contraseña o revocó el acceso), la integración queda en error; si IOL no responde, la corrida queda fallida y la siguiente reintenta sin perder la vinculación. **Tiene que estar programado**: sin él, las cuentas de IOL se desvinculan solas |
 | `iol-sync` | `*/30 14-21 * * 1-5` (cada media hora de 11 a 18:30 de Argentina, días hábiles) | Importa el portafolio de cada cuenta de IOL vinculada como inversiones (ver *InvertirOnline (IOL)*). Si IOL no responde para una cuenta, esa no se toca, la corrida queda fallida con el motivo y la siguiente la reintenta. Una integración en error no se visita |
@@ -490,6 +491,13 @@ ya trae `curl` y tiene `Jobs__ApiKey` en su entorno, así que la clave no se cop
 
 ```bash
 curl -fsS -X POST "http://localhost:8080/api/jobs/metrics-snapshot/run" -H "X-Jobs-Key: $Jobs__ApiKey"
+```
+
+Para las alertas empresariales, el schedule mensual ejecuta el mismo comando con
+`company-alerts`:
+
+```bash
+curl -fsS -X POST "http://localhost:8080/api/jobs/company-alerts/run" -H "X-Jobs-Key: $Jobs__ApiKey"
 ```
 
 Si el schedule corre en el servidor en lugar de dentro del contenedor, es la misma llamada contra
@@ -650,7 +658,38 @@ pasos, siempre en este orden:
 
 El destinatario puede ser un empleado o la empresa (`recipient_type`), así que la misma bandeja
 sirve para las alertas de bienestar del panel de empresa. Los canales externos son solo para
-empleados.
+empleados. La empresa configura los cuatro tipos empresariales de forma independiente:
+`FinancialWellbeingLow` y `ParticipationLow` se evalúan mensualmente sobre fotos agregadas y cada
+empresa puede fijar su umbral entre 1 y 100. `EmployeeAdded` y `EmployeeRemoved` comparan la
+cantidad de empleados activos entre las dos últimas fotos mensuales y avisan, respectivamente,
+un aumento o una reducción netos de la plantilla. Los cuatro tipos empresariales se evalúan
+mensualmente y solo incluyen períodos y cantidades agregadas; no registran ni exponen eventos o
+datos personales de empleados.
+
+#### Alertas empresariales (HU-50)
+
+Las cuatro preferencias pertenecen a la empresa, empiezan desactivadas y se habilitan de forma
+independiente desde `PUT /api/notifications/types/{tipo}`. La frecuencia es siempre
+`Monthly`: el job `company-alerts` corre después de `metrics-snapshot`, por lo que analiza el
+último mes cerrado y no cambios en tiempo real.
+
+| Tipo | Regla evaluada sobre `company_metrics_snapshots` | Configuración |
+|---|---|---|
+| `FinancialWellbeingLow` | El promedio de puntaje de salud financiera del último snapshot visible es menor que el umbral | Umbral opcional entre 1 y 100; por defecto, 60 |
+| `ParticipationLow` | La tasa de participación del último snapshot visible es menor que el umbral | Umbral opcional entre 1 y 100; por defecto, 50 |
+| `EmployeeAdded` | Los empleados activos del último snapshot son más que los del snapshot mensual anterior | No lleva umbral |
+| `EmployeeRemoved` | Los empleados activos del último snapshot son menos que los del snapshot mensual anterior | No lleva umbral |
+
+La participación cuenta a un empleado activo que, durante el mes, confirmó al menos un
+movimiento o hizo un aporte a una meta. El bienestar financiero es el promedio de los puntajes
+de salud financiera que pudieron calcularse para el período; un puntaje requiere actividad
+suficiente y algún ingreso. Ambos respetan el umbral de anonimización del panel empresarial: si
+el snapshot no puede revelarse, no generan alerta.
+
+Las alertas de plantilla describen un **cambio neto**, no eventos individuales de contratación,
+eliminación o desactivación. Si no existe un snapshot mensual anterior, no se puede comparar y
+no se emite una alerta. Así, las notificaciones contienen solo el período actual, el anterior y
+las cantidades agregadas de empleados activos.
 
 Lo que dispara una alerta es un **evento de dominio**: un agregado lo levanta (`Raise`) cuando
 pasa algo, y recién cuando `SaveChanges` confirma el cambio se publica por MediatR, cada evento
@@ -670,16 +709,31 @@ sola vez hasta que el empleado la vuelva a autorizar.
 | `POST /api/notifications/read-all` | Empleado y empresa | Marca todas como leídas y devuelve cuántas marcó |
 | `GET /api/notifications/channels` | Empleado | Cada canal con `isEnabled`, `isConfigurable` y `isConnected` (Telegram vinculado) |
 | `PUT /api/notifications/channels/{canal}` | Empleado | Activa o desactiva un canal externo: `{ "isEnabled": false }`. `400` para `InApp` |
-| `GET /api/notifications/types` | Empleado | Cada tipo de alerta con su `isEnabled` |
-| `PUT /api/notifications/types/{tipo}` | Empleado | Activa o desactiva un tipo de alerta: `{ "isEnabled": false }`. `400` si el tipo no existe |
+| `GET /api/notifications/types` | Empleado y empresa | Cada tipo habilitable del rol con `isEnabled`; para empresa agrega `cadence` (`Monthly`) y, cuando corresponde, `threshold` |
+| `PUT /api/notifications/types/{tipo}` | Empleado y empresa | Activa o desactiva un tipo. La empresa siempre envía `cadence: "Monthly"`; bienestar y participación pueden incluir `threshold`, mientras que las alertas de plantilla no lo admiten |
+
+Ejemplos de configuración empresarial:
+
+```json
+{ "isEnabled": true, "cadence": "Monthly", "threshold": 70 }
+```
+
+para `FinancialWellbeingLow` o `ParticipationLow`, y:
+
+```json
+{ "isEnabled": true, "cadence": "Monthly" }
+```
+
+para `EmployeeAdded` o `EmployeeRemoved`.
 
 Un canal sin preferencia guardada está activo: quien vincula Telegram empieza a recibir alertas
 por ahí hasta que lo apague.
 
 Las preferencias por tipo y por canal conviven: el tipo decide si la alerta existe y el canal
 decide por dónde viaja. Un tipo desactivado (HU-05) corta en `Notifier` antes de crear la
-notificación, así que no queda en la bandeja ni sale por Telegram o correo. Un tipo sin
-preferencia guardada está activo. Las alertas a la empresa no tienen preferencias.
+notificación, así que no queda en la bandeja ni sale por Telegram o correo. Para empleados, un
+tipo sin preferencia guardada está activo. Para empresa, los cuatro tipos de HU-50 nacen
+desactivados: no se genera ninguna alerta hasta que la empresa la habilita explícitamente.
 
 **Tiempo real.** El frontend escucha el hub de SignalR `/hubs/notifications`
 (`Api/Notifications/`) en lugar de consultar el contador cada tanto. Cada notificación nueva

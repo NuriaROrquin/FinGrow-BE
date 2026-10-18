@@ -11,6 +11,8 @@ using Application.Features.Notifications.MarkAllNotificationsAsRead;
 using Application.Features.Notifications.MarkNotificationAsRead;
 using Application.Features.Notifications.Types.ChangeNotificationType;
 using Application.Features.Notifications.Types.ListNotificationTypes;
+using Application.Features.Notifications.Types.ListCompanyNotificationTypes;
+using Application.Features.Notifications.Types.ChangeCompanyNotificationType;
 using Application.Interfaces;
 using Domain.Enums;
 using Domain.ValueObjects;
@@ -57,19 +59,28 @@ public sealed class NotificationsController(ISender sender, ICurrentUser current
             cancellationToken)).ToActionResult();
 
     [HttpGet("types")]
-    [Authorize(Roles = Rol.Empleado)]
     public async Task<IActionResult> ListTypes(CancellationToken cancellationToken) =>
-        (await sender.Send(new ListNotificationTypesQuery(currentUser.UserId!.Value), cancellationToken)).ToActionResult();
+        currentUser.Role == Rol.Empresa
+            ? (await sender.Send(new ListCompanyNotificationTypesQuery(currentUser.UserId!.Value), cancellationToken)).ToActionResult()
+            : (await sender.Send(new ListNotificationTypesQuery(currentUser.UserId!.Value), cancellationToken)).ToActionResult();
 
     [HttpPut("types/{type}")]
-    [Authorize(Roles = Rol.Empleado)]
     public async Task<IActionResult> ChangeType(
         NotificationType type,
         ChangeNotificationTypeRequest request,
         CancellationToken cancellationToken) =>
-        (await sender.Send(
-            new ChangeNotificationTypeCommand(currentUser.UserId!.Value, type, request.IsEnabled),
-            cancellationToken)).ToActionResult();
+        currentUser.Role == Rol.Empresa
+            ? (await sender.Send(
+                new ChangeCompanyNotificationTypeCommand(
+                    currentUser.UserId!.Value,
+                    type,
+                    request.IsEnabled,
+                    request.Cadence ?? NotificationCadence.Monthly,
+                    request.Threshold),
+                cancellationToken)).ToActionResult()
+            : (await sender.Send(
+                new ChangeNotificationTypeCommand(currentUser.UserId!.Value, type, request.IsEnabled),
+                cancellationToken)).ToActionResult();
 
     private NotificationRecipient Recipient =>
         currentUser.Role == Rol.Empresa

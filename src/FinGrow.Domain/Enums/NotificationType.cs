@@ -8,5 +8,9 @@ public enum NotificationType
     BudgetWarning = 4,
     BudgetExceeded = 5,
     IntegrationAccessLost = 6,
-    AchievementUnlocked = 7
+    AchievementUnlocked = 7,
+    FinancialWellbeingLow = 8,
+    ParticipationLow = 9,
+    EmployeeAdded = 10,
+    EmployeeRemoved = 11,
 }

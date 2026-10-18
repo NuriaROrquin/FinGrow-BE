@@ -1,3 +1,5 @@
 namespace FinGrow.Api.Contracts;
 
-public sealed record ChangeNotificationTypeRequest(bool IsEnabled);
+using FinGrow.Domain.Enums;
+
+public sealed record ChangeNotificationTypeRequest(bool IsEnabled, NotificationCadence? Cadence, decimal? Threshold);
