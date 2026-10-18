@@ -7,7 +7,8 @@ using FluentValidation;
 using Interfaces;
 using MediatR;
 
-public sealed record GetMonthlyExpensesQuery(Currency Currency) : IRequest<Result<MonthlyExpensesResponse>>;
+public sealed record GetMonthlyExpensesQuery(Currency Currency, DateOnly? DateTo = null)
+    : IRequest<Result<MonthlyExpensesResponse>>;
 
 public sealed record MonthlyExpenseItem(string Month, decimal TotalExpense, Currency Currency);
 
@@ -37,7 +38,9 @@ internal sealed class GetMonthlyExpensesQueryHandler(
                 Error.Unauthorized("Transactions.Unauthenticated", "Hay que iniciar sesion para consultar los gastos."));
         }
 
-        var (from, to) = TransactionChartPeriod.LastSixCalendarMonths(dateTimeProvider);
+        var (from, to) = request.DateTo is { } dateTo
+            ? TransactionChartPeriod.SixCalendarMonthsEnding(dateTo)
+            : TransactionChartPeriod.LastSixCalendarMonths(dateTimeProvider);
         var totals = await transactionReadRepository.GetMonthlyExpensesAsync(
             employeeId, request.Currency, from, to, cancellationToken);
         var totalsByMonth = totals.ToDictionary(total => (total.Year, total.Month), total => total.Total);
