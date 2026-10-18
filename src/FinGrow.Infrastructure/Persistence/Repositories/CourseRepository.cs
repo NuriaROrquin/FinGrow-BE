@@ -57,5 +57,13 @@ internal sealed class CourseRepository(FinGrowDbContext dbContext) : ICourseRepo
         return lessonIds.ToHashSet();
     }
 
+    public async Task<IReadOnlyList<DateTimeOffset>> ListCompletionDatesAsync(
+        Guid employeeId,
+        CancellationToken cancellationToken = default) =>
+        await dbContext.LessonCompletions
+            .Where(completion => completion.EmployeeId == employeeId)
+            .Select(completion => completion.CompletedAt)
+            .ToListAsync(cancellationToken);
+
     public void AddCompletion(LessonCompletion completion) => dbContext.LessonCompletions.Add(completion);
 }

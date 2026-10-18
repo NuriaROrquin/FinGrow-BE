@@ -15,5 +15,7 @@ public interface ICourseRepository
 
     Task<IReadOnlySet<Guid>> ListCompletedLessonIdsAsync(Guid employeeId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<DateTimeOffset>> ListCompletionDatesAsync(Guid employeeId, CancellationToken cancellationToken = default);
+
     void AddCompletion(LessonCompletion completion);
 }

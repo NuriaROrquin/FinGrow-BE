@@ -1035,8 +1035,8 @@ public sealed class FakeCourseRepository : ICourseRepository
 
     public void Add(Course course) => Courses.Add(course);
 
-    public void Complete(Guid employeeId, Lesson lesson) =>
-        Completions.Add(LessonCompletion.Create(employeeId, lesson.Id, DateTimeOffset.UnixEpoch));
+    public void Complete(Guid employeeId, Lesson lesson, DateTimeOffset? completedAt = null) =>
+        Completions.Add(LessonCompletion.Create(employeeId, lesson.Id, completedAt ?? DateTimeOffset.UnixEpoch));
 
     public Task<IReadOnlyList<Course>> ListPublishedAsync(
         CourseLevel? level,
@@ -1060,6 +1060,12 @@ public sealed class FakeCourseRepository : ICourseRepository
             .Where(completion => completion.EmployeeId == employeeId)
             .Select(completion => completion.LessonId)
             .ToHashSet());
+
+    public Task<IReadOnlyList<DateTimeOffset>> ListCompletionDatesAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<DateTimeOffset>>(Completions
+            .Where(completion => completion.EmployeeId == employeeId)
+            .Select(completion => completion.CompletedAt)
+            .ToList());
 
     public void AddCompletion(LessonCompletion completion) => Completions.Add(completion);
 }

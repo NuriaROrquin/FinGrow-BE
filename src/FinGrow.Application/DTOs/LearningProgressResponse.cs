@@ -9,14 +9,18 @@ public sealed record LearningProgressResponse(
     int NotStartedCourses,
     int LessonCount,
     int CompletedLessons,
-    int ProgressPercentage)
+    int ProgressPercentage,
+    int StreakWeeks,
+    bool StudiedThisWeek)
 {
-    public static LearningProgressResponse From(LearningProgress progress) =>
+    public static LearningProgressResponse From(LearningProgress progress, LearningStreak streak) =>
         new(progress.CourseCount,
             progress.CompletedCourses,
             progress.InProgressCourses,
             progress.NotStartedCourses,
             progress.LessonCount,
             progress.CompletedLessons,
-            progress.Percentage);
+            progress.Percentage,
+            streak.Weeks,
+            streak.StudiedThisWeek);
 }
