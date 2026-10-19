@@ -18,6 +18,9 @@ internal sealed class MetricsAnonymizationPolicy(IOptions<MetricsAnonymizationOp
     public bool CanRevealCompany(PeriodMetrics metrics) =>
         metrics.ActiveEmployees >= CompanyMinimumEmployees;
 
+    public bool CanRevealCompany(int activeEmployees) =>
+        activeEmployees >= CompanyMinimumEmployees;
+
     public bool CanRevealDepartment(PeriodMetrics metrics) =>
         metrics.ActiveEmployees >= DepartmentMinimumEmployees;
 }

@@ -5,6 +5,7 @@ using FinGrow.Application.Common;
 using FinGrow.Application.DTOs;
 using FinGrow.Application.Features.Metrics.GetCompanyMetrics;
 using FinGrow.Application.Features.Metrics.GetCompanyMetricsComparison;
+using FinGrow.Application.Features.Metrics.GetCompanyEducationMetrics;
 using FinGrow.Application.Features.Metrics.GetDepartmentMetrics;
 using FinGrow.Application.Features.Metrics.GetParticipation;
 using MediatR;
@@ -37,6 +38,17 @@ public sealed class CompanyMetricsController(ISender sender) : ControllerBase
         CancellationToken cancellationToken) =>
         (await sender.Send(
             new GetCompanyMetricsComparisonQuery(fromDate, toDate),
+            cancellationToken)).ToActionResult();
+
+    [HttpGet("metrics/education")]
+    [ProducesResponseType<CompanyEducationMetricsResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> EducationMetrics(
+        CancellationToken cancellationToken) =>
+        (await sender.Send(
+            new GetCompanyEducationMetricsQuery(),
             cancellationToken)).ToActionResult();
 
     [HttpGet("metrics/participation")]
