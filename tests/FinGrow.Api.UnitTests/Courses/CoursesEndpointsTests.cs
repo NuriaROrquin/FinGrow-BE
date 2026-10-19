@@ -365,6 +365,9 @@ public class CoursesEndpointsTests
             return Task.FromResult<IReadOnlySet<Guid>>(CompletedLessonIds.ToHashSet());
         }
 
+        public Task<IReadOnlyList<DateTimeOffset>> ListCompletionDatesAsync(Guid employeeId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<DateTimeOffset>>(Array.Empty<DateTimeOffset>());
+
         public void AddCompletion(LessonCompletion completion) => CompletedLessonIds.Add(completion.LessonId);
     }
 

@@ -51,8 +51,9 @@ public sealed class TransactionsController(
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetMonthlyExpenses(
         [FromQuery] Currency currency = Currency.ARS,
+        [FromQuery(Name = "dateTo")] DateOnly? dateTo = null,
         CancellationToken cancellationToken = default) =>
-        (await sender.Send(new GetMonthlyExpensesQuery(currency), cancellationToken)).ToActionResult();
+        (await sender.Send(new GetMonthlyExpensesQuery(currency, dateTo), cancellationToken)).ToActionResult();
 
     [HttpGet("income-vs-expenses")]
     [ProducesResponseType<MonthlyIncomeExpensesResponse>(StatusCodes.Status200OK)]
@@ -60,8 +61,9 @@ public sealed class TransactionsController(
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetMonthlyIncomeExpenses(
         [FromQuery] Currency currency = Currency.ARS,
+        [FromQuery(Name = "dateTo")] DateOnly? dateTo = null,
         CancellationToken cancellationToken = default) =>
-        (await sender.Send(new GetMonthlyIncomeExpensesQuery(currency), cancellationToken)).ToActionResult();
+        (await sender.Send(new GetMonthlyIncomeExpensesQuery(currency, dateTo), cancellationToken)).ToActionResult();
 
     [HttpGet("expenses-by-category")]
     [ProducesResponseType<ExpensesByCategoryResponse>(StatusCodes.Status200OK)]

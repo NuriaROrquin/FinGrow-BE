@@ -3,10 +3,11 @@ namespace FinGrow.Application.Features.Courses.GetLearningProgress;
 using Common;
 using DTOs;
 using Domain.Repositories;
+using Interfaces;
 using Domain.ValueObjects;
 using MediatR;
 
-internal sealed class GetLearningProgressHandler(ICourseRepository courseRepository)
+internal sealed class GetLearningProgressHandler(ICourseRepository courseRepository, IDateTimeProvider dateTimeProvider)
     : IRequestHandler<GetLearningProgressQuery, Result<LearningProgressResponse>>
 {
     public async Task<Result<LearningProgressResponse>> Handle(
@@ -25,6 +26,9 @@ internal sealed class GetLearningProgressHandler(ICourseRepository courseReposit
             .Select(course => course.ProgressFor(completedLessonIds))
             .ToList());
 
-        return Result.Success(LearningProgressResponse.From(progress));
+        var completionDates = await courseRepository.ListCompletionDatesAsync(request.EmployeeId, cancellationToken);
+        var streak = LearningStreak.From(completionDates, dateTimeProvider.Today);
+
+        return Result.Success(LearningProgressResponse.From(progress, streak));
     }
 }

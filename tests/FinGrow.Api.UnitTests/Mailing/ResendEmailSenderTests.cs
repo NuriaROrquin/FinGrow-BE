@@ -86,13 +86,13 @@ public class ResendEmailSenderTests
     }
 
     [Fact]
-    public void Development_redirects_every_message_to_the_resend_test_inbox()
+    public void Without_a_configured_redirect_each_message_goes_to_its_own_recipient()
     {
         using var factory = new EmailWebApplicationFactory();
 
         var options = factory.Services.GetRequiredService<IOptions<EmailOptions>>().Value;
 
-        options.RedirectAllTo.ShouldBe("delivered@resend.dev");
+        options.RedirectAllTo.ShouldBeNullOrWhiteSpace();
     }
 
     [Fact]

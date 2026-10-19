@@ -47,7 +47,7 @@ public class GetLearningProgressHandlerTests
     }
 
     private async Task<LearningProgressResponse> GetAsync() =>
-        (await new GetLearningProgressHandler(_courses).Handle(
+        (await new GetLearningProgressHandler(_courses, new FakeDateTimeProvider(Now)).Handle(
             new GetLearningProgressQuery(EmployeeId),
             CancellationToken.None)).Value;
 
@@ -105,6 +105,32 @@ public class GetLearningProgressHandlerTests
         progress.CourseCount.ShouldBe(1);
         progress.LessonCount.ShouldBe(2);
         progress.ProgressPercentage.ShouldBe(50);
+    }
+
+    [Fact]
+    public async Task The_streak_counts_consecutive_weeks_with_a_completed_lesson()
+    {
+        var course = StoreCourse("constante", 3);
+        _courses.Complete(EmployeeId, course.Lessons.ElementAt(0), Now);
+        _courses.Complete(EmployeeId, course.Lessons.ElementAt(1), Now.AddDays(-7));
+        _courses.Complete(EmployeeId, course.Lessons.ElementAt(2), Now.AddDays(-14));
+
+        var progress = await GetAsync();
+
+        progress.StreakWeeks.ShouldBe(3);
+        progress.StudiedThisWeek.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Another_employee_lessons_do_not_count_towards_the_streak()
+    {
+        var course = StoreCourse("ajeno", 1);
+        _courses.Complete(Guid.CreateVersion7(), course.Lessons.First(), Now);
+
+        var progress = await GetAsync();
+
+        progress.StreakWeeks.ShouldBe(0);
+        progress.StudiedThisWeek.ShouldBeFalse();
     }
 
     [Fact]

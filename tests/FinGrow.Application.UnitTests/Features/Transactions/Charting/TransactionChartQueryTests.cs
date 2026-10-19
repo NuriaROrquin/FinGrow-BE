@@ -17,6 +17,10 @@ public sealed class TransactionChartQueryTests
     {
         "2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10",
     };
+    private static readonly string[] MonthsEndingInMarch =
+    {
+        "2025-10", "2025-11", "2025-12", "2026-01", "2026-02", "2026-03",
+    };
     private static readonly decimal[] ExpectedExpenseTotals = { 125000.50m, 0m, 0m, 0m, 0m, 800m };
 
     [Fact]
@@ -43,6 +47,30 @@ public sealed class TransactionChartQueryTests
         repository.Currency.ShouldBe(Currency.ARS);
         repository.FromDate.ShouldBe(new DateOnly(2026, 5, 1));
         repository.ToDate.ShouldBe(new DateOnly(2026, 10, 31));
+    }
+
+    [Fact]
+    public async Task Monthly_charts_end_at_the_month_of_the_requested_date()
+    {
+        var repository = new FakeTransactionReadRepository();
+        var currentUser = new FakeCurrentUser { UserId = EmployeeId };
+        var dateTimeProvider = new FakeDateTimeProvider(Today);
+        var dateTo = new DateOnly(2026, 3, 15);
+
+        var expenses = await new GetMonthlyExpensesQueryHandler(repository, currentUser, dateTimeProvider)
+            .Handle(new GetMonthlyExpensesQuery(Currency.ARS, dateTo), CancellationToken.None);
+        var expensesFrom = repository.FromDate;
+        var expensesTo = repository.ToDate;
+        var incomeExpenses = await new GetMonthlyIncomeExpensesQueryHandler(repository, currentUser, dateTimeProvider)
+            .Handle(new GetMonthlyIncomeExpensesQuery(Currency.ARS, dateTo), CancellationToken.None);
+
+        expenses.Value.Items.Select(item => item.Month).ShouldBe(MonthsEndingInMarch);
+        incomeExpenses.Value.Items.Select(item => item.Month).ShouldBe(
+            expenses.Value.Items.Select(item => item.Month));
+        expensesFrom.ShouldBe(new DateOnly(2025, 10, 1));
+        expensesTo.ShouldBe(new DateOnly(2026, 3, 31));
+        repository.FromDate.ShouldBe(expensesFrom);
+        repository.ToDate.ShouldBe(expensesTo);
     }
 
     [Fact]
