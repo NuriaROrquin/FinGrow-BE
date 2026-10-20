@@ -15,6 +15,7 @@ internal sealed partial class MetricsSnapshotJob : IScheduledJob
     public const string JobName = "metrics-snapshot";
 
     private readonly ICompanyRepository _companies;
+    private readonly IEmployeeRepository _employees;
     private readonly IPeriodActivityReadRepository _activity;
     private readonly IMetricsSnapshotRepository _snapshots;
     private readonly FinancialHealthScorer _healthScorer;
@@ -24,6 +25,7 @@ internal sealed partial class MetricsSnapshotJob : IScheduledJob
 
     public MetricsSnapshotJob(
         ICompanyRepository companies,
+        IEmployeeRepository employees,
         IPeriodActivityReadRepository activity,
         IMetricsSnapshotRepository snapshots,
         FinancialHealthScorer healthScorer,
@@ -32,6 +34,7 @@ internal sealed partial class MetricsSnapshotJob : IScheduledJob
         ILogger<MetricsSnapshotJob> logger)
     {
         _companies = companies;
+        _employees = employees;
         _activity = activity;
         _snapshots = snapshots;
         _healthScorer = healthScorer;
@@ -62,10 +65,12 @@ internal sealed partial class MetricsSnapshotJob : IScheduledJob
         foreach (var company in companies)
         {
             var alreadyTaken = await _snapshots.ListCompanyPeriodStartsAsync(company.Id, cancellationToken);
+            var lastWithdrawal = await _employees.FindLastWithdrawalAsync(company.Id, cancellationToken);
             var firstPeriod = MetricsPeriod.MonthOf(ArgentinaTime.DateOf(company.CreatedAt));
             var pending = firstPeriod
                 .Until(lastClosed)
-                .Where(period => period == lastClosed || !alreadyTaken.Contains(period.Start))
+                .Where(period => !alreadyTaken.Contains(period.Start)
+                    || (period == lastClosed && !WithdrawnAfter(period, lastWithdrawal)))
                 .ToList();
 
             foreach (var period in pending)
@@ -108,6 +113,12 @@ internal sealed partial class MetricsSnapshotJob : IScheduledJob
                     $"No se pudo obtener la cotizacion del dolar MEP: {periodsWithoutExchangeRate} foto(s) de empresa quedaron pendientes para la proxima corrida."),
                 summary);
     }
+
+    // Rehacer la foto del ultimo mes cerrado sirve para sumar movimientos confirmados tarde, pero si
+    // despues de ese mes alguien se dio de baja (HU-74) sus datos ya no estan y la foto lo perderia:
+    // se conserva la que se tomo. Las fotos guardan conteos, asi que la baja no las altera.
+    private static bool WithdrawnAfter(MetricsPeriod period, DateTimeOffset? lastWithdrawal) =>
+        lastWithdrawal >= period.EndInstantExclusive;
 
     private static bool ExistedDuring(Department department, MetricsPeriod period) =>
         department.WasActiveDuring(period.StartInstant, period.EndInstantExclusive);

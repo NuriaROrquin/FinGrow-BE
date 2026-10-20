@@ -30,6 +30,11 @@ internal sealed class EmployeeRepository : IEmployeeRepository
             .Select(group => new { DepartmentId = group.Key, Employees = group.Count() })
             .ToDictionaryAsync(row => row.DepartmentId, row => row.Employees, cancellationToken);
 
+    public Task<DateTimeOffset?> FindLastWithdrawalAsync(Guid companyId, CancellationToken cancellationToken = default) =>
+        _dbContext.Employees
+            .Where(employee => employee.CompanyId == companyId)
+            .MaxAsync(employee => employee.WithdrawnAt, cancellationToken);
+
     public async Task<IReadOnlyList<Employee>> ListByCompanyAsync(
         Guid companyId,
         CancellationToken cancellationToken = default) =>

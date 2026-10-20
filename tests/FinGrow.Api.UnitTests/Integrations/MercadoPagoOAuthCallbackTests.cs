@@ -149,6 +149,9 @@ public class MercadoPagoOAuthCallbackTests
         public Task<IReadOnlyList<Employee>> ListByCompanyAsync(Guid companyId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<DateTimeOffset?> FindLastWithdrawalAsync(Guid companyId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<IReadOnlyList<Employee>> ListByDepartmentAsync(Guid departmentId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 

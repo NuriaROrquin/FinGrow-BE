@@ -11,6 +11,9 @@ internal static class EmployeeErrors
     public static readonly Error DepartmentNotAvailable =
         Error.Validation("Employee.DepartmentNotAvailable", "El departamento elegido no existe en tu empresa o está inactivo.");
 
+    public static readonly Error Withdrawn =
+        Error.Conflict("Employee.Withdrawn", "El empleado se dio de baja y borró sus datos: su acceso no se puede reactivar.");
+
     public static Error NotFound(Guid employeeId) =>
         Error.NotFound("Employee.NotFound", $"No existe un empleado con id '{employeeId}' en tu empresa.");
 

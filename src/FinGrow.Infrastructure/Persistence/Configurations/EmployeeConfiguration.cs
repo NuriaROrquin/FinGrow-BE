@@ -10,7 +10,9 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
 {
     public void Configure(EntityTypeBuilder<Employee> builder)
     {
-        builder.ToTable("employees");
+        // La baja del empleado (HU-74) es definitiva: con fecha de baja no puede volver a tener acceso.
+        builder.ToTable("employees", table =>
+            table.HasCheckConstraint("ck_employees_withdrawn_is_inactive", "withdrawn_at IS NULL OR NOT is_active"));
 
         builder.HasKey(employee => employee.Id);
 
@@ -67,6 +69,8 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
 
         builder.Property(employee => employee.HiredOn).IsRequired();
         builder.Property(employee => employee.IsActive).IsRequired();
+        builder.Property(employee => employee.WithdrawnAt);
+        builder.Ignore(employee => employee.IsWithdrawn);
         builder.Property(employee => employee.CreatedAt).IsRequired();
         builder.Property(employee => employee.UpdatedAt).IsRequired();
 

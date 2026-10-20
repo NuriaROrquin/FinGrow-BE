@@ -53,7 +53,9 @@ internal sealed class LoginEmployeeCommandHandler : IRequestHandler<LoginEmploye
 
         var employee = await _employeeRepository.GetByEmailAsync(email, cancellationToken);
 
-        if (employee is null || !_passwordHasher.Verify(request.Password, employee.PasswordHash))
+        // Quien se dio de baja (HU-74) recibe el mismo error que una credencial equivocada: la cuenta ya
+        // no existe para el, y no hay que confirmar que el email estuvo registrado.
+        if (employee is null || employee.IsWithdrawn || !_passwordHasher.Verify(request.Password, employee.PasswordHash))
         {
             return Result.Failure<LoginResult>(CredencialesInvalidas);
         }

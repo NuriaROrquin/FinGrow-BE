@@ -11,7 +11,8 @@ public sealed record CompanyEmployeeResponse(
     string? DepartmentName,
     DateOnly HiredOn,
     bool IsActive,
-    DateTimeOffset? LastLoginAt)
+    DateTimeOffset? LastLoginAt,
+    DateTimeOffset? WithdrawnAt)
 {
     public static CompanyEmployeeResponse FromEntity(Employee employee, Department? department) =>
         new(
@@ -23,5 +24,6 @@ public sealed record CompanyEmployeeResponse(
             department?.Name,
             employee.HiredOn,
             employee.IsActive,
-            employee.LastLoginAt);
+            employee.LastLoginAt,
+            employee.WithdrawnAt);
 }

@@ -228,6 +228,9 @@ internal sealed class CompanyStaffWebApplicationFactory : WebApplicationFactory<
                 .GroupBy(employee => employee.DepartmentId!.Value)
                 .ToDictionary(group => group.Key, group => group.Count()));
 
+        public Task<DateTimeOffset?> FindLastWithdrawalAsync(Guid companyId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(employees.Where(employee => employee.CompanyId == companyId).Max(employee => employee.WithdrawnAt));
+
         public Task<IReadOnlyList<Employee>> ListByCompanyAsync(Guid companyId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<Employee>>(employees
                 .Where(employee => employee.CompanyId == companyId)

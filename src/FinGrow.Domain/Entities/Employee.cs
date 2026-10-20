@@ -102,6 +102,12 @@ public sealed class Employee : AggregateRoot, ITwoFactorAccount
     /// <summary>Baja logica: desactivar corta el acceso sin borrar el historial financiero (HU-55).</summary>
     public bool IsActive { get; private set; }
 
+    /// <summary>Cuando el propio empleado pidio la baja y el borrado de sus datos (HU-74). Es
+    /// definitiva: a diferencia de <see cref="Deactivate"/>, la empresa no la puede revertir.</summary>
+    public DateTimeOffset? WithdrawnAt { get; private set; }
+
+    public bool IsWithdrawn => WithdrawnAt is not null;
+
     public DateTimeOffset? LastLoginAt { get; private set; }
 
     public string? TwoFactorSecret { get; private set; }
@@ -281,8 +287,35 @@ public sealed class Employee : AggregateRoot, ITwoFactorAccount
 
     public void Activate(DateTimeOffset updatedAt)
     {
+        if (IsWithdrawn)
+        {
+            throw new DomainException("El empleado se dio de baja y su acceso no se puede reactivar.");
+        }
+
         IsActive = true;
         UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Baja pedida por el empleado: corta el acceso y borra los datos de perfil que cargo el
+    /// (DNI, direccion, fecha de nacimiento) y su doble factor. Nombre, email y telefono quedan
+    /// porque son los que cargo la empresa al darlo de alta y los sigue viendo en su nomina.
+    /// </summary>
+    public void Withdraw(DateTimeOffset withdrawnAt)
+    {
+        if (IsWithdrawn)
+        {
+            return;
+        }
+
+        IsActive = false;
+        WithdrawnAt = withdrawnAt;
+        NationalId = null;
+        Address = null;
+        BirthDate = null;
+        TwoFactorSecret = null;
+        TwoFactorEnabledAt = null;
+        UpdatedAt = withdrawnAt;
     }
 
     public void DisableTwoFactor(DateTimeOffset updatedAt)

@@ -17,6 +17,9 @@ public interface IEmployeeRepository
 
     Task<IReadOnlyList<Employee>> ListByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default);
 
+    /// <summary>La baja mas reciente que pidio un empleado de la empresa (HU-74), o null si nadie se dio de baja.</summary>
+    Task<DateTimeOffset?> FindLastWithdrawalAsync(Guid companyId, CancellationToken cancellationToken = default);
+
     void Add(Employee employee);
 
     void Remove(Employee employee);

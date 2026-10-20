@@ -57,6 +57,20 @@ public class ChangeEmployeeAccessCommandHandlerTests
     }
 
     [Fact]
+    public async Task An_employee_who_withdrew_cannot_be_activated_again()
+    {
+        var employee = _scenario.AddEmployee(department: null);
+        employee.Withdraw(CompanyStaffScenario.Now.AddDays(-1));
+
+        var result = await CreateHandler().Handle(new ChangeEmployeeAccessCommand(employee.Id, true), CancellationToken.None);
+
+        result.Error.Type.ShouldBe(ErrorType.Conflict);
+        result.Error.Code.ShouldBe("Employee.Withdrawn");
+        employee.IsActive.ShouldBeFalse();
+        _scenario.UnitOfWork.SaveCount.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task Asking_for_the_current_state_changes_nothing()
     {
         var employee = _scenario.AddEmployee(department: null);

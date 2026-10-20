@@ -234,6 +234,14 @@ ante un recurso de otra empresa, para no confirmar que existe.
   tokens y el login responde `Auth.AccesoDesactivado` (403), recién después de verificar la
   contraseña para no revelar qué cuentas existen. El access token emitido sigue valiendo hasta
   que expira, igual que al cambiar la contraseña.
+- **El empleado se puede dar de baja solo** (`POST /api/account/withdrawal`, HU-74), confirmando
+  con su contraseña. `IEmployeeDataEraser` borra en una transacción sus datos financieros
+  (movimientos, presupuestos, metas, inversiones, integraciones, puntajes, logros y
+  notificaciones); sus comprobantes quedan sueltos para `receipts-cleanup`. La fila del empleado
+  queda con `withdrawn_at`, sin DNI, dirección, nacimiento ni 2FA: la empresa lo sigue viendo en
+  su nómina como dado de baja. Es definitiva (un `CHECK` impide reactivarla) y el login le
+  responde lo mismo que a una contraseña equivocada. `metrics-snapshot` no rehace la foto de un
+  mes cerrado si alguien se dio de baja después: la perdería sin sus datos.
 - **El departamento de un empleado tiene historial** (`employee_department_assignments`, hija
   del agregado `Employee`): `AssignToDepartment` cierra la asignación vigente y abre otra, y un
   índice único parcial impide dos abiertas a la vez. `metrics-snapshot` toma el departamento que

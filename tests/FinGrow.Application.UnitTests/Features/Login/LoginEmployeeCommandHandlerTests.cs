@@ -72,6 +72,25 @@ public class LoginEmployeeCommandHandlerTests
     }
 
     [Fact]
+    public async Task An_employee_who_withdrew_gets_the_same_error_as_wrong_credentials()
+    {
+        var employee = CreateEmployee(plainPassword: "1234");
+        employee.Withdraw(Now.AddDays(-1));
+        var employeeRepository = new FakeEmployeeRepository();
+        employeeRepository.Employees.Add(employee);
+
+        var withdrawn = await CreateHandler(employeeRepository).Handle(
+            new LoginEmployeeCommand("empleado@empresa.com", "1234"),
+            CancellationToken.None);
+        var wrongPassword = await CreateHandler(new FakeEmployeeRepository()).Handle(
+            new LoginEmployeeCommand("empleado@empresa.com", "otra"),
+            CancellationToken.None);
+
+        withdrawn.Error.ShouldBe(wrongPassword.Error);
+        withdrawn.Error.Code.ShouldBe("Auth.CredencialesInvalidas");
+    }
+
+    [Fact]
     public async Task With_two_factor_enabled_the_password_only_returns_a_challenge()
     {
         var employee = CreateEmployee(plainPassword: "1234");
