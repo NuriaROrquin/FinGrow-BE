@@ -43,7 +43,7 @@ public class LoginCompanyCommandHandlerTests
         return new LoginCompanyCommandHandler(
             companyRepository,
             new FakePasswordHasher(),
-            new SessionIssuer(tokenService, new FakeRefreshTokenRepository(), new FakeDateTimeProvider(Now)),
+            new SessionIssuer(tokenService, new FakeRefreshTokenRepository(), new FakeDateTimeProvider(Now), new FakeClientDevice()),
             tokenService,
             new FakeUnitOfWork());
     }

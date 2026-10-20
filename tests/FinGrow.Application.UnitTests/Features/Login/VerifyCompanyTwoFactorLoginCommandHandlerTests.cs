@@ -35,7 +35,7 @@ public class VerifyCompanyTwoFactorLoginCommandHandlerTests
             _tokenService,
             new FakeTotpService(),
             _companies,
-            new SessionIssuer(_tokenService, new FakeRefreshTokenRepository(), new FakeDateTimeProvider(Now)),
+            new SessionIssuer(_tokenService, new FakeRefreshTokenRepository(), new FakeDateTimeProvider(Now), new FakeClientDevice()),
             new FakeUnitOfWork(),
             new FakeDateTimeProvider(Now));
 

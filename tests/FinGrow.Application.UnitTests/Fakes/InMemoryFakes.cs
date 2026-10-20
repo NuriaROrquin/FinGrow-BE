@@ -703,6 +703,40 @@ public sealed class FakeRefreshTokenRepository : IRefreshTokenRepository
 
         return Task.CompletedTask;
     }
+
+    public Task<IReadOnlyList<RefreshToken>> ListActiveForUserAsync(
+        Guid userId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<RefreshToken>>(Tokens
+            .Where(token => token.UserId == userId && token.IsActive(now))
+            .OrderByDescending(token => token.CreatedAt)
+            .ToList());
+
+    public Task<RefreshToken?> FindActiveBySessionAsync(Guid sessionId, DateTimeOffset now, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Tokens
+            .Where(token => token.SessionId == sessionId && token.IsActive(now))
+            .OrderByDescending(token => token.CreatedAt)
+            .FirstOrDefault());
+
+    public Task RevokeAllForUserExceptSessionAsync(
+        Guid userId,
+        Guid keptSessionId,
+        DateTimeOffset revokedAt,
+        CancellationToken cancellationToken = default)
+    {
+        foreach (var token in Tokens.Where(t => t.UserId == userId && t.SessionId != keptSessionId && t.RevokedAt is null))
+        {
+            token.Revoke(revokedAt);
+        }
+
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class FakeClientDevice : IClientDevice
+{
+    public string? UserAgent { get; set; }
 }
 
 public sealed class FakeGoalRepository : IGoalRepository

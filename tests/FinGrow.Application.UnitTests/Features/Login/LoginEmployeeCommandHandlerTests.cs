@@ -34,7 +34,7 @@ public class LoginEmployeeCommandHandlerTests
     }
 
     private static SessionIssuer CreateSessionIssuer() =>
-        new(new FakeTokenService(), new FakeRefreshTokenRepository(), new FakeDateTimeProvider(Now));
+        new(new FakeTokenService(), new FakeRefreshTokenRepository(), new FakeDateTimeProvider(Now), new FakeClientDevice());
 
     private static LoginEmployeeCommandHandler CreateHandler(FakeEmployeeRepository employees, FakeUnitOfWork? unitOfWork = null) =>
         new(
