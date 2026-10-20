@@ -705,6 +705,29 @@ public sealed class FakeRefreshTokenRepository : IRefreshTokenRepository
     }
 }
 
+public sealed class FakePasswordResetTokenRepository : IPasswordResetTokenRepository
+{
+    public List<PasswordResetToken> Tokens { get; } = new();
+
+    public Task<PasswordResetToken?> FindByHashAsync(string tokenHash, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Tokens.FirstOrDefault(token => token.TokenHash == tokenHash));
+
+    public Task<bool> AnyIssuedAfterAsync(Guid userId, DateTimeOffset since, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Tokens.Any(token => token.UserId == userId && token.CreatedAt > since));
+
+    public void Add(PasswordResetToken token) => Tokens.Add(token);
+
+    public Task InvalidateAllForUserAsync(Guid userId, DateTimeOffset usedAt, CancellationToken cancellationToken = default)
+    {
+        foreach (var token in Tokens.Where(token => token.UserId == userId && token.UsedAt is null))
+        {
+            token.Redeem(usedAt);
+        }
+
+        return Task.CompletedTask;
+    }
+}
+
 public sealed class FakeGoalRepository : IGoalRepository
 {
     public List<Goal> Goals { get; } = new();

@@ -51,6 +51,9 @@ public sealed partial class FinGrowDbContext
         modelBuilder.Entity<RefreshToken>().HasQueryFilter(
             TenantFilter, token => IsUnscoped || token.CompanyId == CurrentCompanyId);
 
+        modelBuilder.Entity<PasswordResetToken>().HasQueryFilter(
+            TenantFilter, token => IsUnscoped || token.CompanyId == CurrentCompanyId);
+
         // Lo que cuelga de un empleado hereda su empresa: el filtro de Employees se aplica solo dentro
         // de estas subconsultas, así que alcanza con preguntar si el dueño es visible.
         modelBuilder.Entity<Transaction>().HasQueryFilter(

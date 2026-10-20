@@ -7,6 +7,7 @@ using FinGrow.Api.MercadoPago;
 using FinGrow.Api.Notifications;
 using FinGrow.Application;
 using FinGrow.Application.Features.Metrics;
+using FinGrow.Application.Features.PasswordReset;
 using FinGrow.Infrastructure;
 using FinGrow.Infrastructure.Persistence;
 using Serilog;
@@ -30,6 +31,10 @@ builder.Services.AddOptions<MercadoPagoReturnOptions>()
     .ValidateOnStart();
 builder.Services.AddOptions<GmailReturnOptions>()
     .Bind(builder.Configuration.GetSection(GmailReturnOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+builder.Services.AddOptions<PasswordResetOptions>()
+    .Bind(builder.Configuration.GetSection(PasswordResetOptions.SectionName))
     .ValidateDataAnnotations()
     .ValidateOnStart();
 builder.Services.AddOptions<JobsOptions>()

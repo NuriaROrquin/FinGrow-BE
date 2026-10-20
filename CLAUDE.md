@@ -465,6 +465,24 @@ primer intento durante `OutboundEmail.FirstAttemptGrace`: así el trabajo no lo 
 - **El cliente de Resend no reintenta**: repetir el `POST` cuando Resend ya lo recibió duplica el
   correo. Los reintentos son de `outbound_emails`.
 
+## Recuperar la contraseña (HU-72)
+
+`POST /password-reset/{empleado|empresa}` encola un correo con un enlace a
+`PasswordReset:ResetUrl?token=...&tipo=...`; el front lo valida al abrirlo (`POST /password-reset/validate`)
+y lo canjea con la contraseña nueva (`POST /password-reset/confirm`), que le devuelve el rol para
+volver al login que corresponde. Lo que no se deduce leyendo:
+
+- **El pedido siempre responde 204**, exista o no la cuenta, esté desactivada o se haya pedido otro
+  enlace hace menos de un minuto. No le agregues un 404 "para ayudar": revela qué emails existen.
+- **En la base queda solo el hash del token** (`password_reset_tokens`), como en `refresh_tokens`.
+  Vence a la hora y es de un solo uso; al canjear uno se invalidan todos los pendientes del usuario
+  y se revocan sus refresh tokens, igual que al cambiar la contraseña.
+- **Vencido, usado o inexistente dan el mismo error** (`PasswordReset.EnlaceInvalido`, 400), y
+  también un enlace de una cuenta que la empresa desactivó después de pedirlo.
+- **El doble factor no cambia**: quien lo tiene activo lo sigue necesitando para entrar.
+- **Empleados y empresas siguen en tablas separadas** hasta T-37: `ResettableAccount` los junta.
+  Cuando exista `users`, ese es el único lugar que hay que tocar.
+
 ## Eventos de dominio y alertas
 
 Un agregado levanta un evento con `Raise` y `DomainEventsInterceptor` (`Infrastructure/Persistence/`)

@@ -52,6 +52,8 @@ public sealed partial class FinGrowDbContext : DbContext, IUnitOfWork
 
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+
     public DbSet<JobRun> JobRuns => Set<JobRun>();
 
     public DbSet<CompanyMetricsSnapshot> CompanyMetricsSnapshots => Set<CompanyMetricsSnapshot>();
