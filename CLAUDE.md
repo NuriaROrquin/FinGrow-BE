@@ -234,7 +234,7 @@ ante un recurso de otra empresa, para no confirmar que existe.
   tokens y el login responde `Auth.AccesoDesactivado` (403), recién después de verificar la
   contraseña para no revelar qué cuentas existen. El access token emitido sigue valiendo hasta
   que expira, igual que al cambiar la contraseña.
-- **El empleado se puede dar de baja solo** (`POST /api/account/withdrawal`, HU-74), confirmando
+- **El empleado se puede dar de baja solo** (`POST /account/withdrawal`, HU-74), confirmando
   con su contraseña. `IEmployeeDataEraser` borra en una transacción sus datos financieros
   (movimientos, presupuestos, metas, inversiones, integraciones, puntajes, logros y
   notificaciones); sus comprobantes quedan sueltos para `receipts-cleanup`. La fila del empleado

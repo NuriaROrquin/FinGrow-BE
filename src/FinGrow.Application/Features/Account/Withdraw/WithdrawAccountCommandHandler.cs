@@ -14,10 +14,10 @@ using Microsoft.Extensions.Logging;
 internal sealed partial class WithdrawAccountCommandHandler : IRequestHandler<WithdrawAccountCommand, Result>
 {
     private static readonly Error NoAutenticado =
-        Error.Unauthorized("Account.NoAutenticado", "Hay que iniciar sesion para darse de baja.");
+        Error.Unauthorized("Account.NoAutenticado", "Hay que iniciar sesión para darse de baja.");
 
     private static readonly Error ContrasenaIncorrecta =
-        Error.Validation("Account.ContrasenaIncorrecta", "La contrasena no es correcta.");
+        Error.Validation("Account.ContrasenaIncorrecta", "La contraseña no es correcta.");
 
     private readonly ICurrentUser _currentUser;
     private readonly IEmployeeRepository _employees;

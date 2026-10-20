@@ -7,5 +7,5 @@ public sealed class WithdrawAccountCommandValidator : AbstractValidator<Withdraw
     public WithdrawAccountCommandValidator() =>
         RuleFor(command => command.Password)
             .NotEmpty()
-            .WithMessage("Para darte de baja tenes que confirmar tu contrasena.");
+            .WithMessage("Para darte de baja tenés que confirmar tu contraseña.");
 }
