@@ -249,6 +249,11 @@ public sealed class Investment : AggregateRoot
 
     public DateOnly? MaturesOn => TermDays is { } termDays ? PurchasedOn.AddDays(termDays) : null;
 
+    /// <summary>Lo que se cobra el dia del vencimiento, con la TNA pactada. Solo lo tienen las que llevan plazo.</summary>
+    public Money? ValueAtMaturity => MaturesOn is { } maturesOn && AnnualRate is { } annualRate
+        ? AccruedValueOn(annualRate, maturesOn)
+        : null;
+
     public bool IsValuedAtMaturity => MaturesOn is { } maturesOn && ValuedOn >= maturesOn;
 
     public Money ValueOn(DateOnly date)

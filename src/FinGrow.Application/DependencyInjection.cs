@@ -20,6 +20,7 @@ using Features.Metrics;
 using Features.Metrics.SnapshotMetrics;
 using Features.Notifications;
 using Features.Notifications.Alerts.GoalProgress;
+using Features.Notifications.Alerts.InvestmentAlerts;
 using Features.Notifications.Delivery;
 using Features.OutboundEmails;
 using Features.OutboundEmails.DeliverDueEmails;
@@ -81,6 +82,7 @@ public static class DependencyInjection
         services.AddScoped<IScheduledJob, InvestmentQuotesJob>();
         services.AddScoped<IScheduledJob, InvestmentAccrualsJob>();
         services.AddScoped<IScheduledJob, GoalProgressAlertsJob>();
+        services.AddScoped<IScheduledJob, InvestmentAlertsJob>();
         services.AddScoped<IScheduledJob, EmailDeliveryJob>();
         services.AddScoped<IScheduledJob, ReceiptsCleanupJob>();
         services.AddScoped<IScheduledJob, AchievementsEvaluationJob>();
