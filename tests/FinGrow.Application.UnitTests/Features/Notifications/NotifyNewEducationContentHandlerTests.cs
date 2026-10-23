@@ -34,6 +34,7 @@ public class NotifyNewEducationContentHandlerTests
         services.AddSingleton<INotificationRepository>(_notifications);
         services.AddSingleton<INotificationChannelSettingRepository>(new FakeNotificationChannelSettingRepository());
         services.AddSingleton<INotificationTypeSettingRepository>(_typeSettings);
+        services.AddSingleton<ICompanyNotificationSettingRepository>(new FakeCompanyNotificationSettingRepository());
         services.AddSingleton<IUnitOfWork>(new FakeUnitOfWork());
         services.AddSingleton<IDateTimeProvider>(new FakeDateTimeProvider(Now));
         services.AddSingleton<IEnumerable<INotificationSender>>(Array.Empty<INotificationSender>());

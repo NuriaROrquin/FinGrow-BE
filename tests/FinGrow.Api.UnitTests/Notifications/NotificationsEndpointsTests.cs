@@ -170,7 +170,8 @@ public class NotificationsEndpointsTests
             new { isEnabled = false });
 
         var items = types.EnumerateArray().ToList();
-        items.Count.ShouldBe(Enum.GetValues<NotificationType>().Length);
+        var companyOnlyTypes = 4;
+        items.Count.ShouldBe(Enum.GetValues<NotificationType>().Length - companyOnlyTypes);
         items.ShouldAllBe(item => item.GetProperty("isEnabled").GetBoolean());
         change.StatusCode.ShouldBe(HttpStatusCode.OK);
         var body = await change.Content.ReadFromJsonAsync<JsonElement>();
