@@ -6,6 +6,8 @@ using FinGrow.Application.DTOs;
 using FinGrow.Application.Features.Metrics.GetCompanyMetrics;
 using FinGrow.Application.Features.Metrics.GetCompanyMetricsComparison;
 using FinGrow.Application.Features.Metrics.GetCompanyEducationMetrics;
+using FinGrow.Application.Features.Metrics.GetCompanyDepartmentMetrics;
+using FinGrow.Application.Features.Metrics.GetDepartmentMetricsOverview;
 using FinGrow.Application.Features.Metrics.GetDepartmentMetrics;
 using FinGrow.Application.Features.Metrics.GetParticipation;
 using MediatR;
@@ -69,4 +71,23 @@ public sealed class CompanyMetricsController(ISender sender) : ControllerBase
         (await sender.Send(
             new GetDepartmentMetricsQuery(departmentId, fromDate, toDate),
             cancellationToken)).ToActionResult();
+
+    [HttpGet("departments/metrics")]
+    [ProducesResponseType<IReadOnlyList<CompanyDepartmentMetricsResponse>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ListDepartmentsMetrics(
+        [FromQuery] DateOnly? fromDate,
+        [FromQuery] DateOnly? toDate,
+        CancellationToken cancellationToken) =>
+        (await sender.Send(
+            new GetCompanyDepartmentMetricsQuery(fromDate, toDate),
+            cancellationToken)).ToActionResult();
+
+    [HttpGet("departments/metrics/overview")]
+    [ProducesResponseType<IReadOnlyList<DepartmentMetricsOverviewResponse>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> DepartmentMetricsOverview(CancellationToken cancellationToken) =>
+        (await sender.Send(new GetDepartmentMetricsOverviewQuery(), cancellationToken)).ToActionResult();
 }
