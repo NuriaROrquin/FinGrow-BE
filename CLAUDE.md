@@ -413,6 +413,13 @@ son solo para el rol `Empleado`. Lo que no se deduce leyendo:
   de las metas, nunca movimientos ni el puntaje de salud financiera.
 - **Si la IA falla, el reporte no falla**: el handler atrapa el error y responde los hitos con
   `RecommendationsAvailable = false`.
+- **El análisis de presupuesto (HU-25) no es `insights`.** `GET /api/budgets/analysis`
+  (`Features/Budgets/Analysis`) se habilita con 2 meses con presupuesto en la moneda (el mes en
+  curso cuenta), no con meses con actividad, y le pide a FinGrow-AI `budget-insights`, otro endpoint
+  con su propio prompt. Comparte con HU-44 la forma de las recomendaciones
+  (`FinancialRecommendation`), la caché y la regla de que si la IA cae se responden igual los datos
+  calculados. El mes en curso habilita y viaja a la IA marcado como parcial, pero no entra en el
+  resumen: los datos calculados son de meses cerrados.
 - **El desglose de gastos (HU-42) saca `ahorro_inversion` del ranking**, con el mismo criterio que
   el puntaje de salud: es ahorro, no gasto. Los porcentajes se calculan sobre `Consumption` (el total
   sin ahorro) y el ahorro viaja aparte en `Savings`. `Consumption + Savings = Total`, y `Total` es igual

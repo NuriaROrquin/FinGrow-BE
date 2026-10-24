@@ -592,6 +592,24 @@ durante `AiService:RecommendationsCacheHours`: la clave es el contenido completo
 cualquier movimiento nuevo genera recomendaciones nuevas. La aclaración de que no es asesoramiento
 financiero certificado la muestra el front.
 
+### Análisis de presupuesto (HU-25)
+
+`GET /api/budgets/analysis?currency` arma la tarjeta "Análisis de Presupuesto" de Presupuestos, solo
+para el rol `Empleado`. Mira los presupuestos mensuales de los últimos 6 meses cerrados más el mes en
+curso, y solo los que están en la moneda pedida (la moneda de un presupuesto es la de sus topes). No
+depende del mes que el empleado esté mirando en la pantalla.
+
+| Parte | De dónde sale |
+|---|---|
+| Habilitación | Al menos 2 meses con presupuesto en la moneda, y el del mes en curso cuenta (`hasCurrentMonthBudget`). Como hay un solo mes en curso, siempre queda al menos uno cerrado. Si no alcanza, la respuesta trae cuántos hay y cuántos faltan, sin resumen ni recomendaciones, y no llama a la IA |
+| Resumen | Reglas fijas sobre los meses cerrados (el mes en curso no entra: su gasto todavía es parcial): por categoría con tope, en cuántos meses tuvo tope, en cuántos se pasó (`Budget.HealthOf`, el mismo criterio que la pantalla), el tope y el gasto promedio y el uso promedio; la categoría más excedida; y del último mes cerrado, cuántas categorías respetó el tope y los totales. `ahorro_inversion` no cuenta como exceso ni entra en los conteos de cumplimiento, porque pasarse es ahorrar de más; sí suma en los totales |
+| Recomendaciones | Tres, generadas por FinGrow-AI (`budget-insights`). Recibe por mes los topes contra lo gastado y lo gastado en categorías sin tope, con el mes en curso marcado como parcial, y responde en el idioma del empleado |
+
+Lo gastado sale de `IMonthlySummaryReadRepository`, el mismo resumen de los reportes. Nada se guarda:
+borrar un presupuesto o una categoría (HU-79) cambia el análisis en la consulta siguiente. Si la IA no
+responde, el resumen sale igual y `recommendationsAvailable` viene en `false`. La caché de
+`AiService:RecommendationsCacheHours` también aplica, con una clave distinta de la de HU-44.
+
 ### Logros
 
 El catálogo (`achievements`) es fijo: lo define `AchievementCatalog` (`Domain/Entities/`) y lo
