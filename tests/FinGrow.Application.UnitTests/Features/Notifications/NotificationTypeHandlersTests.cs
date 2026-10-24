@@ -21,8 +21,22 @@ public class NotificationTypeHandlersTests
     {
         var types = (await List()).Value;
 
-        types.Count.ShouldBe(Enum.GetValues<NotificationType>().Length);
+        types.Count.ShouldBe(Enum.GetValues<NotificationType>().Length - 4);
         types.ShouldAllBe(type => type.IsEnabled);
+    }
+
+    [Fact]
+    public async Task The_employee_list_leaves_out_the_company_alert_types()
+    {
+        var types = (await List()).Value;
+
+        types.Select(type => type.Type).ShouldNotContain(NotificationType.FinancialWellbeingLow);
+        types.Select(type => type.Type).ShouldNotContain(NotificationType.ParticipationLow);
+        types.Select(type => type.Type).ShouldNotContain(NotificationType.EmployeeAdded);
+        types.Select(type => type.Type).ShouldNotContain(NotificationType.EmployeeRemoved);
+        types.Select(type => type.Type).ShouldContain(NotificationType.InvestmentValueChanged);
+        types.Select(type => type.Type).ShouldContain(NotificationType.InvestmentMaturing);
+        types.Select(type => type.Type).ShouldContain(NotificationType.NewEducationContent);
     }
 
     [Fact]

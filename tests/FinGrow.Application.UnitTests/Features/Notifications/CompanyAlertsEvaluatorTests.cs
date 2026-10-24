@@ -113,6 +113,23 @@ public class CompanyAlertsEvaluatorTests
     }
 
     [Fact]
+    public async Task Low_financial_wellbeing_is_not_sent_with_less_than_three_employees_with_score()
+    {
+        _settings.Add(CompanyNotificationSetting.Create(
+            _company.Id, NotificationType.FinancialWellbeingLow, isEnabled: true, NotificationCadence.Monthly, Now.AddMonths(-1)));
+        _snapshots.Add(CompanyMetricsSnapshot.Take(
+            _company.Id,
+            MetricsPeriod.MonthOf(new DateOnly(2026, 9, 1)),
+            PeriodMetrics.From(10, 4, 60, 3, 3, 0, 2, 2, 60),
+            Now.AddDays(-1)));
+
+        var notifications = await CreateEvaluator().EvaluateAsync(_company, Now, CancellationToken.None);
+
+        notifications.ShouldBe(0);
+        _notifications.Notifications.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task A_custom_wellbeing_threshold_is_used_for_the_alert()
     {
         _settings.Add(CompanyNotificationSetting.Create(

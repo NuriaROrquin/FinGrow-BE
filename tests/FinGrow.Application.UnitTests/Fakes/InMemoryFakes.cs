@@ -814,6 +814,19 @@ public sealed class FakeMetricsSnapshotRepository : IMetricsSnapshotRepository
             .OrderBy(snapshot => snapshot.PeriodStart)
             .ToList());
 
+    public Task<IReadOnlyList<DepartmentMetricsSnapshot>> ListDepartmentsAsync(
+        Guid companyId,
+        DateOnly? from,
+        DateOnly? to,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<DepartmentMetricsSnapshot>>(DepartmentSnapshots
+            .Where(snapshot => snapshot.CompanyId == companyId
+                && (from == null || snapshot.PeriodStart >= from)
+                && (to == null || snapshot.PeriodStart <= to))
+            .OrderBy(snapshot => snapshot.PeriodStart)
+            .ThenBy(snapshot => snapshot.DepartmentId)
+            .ToList());
+
     public void Add(CompanyMetricsSnapshot snapshot) => CompanySnapshots.Add(snapshot);
 
     public void Add(DepartmentMetricsSnapshot snapshot) => DepartmentSnapshots.Add(snapshot);

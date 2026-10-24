@@ -46,7 +46,7 @@ internal sealed class GetCompanyMetricsComparisonQueryHandler(
             .Select(snapshot => new CompanyMetricsComparisonPeriodResponse(
                 snapshot.PeriodStart,
                 snapshot.Metrics.ParticipationRate,
-                snapshot.Metrics.AverageFinancialHealthScore))
+                anonymizationPolicy.CompanyAverageScore(snapshot.Metrics)))
             .ToList();
 
         var first = periods[0];

@@ -6,6 +6,7 @@ using FinGrow.Application.DTOs;
 using FinGrow.Application.Features.Metrics.GetCompanyMetrics;
 using FinGrow.Application.Features.Metrics.GetCompanyMetricsComparison;
 using FinGrow.Application.Features.Metrics.GetCompanyEducationMetrics;
+using FinGrow.Application.Features.Metrics.GetDepartmentMetricsOverview;
 using FinGrow.Application.Features.Metrics.GetDepartmentMetrics;
 using FinGrow.Application.Features.Metrics.GetParticipation;
 using MediatR;
@@ -68,5 +69,17 @@ public sealed class CompanyMetricsController(ISender sender) : ControllerBase
         CancellationToken cancellationToken) =>
         (await sender.Send(
             new GetDepartmentMetricsQuery(departmentId, fromDate, toDate),
+            cancellationToken)).ToActionResult();
+
+    [HttpGet("metrics/departments")]
+    [ProducesResponseType<IReadOnlyList<DepartmentMetricsOverviewResponse>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ListDepartmentMetricsSummary(
+        [FromQuery] DateOnly? fromDate,
+        [FromQuery] DateOnly? toDate,
+        CancellationToken cancellationToken) =>
+        (await sender.Send(
+            new GetDepartmentMetricsOverviewQuery(fromDate, toDate),
             cancellationToken)).ToActionResult();
 }

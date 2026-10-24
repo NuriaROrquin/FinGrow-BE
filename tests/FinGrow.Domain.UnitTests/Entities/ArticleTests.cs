@@ -3,6 +3,7 @@ namespace FinGrow.Domain.UnitTests.Entities;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.Errors;
+using FinGrow.Domain.Events;
 
 public class ArticleTests
 {
@@ -28,6 +29,20 @@ public class ArticleTests
 
         article.IsPublished.ShouldBeTrue();
         article.PublishedAt.ShouldBe(Now);
+    }
+
+    [Fact]
+    public void Publishing_for_the_first_time_raises_the_event_and_publishing_again_does_not()
+    {
+        var article = CreateArticle();
+
+        article.Publish(Now);
+        article.Publish(Now.AddDays(5));
+
+        var published = article.DequeueDomainEvents().ShouldHaveSingleItem().ShouldBeOfType<EducationContentPublished>();
+        published.ContentId.ShouldBe(article.Id);
+        published.Kind.ShouldBe(EducationContentKind.Article);
+        published.Title.ShouldBe(article.Title);
     }
 
     [Theory]
