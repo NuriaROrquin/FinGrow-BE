@@ -561,7 +561,9 @@ este cambio quedan sin puntaje.
 
 Las fotos guardan `employees_with_score` y `financial_health_score_sum`; el promedio se deriva
 (`PeriodMetrics.AverageFinancialHealthScore`) y el umbral mínimo de anonimización de T-11 se
-aplica al mostrarlo. La fórmula vive en `FinancialHealthFactors` (`Domain/ValueObjects/`): pesos
+aplica al mostrarlo, contando los empleados con puntaje y no los activos (HU-57): con menos de
+tres, el promedio, su banda y su variación viajan en `null` y el resto de la métrica se muestra
+igual. La fórmula vive en `FinancialHealthFactors` (`Domain/ValueObjects/`): pesos
 y umbrales son constantes de esa clase.
 
 ### Reportes: evolución mensual (HU-41), hitos y recomendaciones (HU-44)
@@ -685,7 +687,8 @@ La participación cuenta a un empleado activo que, durante el mes, confirmó al 
 movimiento o hizo un aporte a una meta. El bienestar financiero es el promedio de los puntajes
 de salud financiera que pudieron calcularse para el período; un puntaje requiere actividad
 suficiente y algún ingreso. Ambos respetan el umbral de anonimización del panel empresarial: si
-el snapshot no puede revelarse, no generan alerta.
+el snapshot no puede revelarse, no generan alerta. El bienestar financiero tampoco avisa si
+menos de tres empleados tienen puntaje.
 
 Las alertas de plantilla describen un **cambio neto**, no eventos individuales de contratación,
 eliminación o desactivación. Si no existe un snapshot mensual anterior, no se puede comparar y
