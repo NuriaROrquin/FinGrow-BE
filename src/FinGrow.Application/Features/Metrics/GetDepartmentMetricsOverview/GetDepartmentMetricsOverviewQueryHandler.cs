@@ -68,14 +68,16 @@ internal sealed class GetDepartmentMetricsOverviewQueryHandler(
                         MetricsAnonymizationPolicy.NotEnoughEmployees.Description);
                 }
 
+                var averageScore = anonymizationPolicy.DepartmentAverageScore(latestSnapshot.Metrics);
+
                 return new DepartmentMetricsOverviewResponse(
                     department.Id,
                     department.Name,
                     latestSnapshot.PeriodStart,
                     latestSnapshot.Metrics.ActiveEmployees,
-                    latestSnapshot.Metrics.AverageFinancialHealthScore,
+                    averageScore,
                     latestSnapshot.Metrics.ParticipationRate,
-                    latestSnapshot.Metrics.AverageFinancialHealthScore is { } score
+                    averageScore is { } score
                         ? FinancialHealthScale.BandOf(score)
                         : null,
                     false,

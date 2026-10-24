@@ -35,7 +35,10 @@ internal sealed class GetDepartmentMetricsQueryHandler(
 
         return Result.Success<IReadOnlyList<DepartmentMetricsResponse>>(
             departmentSnapshots
-                .Select(snapshot => DepartmentMetricsResponse.FromSnapshot(snapshot, company.FiscalYearStartMonth))
+                .Select(snapshot => DepartmentMetricsResponse.FromSnapshot(
+                    snapshot,
+                    company.FiscalYearStartMonth,
+                    anonymizationPolicy.DepartmentAverageScore(snapshot.Metrics)))
                 .ToList());
     }
 }

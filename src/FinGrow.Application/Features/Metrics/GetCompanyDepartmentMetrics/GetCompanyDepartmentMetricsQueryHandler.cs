@@ -44,7 +44,9 @@ internal sealed class GetCompanyDepartmentMetricsQueryHandler(
                     department.IsActive,
                     visibleSnapshots
                         .Select(snapshot => DepartmentMetricsResponse.FromSnapshot(
-                            snapshot, company.FiscalYearStartMonth))
+                            snapshot,
+                            company.FiscalYearStartMonth,
+                            anonymizationPolicy.DepartmentAverageScore(snapshot.Metrics)))
                         .ToList(),
                     hasHiddenMetrics,
                     anonymizationPolicy.DepartmentMinimumEmployees,
