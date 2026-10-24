@@ -264,6 +264,28 @@ public async Task Editing_a_limit_of_a_month_without_a_budget_responds_404()
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
+    [Fact]
+    public async Task The_budget_analysis_is_rejected_for_a_company_token_with_403()
+    {
+        using var factory = new BudgetsWebApplicationFactory();
+        var client = CreateAuthenticatedClient(factory, Rol.Empresa);
+
+        var response = await client.GetAsync(new Uri(BudgetsPath + "/analysis", UriKind.Relative));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task The_budget_analysis_with_an_unknown_currency_responds_400()
+    {
+        using var factory = new BudgetsWebApplicationFactory();
+        var client = CreateAuthenticatedClient(factory, Rol.Empleado);
+
+        var response = await client.GetAsync(new Uri(BudgetsPath + "/analysis?currency=XYZ", UriKind.Relative));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
     private static object SeptemberBudget() => new
     {
         year = 2026,
@@ -349,6 +371,18 @@ public async Task Editing_a_limit_of_a_month_without_a_budget_responds_404()
             CancellationToken cancellationToken = default) =>
             Task.FromResult(budgets.FirstOrDefault(budget =>
                 budget.EmployeeId == employeeId && budget.Period == period && budget.PeriodStart == periodStart));
+
+        public Task<IReadOnlyList<Budget>> ListMonthlyAsync(
+            Guid employeeId,
+            DateOnly fromPeriodStart,
+            DateOnly toPeriodStart,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Budget>>(budgets
+                .Where(budget => budget.EmployeeId == employeeId
+                    && budget.PeriodStart >= fromPeriodStart
+                    && budget.PeriodStart <= toPeriodStart)
+                .OrderBy(budget => budget.PeriodStart)
+                .ToList());
     }
 
     private sealed class InMemoryBudgetSpendingReadRepository(Dictionary<ExpenseCategory, decimal> spent)
