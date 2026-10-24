@@ -424,6 +424,11 @@ public class TelegramWebhookTests
             RecommendationsInput input,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+
+        public Task<FinancialRecommendations> RecommendBudgetAsync(
+            BudgetRecommendationsInput input,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class InMemoryReceiptRepository(List<TransactionReceipt> receipts) : ITransactionReceiptRepository
