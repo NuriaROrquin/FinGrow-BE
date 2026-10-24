@@ -23,4 +23,14 @@ internal sealed class MetricsAnonymizationPolicy(IOptions<MetricsAnonymizationOp
 
     public bool CanRevealDepartment(PeriodMetrics metrics) =>
         metrics.ActiveEmployees >= DepartmentMinimumEmployees;
+
+    public decimal? CompanyAverageScore(PeriodMetrics metrics) =>
+        metrics.EmployeesWithScore >= CompanyMinimumEmployees
+            ? metrics.AverageFinancialHealthScore
+            : null;
+
+    public decimal? DepartmentAverageScore(PeriodMetrics metrics) =>
+        metrics.EmployeesWithScore >= DepartmentMinimumEmployees
+            ? metrics.AverageFinancialHealthScore
+            : null;
 }

@@ -19,7 +19,8 @@ public sealed record DepartmentMetricsResponse(
 {
     public static DepartmentMetricsResponse FromSnapshot(
         DepartmentMetricsSnapshot snapshot,
-        int fiscalYearStartMonth) =>
+        int fiscalYearStartMonth,
+        decimal? averageFinancialHealthScore) =>
         new(
             snapshot.PeriodStart,
             FinGrow.Domain.ValueObjects.FiscalYear.From(snapshot.PeriodStart, fiscalYearStartMonth).StartYear,
@@ -30,8 +31,8 @@ public sealed record DepartmentMetricsResponse(
             snapshot.Metrics.EmployeesWithActiveGoal,
             snapshot.Metrics.GoalsAchieved,
             snapshot.Metrics.EmployeesWithIntegration,
-            snapshot.Metrics.AverageFinancialHealthScore,
-            snapshot.Metrics.AverageFinancialHealthScore is { } score
+            averageFinancialHealthScore,
+            averageFinancialHealthScore is { } score
                 ? FinancialHealthScale.BandOf(score)
                 : null);
 }

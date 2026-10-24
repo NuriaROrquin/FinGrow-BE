@@ -83,6 +83,30 @@ public class GetDepartmentMetricsOverviewQueryHandlerTests
     }
 
     [Fact]
+    public async Task A_department_with_less_than_three_employees_with_score_hides_only_its_score()
+    {
+        var department = _scenario.AddDepartment("Ventas");
+        _snapshots.Add(DepartmentMetricsSnapshot.Take(
+            _scenario.Company.Id,
+            department.Id,
+            October,
+            PeriodMetrics.From(4, 2, 15, 2, 2, 1, 2, 2, 160),
+            CompanyStaffScenario.Now));
+
+        var result = await CreateHandler().Handle(
+            new GetDepartmentMetricsOverviewQuery(),
+            CancellationToken.None);
+
+        result.IsSuccess.ShouldBeTrue();
+        var metrics = result.Value.Single();
+        metrics.Employees.ShouldBe(4);
+        metrics.Participation.ShouldBe(50m);
+        metrics.AverageScore.ShouldBeNull();
+        metrics.Status.ShouldBeNull();
+        metrics.IsMetricsHidden.ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task A_department_below_the_minimum_hides_its_metrics()
     {
         var department = _scenario.AddDepartment("Marketing");

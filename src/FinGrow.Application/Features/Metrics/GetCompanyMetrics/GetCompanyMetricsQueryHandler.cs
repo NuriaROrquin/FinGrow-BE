@@ -40,7 +40,10 @@ internal sealed class GetCompanyMetricsQueryHandler(
 
         return Result.Success<IReadOnlyList<CompanyMetricsResponse>>(
             companySnapshots
-                .Select(snapshot => CompanyMetricsResponse.FromSnapshot(snapshot, company.FiscalYearStartMonth))
+                .Select(snapshot => CompanyMetricsResponse.FromSnapshot(
+                    snapshot,
+                    company.FiscalYearStartMonth,
+                    anonymizationPolicy.CompanyAverageScore(snapshot.Metrics)))
                 .ToList());
     }
 }
