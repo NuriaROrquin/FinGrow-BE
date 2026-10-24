@@ -28,7 +28,7 @@ public class GetCompanyMetricsComparisonQueryHandlerTests
         _snapshots.Add(CompanyMetricsSnapshot.Take(
             _scenario.Company.Id,
             September,
-            PeriodMetrics.From(5, 2, 10, 3, 2, 1, 2, 2, 140),
+            PeriodMetrics.From(5, 2, 10, 3, 2, 1, 2, 3, 210),
             CompanyStaffScenario.CreatedAt));
         _snapshots.Add(CompanyMetricsSnapshot.Take(
             _scenario.Company.Id,
@@ -48,6 +48,32 @@ public class GetCompanyMetricsComparisonQueryHandlerTests
         result.Value.Periods[1].AverageFinancialHealthScore.ShouldBe(75m);
         result.Value.ParticipationRateChange.ShouldBe(40m);
         result.Value.AverageFinancialHealthScoreChange.ShouldBe(5m);
+    }
+
+    [Fact]
+    public async Task Hides_the_score_of_a_period_with_less_than_three_employees_with_score()
+    {
+        _snapshots.Add(CompanyMetricsSnapshot.Take(
+            _scenario.Company.Id,
+            September,
+            PeriodMetrics.From(5, 2, 10, 3, 2, 1, 2, 2, 140),
+            CompanyStaffScenario.CreatedAt));
+        _snapshots.Add(CompanyMetricsSnapshot.Take(
+            _scenario.Company.Id,
+            October,
+            PeriodMetrics.From(5, 4, 12, 4, 3, 2, 3, 3, 225),
+            CompanyStaffScenario.Now));
+
+        var result = await CreateHandler().Handle(
+            new GetCompanyMetricsComparisonQuery(),
+            CancellationToken.None);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Periods[0].AverageFinancialHealthScore.ShouldBeNull();
+        result.Value.Periods[0].ParticipationRate.ShouldBe(40m);
+        result.Value.Periods[1].AverageFinancialHealthScore.ShouldBe(75m);
+        result.Value.AverageFinancialHealthScoreChange.ShouldBeNull();
+        result.Value.ParticipationRateChange.ShouldBe(40m);
     }
 
     [Fact]
