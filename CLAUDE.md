@@ -354,6 +354,12 @@ Application, antes de serializar la respuesta, y no escondiendo columnas en el f
   `DepartmentMetricsResponse` y `CompanyParticipationResponse` solo pueden contener períodos,
   conteos, tasas y promedios agregados. No agregues `EmployeeId`, `UserId`, nombres, emails, `TransactionId`, `GoalId`,
   `InvestmentId` ni colecciones de entidades personales.
+- **El último ingreso es el único dato individual de uso que ve la empresa** (HU-81).
+  Gestión de Empleados (`GET /api/company/employees`, `CompanyEmployeeResponse`) es la nómina,
+  no una métrica: devuelve los datos de alta de cada empleado y `LastLoginAt`, para que la
+  empresa sepa a quién recordarle que active su cuenta. No agregues a esa respuesta, ni a
+  ninguna otra que lea la empresa, otros datos de uso: pantallas visitadas, movimientos, montos,
+  metas, inversiones ni integraciones conectadas.
 - **El mapeo al DTO es explícito.** No serialices snapshots, entidades ni `PeriodMetrics`
   directamente desde un controller o handler. Si se agrega un campo al modelo, debe evaluarse
   expresamente si puede formar parte del contrato anonimizado.
