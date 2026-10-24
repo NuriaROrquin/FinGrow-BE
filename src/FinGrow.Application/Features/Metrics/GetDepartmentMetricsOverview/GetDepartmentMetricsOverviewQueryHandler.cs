@@ -25,7 +25,10 @@ internal sealed class GetDepartmentMetricsOverviewQueryHandler(
         }
 
         var departmentSnapshots = await snapshots.ListDepartmentsAsync(
-            companyId, from: null, to: null, cancellationToken: cancellationToken);
+            companyId,
+            request.FromDate,
+            request.ToDate,
+            cancellationToken);
 
         var response = company.Departments
             .OrderBy(department => department.Name, StringComparer.OrdinalIgnoreCase)
