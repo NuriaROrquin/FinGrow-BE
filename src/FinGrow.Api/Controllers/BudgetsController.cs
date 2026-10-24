@@ -3,6 +3,7 @@
 using Extensions;
 using Application.Common;
 using Application.DTOs;
+using Application.Features.Budgets.Analysis;
 using Application.Features.Budgets.CreateBudget;
 using Application.Features.Budgets.DuplicatePreviousBudget;
 using Application.Interfaces;
@@ -26,6 +27,15 @@ public sealed class BudgetsController(ISender sender, ICurrentUser currentUser) 
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Get(int year, int month, CancellationToken cancellationToken) =>
         (await sender.Send(new GetBudgetQuery(currentUser.UserId!.Value, year, month), cancellationToken)).ToActionResult();
+
+    [HttpGet("analysis")]
+    [ProducesResponseType<BudgetAnalysisResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Analysis(
+        [FromQuery] Currency currency = Currency.ARS,
+        CancellationToken cancellationToken = default) =>
+        (await sender.Send(new GetBudgetAnalysisQuery(currentUser.UserId!.Value, currency), cancellationToken))
+        .ToActionResult();
 
     [HttpPost]
     [ProducesResponseType<BudgetResponse>(StatusCodes.Status200OK)]
