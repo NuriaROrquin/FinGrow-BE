@@ -33,20 +33,27 @@ internal sealed class GetCompanyDepartmentMetricsQueryHandler(
                 var snapshotsForDepartment = departmentSnapshots
                     .Where(snapshot => snapshot.DepartmentId == department.Id)
                     .ToList();
-                var visibleSnapshots = snapshotsForDepartment
-                    .Where(snapshot => anonymizationPolicy.CanRevealDepartment(snapshot.Metrics))
-                    .ToList();
-                var hasHiddenMetrics = snapshotsForDepartment.Count != visibleSnapshots.Count;
+                var hasHiddenMetrics = snapshotsForDepartment
+                    .Any(snapshot => !anonymizationPolicy.CanRevealDepartment(snapshot.Metrics));
 
                 return new CompanyDepartmentMetricsResponse(
                     department.Id,
                     department.Name,
                     department.IsActive,
-                    visibleSnapshots
-                        .Select(snapshot => DepartmentMetricsResponse.FromSnapshot(
-                            snapshot,
-                            company.FiscalYearStartMonth,
-                            anonymizationPolicy.DepartmentAverageScore(snapshot.Metrics)))
+                    snapshotsForDepartment
+                        .OrderBy(snapshot => snapshot.PeriodStart)
+                        .Select(snapshot =>
+                        {
+                            var isHidden = !anonymizationPolicy.CanRevealDepartment(snapshot.Metrics);
+
+                            return DepartmentMetricsResponse.FromSnapshot(
+                                snapshot,
+                                company.FiscalYearStartMonth,
+                                anonymizationPolicy.DepartmentAverageScore(snapshot.Metrics),
+                                isHidden,
+                                anonymizationPolicy.DepartmentMinimumEmployees,
+                                isHidden ? MetricsAnonymizationPolicy.NotEnoughEmployees.Description : null);
+                        })
                         .ToList(),
                     hasHiddenMetrics,
                     anonymizationPolicy.DepartmentMinimumEmployees,

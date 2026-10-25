@@ -31,6 +31,7 @@ internal sealed class GetDepartmentMetricsOverviewQueryHandler(
             cancellationToken);
 
         var response = company.Departments
+            .Where(department => department.IsActive)
             .OrderBy(department => department.Name, StringComparer.OrdinalIgnoreCase)
             .Select(department =>
             {
@@ -48,6 +49,7 @@ internal sealed class GetDepartmentMetricsOverviewQueryHandler(
                         null,
                         null,
                         null,
+                        null,
                         false,
                         anonymizationPolicy.DepartmentMinimumEmployees,
                         null);
@@ -59,6 +61,7 @@ internal sealed class GetDepartmentMetricsOverviewQueryHandler(
                         department.Id,
                         department.Name,
                         latestSnapshot.PeriodStart,
+                        latestSnapshot.Metrics.ActiveEmployees,
                         null,
                         null,
                         null,
@@ -75,8 +78,9 @@ internal sealed class GetDepartmentMetricsOverviewQueryHandler(
                     department.Name,
                     latestSnapshot.PeriodStart,
                     latestSnapshot.Metrics.ActiveEmployees,
-                    averageScore,
+                    latestSnapshot.Metrics.ParticipatingEmployees,
                     latestSnapshot.Metrics.ParticipationRate,
+                    averageScore,
                     averageScore is { } score
                         ? FinancialHealthScale.BandOf(score)
                         : null,
