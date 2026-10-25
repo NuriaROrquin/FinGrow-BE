@@ -223,11 +223,11 @@ Email, hash de contraseña, rol, doble factor, último ingreso y si la cuenta es
 - **El email es único entre empleados y empresas.** Un empleado no puede usar el email de una
   empresa ni al revés: el alta y la edición del empleado y el perfil de la empresa lo validan
   contra `IUserRepository` y responden 409.
-- **Un solo flujo por caso de uso.** `LoginCommand` y `VerifyTwoFactorLoginCommand` reciben el rol
-  del endpoint (`/login/empleado` o `/login/empresa`) y rechazan una cuenta del otro rol como
-  credenciales inválidas. Cambio de contraseña, doble factor y refresh trabajan sobre el `User` del
-  token. La única bifurcación por rol es `SessionAccountResolver`, que arma la sesión con el nombre
-  y la empresa del empleado o de la empresa.
+- **Un solo login para los dos roles.** `POST /login` y `POST /login/2fa` no reciben el rol: como
+  el email es único, el `User` que lo tiene dice si es empleado o empresa, y la sesión vuelve con
+  ese rol para que el front sepa a qué panel ir. Cambio de contraseña, doble factor y refresh
+  trabajan sobre el `User` del token. La única bifurcación por rol es `SessionAccountResolver`,
+  que arma la sesión con el nombre y la empresa del empleado o de la empresa.
 - **Desactivar es del usuario.** `Employee.Deactivate` y `Activate` cambian su `User`, y las
   consultas que cuentan activos filtran por `employee.User.IsActive`. `Employee` y `Company` cargan
   su `User` siempre (`AutoInclude`).

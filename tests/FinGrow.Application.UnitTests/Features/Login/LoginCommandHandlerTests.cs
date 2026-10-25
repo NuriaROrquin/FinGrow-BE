@@ -71,15 +71,15 @@ public class LoginCommandHandlerTests
             new FakeDateTimeProvider(Now));
     }
 
-    private Task<Result<FinGrow.Application.DTOs.LoginResult>> LoginAsync(string email, string password, UserRole role) =>
-        CreateHandler().Handle(new LoginCommand(email, password, role), CancellationToken.None);
+    private Task<Result<FinGrow.Application.DTOs.LoginResult>> LoginAsync(string email, string password) =>
+        CreateHandler().Handle(new LoginCommand(email, password), CancellationToken.None);
 
     [Fact]
     public async Task Valid_credentials_log_the_employee_in_and_return_a_token()
     {
         var employee = AddEmployee(plainPassword: "1234");
 
-        var result = await LoginAsync("empleado@empresa.com", "1234", UserRole.Employee);
+        var result = await LoginAsync("empleado@empresa.com", "1234");
 
         result.IsSuccess.ShouldBeTrue();
         result.Value.TwoFactorChallenge.ShouldBeNull();
@@ -98,7 +98,7 @@ public class LoginCommandHandlerTests
     {
         var company = AddCompany(plainPassword: "1234");
 
-        var result = await LoginAsync("empresa@empresa.com", "1234", UserRole.Company);
+        var result = await LoginAsync("empresa@empresa.com", "1234");
 
         result.IsSuccess.ShouldBeTrue();
         result.Value.TwoFactorChallenge.ShouldBeNull();
@@ -120,7 +120,7 @@ public class LoginCommandHandlerTests
         employee.User.StartTwoFactorEnrollment("SECRETBASE32", Now);
         employee.User.EnableTwoFactor(Now);
 
-        var result = await LoginAsync("empleado@empresa.com", "1234", UserRole.Employee);
+        var result = await LoginAsync("empleado@empresa.com", "1234");
 
         result.IsSuccess.ShouldBeTrue();
         result.Value.Session.ShouldBeNull();
@@ -137,7 +137,7 @@ public class LoginCommandHandlerTests
         company.User.StartTwoFactorEnrollment("SECRETBASE32", Now);
         company.User.EnableTwoFactor(Now);
 
-        var result = await LoginAsync("empresa@empresa.com", "1234", UserRole.Company);
+        var result = await LoginAsync("empresa@empresa.com", "1234");
 
         result.IsSuccess.ShouldBeTrue();
         result.Value.Session.ShouldBeNull();
@@ -152,7 +152,7 @@ public class LoginCommandHandlerTests
         var user = role == UserRole.Company ? AddCompany().User : AddEmployee().User;
         user.StartTwoFactorEnrollment("SECRETBASE32", Now);
 
-        var result = await LoginAsync(user.Email.Value, "1234", role);
+        var result = await LoginAsync(user.Email.Value, "1234");
 
         result.IsSuccess.ShouldBeTrue();
         result.Value.Session.ShouldNotBeNull();
@@ -166,7 +166,7 @@ public class LoginCommandHandlerTests
     {
         var user = role == UserRole.Company ? AddCompany().User : AddEmployee().User;
 
-        var result = await LoginAsync(user.Email.Value, "wrong", role);
+        var result = await LoginAsync(user.Email.Value, "wrong");
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("Auth.CredencialesInvalidas");
@@ -179,40 +179,16 @@ public class LoginCommandHandlerTests
         company.User.StartTwoFactorEnrollment("SECRETBASE32", Now);
         company.User.EnableTwoFactor(Now);
 
-        var result = await LoginAsync("empresa@empresa.com", "wrong", UserRole.Company);
-
-        result.IsFailure.ShouldBeTrue();
-        result.Error.Code.ShouldBe("Auth.CredencialesInvalidas");
-    }
-
-    [Theory]
-    [InlineData(UserRole.Employee)]
-    [InlineData(UserRole.Company)]
-    public async Task Nonexistent_email_returns_the_same_generic_error_as_wrong_password(UserRole role)
-    {
-        var result = await LoginAsync("nadie@empresa.com", "1234", role);
+        var result = await LoginAsync("empresa@empresa.com", "wrong");
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("Auth.CredencialesInvalidas");
     }
 
     [Fact]
-    public async Task An_employee_cannot_log_in_through_the_company_login()
+    public async Task Nonexistent_email_returns_the_same_generic_error_as_wrong_password()
     {
-        AddEmployee(plainPassword: "1234");
-
-        var result = await LoginAsync("empleado@empresa.com", "1234", UserRole.Company);
-
-        result.IsFailure.ShouldBeTrue();
-        result.Error.Code.ShouldBe("Auth.CredencialesInvalidas");
-    }
-
-    [Fact]
-    public async Task A_company_cannot_log_in_through_the_employee_login()
-    {
-        AddCompany(plainPassword: "1234");
-
-        var result = await LoginAsync("empresa@empresa.com", "1234", UserRole.Employee);
+        var result = await LoginAsync("nadie@empresa.com", "1234");
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("Auth.CredencialesInvalidas");
@@ -225,7 +201,7 @@ public class LoginCommandHandlerTests
     {
         var user = role == UserRole.Company ? AddCompany(isActive: false).User : AddEmployee(isActive: false).User;
 
-        var result = await LoginAsync(user.Email.Value, "1234", role);
+        var result = await LoginAsync(user.Email.Value, "1234");
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("Auth.AccesoDesactivado");
@@ -237,7 +213,7 @@ public class LoginCommandHandlerTests
     {
         AddEmployee(plainPassword: "1234", isActive: false);
 
-        var result = await LoginAsync("empleado@empresa.com", "otra", UserRole.Employee);
+        var result = await LoginAsync("empleado@empresa.com", "otra");
 
         result.Error.Code.ShouldBe("Auth.CredencialesInvalidas");
     }
