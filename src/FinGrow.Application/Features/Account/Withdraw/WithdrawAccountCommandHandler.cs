@@ -95,6 +95,10 @@ internal sealed partial class WithdrawAccountCommandHandler : IRequestHandler<Wi
         {
             LogRevokeFailed(_logger, exception, employeeId);
         }
+        catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            LogRevokeFailed(_logger, exception, employeeId);
+        }
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "El empleado {EmployeeId} se dio de baja y se borraron sus datos financieros.")]

@@ -126,6 +126,22 @@ public class WithdrawAccountCommandHandlerTests
     }
 
     [Fact]
+    public async Task Google_timing_out_does_not_stop_the_withdrawal()
+    {
+        var employee = AddLoggedInEmployee();
+        var gmail = EmployeeIntegration.Create(employee.Id, IntegrationProvider.Gmail, "ana@gmail.com", Now.AddDays(-10));
+        gmail.Authorize(OAuthGrant.From("access", "refresh", Now.AddHours(1)), Now.AddDays(-10));
+        _integrations.Integrations.Add(gmail);
+        _gmail.RevokeFailure = new TaskCanceledException("The request was canceled due to the configured HttpClient.Timeout.");
+
+        var result = await CreateHandler().Handle(new WithdrawAccountCommand(Password), CancellationToken.None);
+
+        result.IsSuccess.ShouldBeTrue();
+        employee.IsWithdrawn.ShouldBeTrue();
+        _eraser.ErasedEmployees.ShouldBe(new[] { employee.Id });
+    }
+
+    [Fact]
     public async Task Without_a_session_nothing_happens()
     {
         var result = await CreateHandler().Handle(new WithdrawAccountCommand(Password), CancellationToken.None);

@@ -459,9 +459,17 @@ public sealed class FakeGmailOAuthClient : IGmailOAuthClient
     public Task<string> GetEmailAddressAsync(string accessToken, CancellationToken cancellationToken = default) =>
         Task.FromResult(EmailAddress);
 
+    public Exception? RevokeFailure { get; set; }
+
     public Task RevokeAsync(string token, CancellationToken cancellationToken = default)
     {
         ThrowIfUnreachable();
+
+        if (RevokeFailure is not null)
+        {
+            throw RevokeFailure;
+        }
+
         RevokedTokens.Add(token);
 
         return Task.CompletedTask;
