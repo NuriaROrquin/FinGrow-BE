@@ -45,8 +45,7 @@ public class ChangePasswordCommandHandlerTests
     private ChangePasswordCommandHandler CreateHandler() =>
         new(
             _currentUser,
-            _employees,
-            new FakeCompanyRepository(),
+            new FakeUserRepository(_employees),
             new FakePasswordHasher(),
             _refreshTokens,
             _unitOfWork,
@@ -64,7 +63,7 @@ public class ChangePasswordCommandHandlerTests
             CancellationToken.None);
 
         result.IsSuccess.ShouldBeTrue();
-        employee.PasswordHash.ShouldBe("nueva-5678");
+        employee.User.PasswordHash.ShouldBe("nueva-5678");
         laptop.RevokedAt.ShouldBe(Now);
         phone.RevokedAt.ShouldBe(Now);
         _unitOfWork.SaveCount.ShouldBe(1);
@@ -93,7 +92,7 @@ public class ChangePasswordCommandHandlerTests
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("Account.ContrasenaActualIncorrecta");
-        employee.PasswordHash.ShouldBe("actual-1234");
+        employee.User.PasswordHash.ShouldBe("actual-1234");
         session.RevokedAt.ShouldBeNull();
         _unitOfWork.SaveCount.ShouldBe(0);
     }

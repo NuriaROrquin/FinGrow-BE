@@ -79,7 +79,7 @@ public class UpdateProfileCommandHandlerTests
 
         await CreateHandler().Handle(Command(), CancellationToken.None);
 
-        employee.Email.Value.ShouldBe("ana.gomez@acme.com");
+        employee.User.Email.Value.ShouldBe("ana.gomez@acme.com");
         employee.PreferredCurrency.ShouldBe(Currency.USD);
     }
 

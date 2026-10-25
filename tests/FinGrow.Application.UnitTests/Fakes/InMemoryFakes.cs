@@ -18,9 +18,6 @@ public sealed class FakeEmployeeRepository : IEmployeeRepository
     public Task<Employee?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Employees.FirstOrDefault(employee => employee.Id == id));
 
-    public Task<Employee?> GetByEmailAsync(Email email, CancellationToken cancellationToken) =>
-        Task.FromResult(Employees.FirstOrDefault(employee => employee.Email == email));
-
     public Task<IReadOnlyDictionary<Guid, int>> CountByDepartmentAsync(
         Guid companyId,
         CancellationToken cancellationToken = default) =>
@@ -56,11 +53,35 @@ public sealed class FakeCompanyRepository : ICompanyRepository
     public Task<Company?> GetWithDepartmentsAsync(Guid id, CancellationToken cancellationToken = default) =>
         GetByIdAsync(id, cancellationToken);
 
-    public Task<Company?> GetByEmailAsync(Email email, CancellationToken cancellationToken) =>
-        Task.FromResult(Companies.FirstOrDefault(company => company.Email == email));
-
     public Task<IReadOnlyList<Company>> ListActiveAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<Company>>(Companies.Where(company => company.IsActive).ToList());
+        Task.FromResult<IReadOnlyList<Company>>(Companies.Where(company => company.User.IsActive).ToList());
+}
+
+public sealed class FakeUserRepository : IUserRepository
+{
+    private readonly FakeEmployeeRepository _employees;
+    private readonly FakeCompanyRepository _companies;
+
+    public FakeUserRepository(FakeEmployeeRepository employees, FakeCompanyRepository? companies = null)
+    {
+        _employees = employees;
+        _companies = companies ?? new FakeCompanyRepository();
+    }
+
+    public List<User> Removed { get; } = new();
+
+    private IEnumerable<User> Users => _employees.Employees
+        .Select(employee => employee.User)
+        .Concat(_companies.Companies.Select(company => company.User))
+        .Where(user => !Removed.Contains(user));
+
+    public Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Users.FirstOrDefault(user => user.Id == id));
+
+    public Task<User?> GetByEmailAsync(Email email, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Users.FirstOrDefault(user => user.Email == email));
+
+    public void Remove(User user) => Removed.Add(user);
 }
 
 public sealed class FakeEmployeeIntegrationRepository : IEmployeeIntegrationRepository

@@ -15,8 +15,34 @@ public class EmployeeTests
     {
         var employee = CreateEmployee();
 
-        employee.IsActive.ShouldBeTrue();
+        employee.User.IsActive.ShouldBeTrue();
         employee.DepartmentId.ShouldBeNull();
+    }
+
+    [Fact]
+    public void The_login_of_an_employee_shares_its_id_and_has_the_employee_role()
+    {
+        var employee = CreateEmployee();
+
+        employee.User.Id.ShouldBe(employee.Id);
+        employee.User.Role.ShouldBe(UserRole.Employee);
+        employee.User.LastLoginAt.ShouldBeNull();
+        employee.User.IsTwoFactorEnabled.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Deactivating_an_employee_deactivates_its_login()
+    {
+        var employee = CreateEmployee();
+
+        employee.Deactivate(Now.AddDays(1));
+
+        employee.User.IsActive.ShouldBeFalse();
+        employee.UpdatedAt.ShouldBe(Now.AddDays(1));
+
+        employee.Activate(Now.AddDays(2));
+
+        employee.User.IsActive.ShouldBeTrue();
     }
 
     [Fact]
@@ -133,7 +159,7 @@ public class EmployeeTests
         var employee = CreateEmployee();
         employee.Deactivate(Now);
 
-        Should.Throw<DomainException>(() => employee.RegisterLogin(Now.AddHours(1)));
+        Should.Throw<DomainException>(() => employee.User.RegisterLogin(Now.AddHours(1)));
     }
 
     [Fact]
@@ -141,9 +167,9 @@ public class EmployeeTests
     {
         var employee = CreateEmployee();
 
-        employee.RegisterLogin(Now.AddHours(1));
+        employee.User.RegisterLogin(Now.AddHours(1));
 
-        employee.LastLoginAt.ShouldBe(Now.AddHours(1));
+        employee.User.LastLoginAt.ShouldBe(Now.AddHours(1));
     }
 
     [Fact]
@@ -151,15 +177,15 @@ public class EmployeeTests
     {
         var employee = CreateEmployee();
 
-        employee.StartTwoFactorEnrollment("SECRETBASE32", Now);
+        employee.User.StartTwoFactorEnrollment("SECRETBASE32", Now);
 
-        employee.TwoFactorSecret.ShouldBe("SECRETBASE32");
-        employee.IsTwoFactorEnabled.ShouldBeFalse();
+        employee.User.TwoFactorSecret.ShouldBe("SECRETBASE32");
+        employee.User.IsTwoFactorEnabled.ShouldBeFalse();
 
-        employee.EnableTwoFactor(Now.AddMinutes(1));
+        employee.User.EnableTwoFactor(Now.AddMinutes(1));
 
-        employee.IsTwoFactorEnabled.ShouldBeTrue();
-        employee.TwoFactorEnabledAt.ShouldBe(Now.AddMinutes(1));
+        employee.User.IsTwoFactorEnabled.ShouldBeTrue();
+        employee.User.TwoFactorEnabledAt.ShouldBe(Now.AddMinutes(1));
     }
 
     [Fact]
@@ -167,19 +193,19 @@ public class EmployeeTests
     {
         var employee = CreateEmployee();
 
-        Should.Throw<DomainException>(() => employee.EnableTwoFactor(Now));
+        Should.Throw<DomainException>(() => employee.User.EnableTwoFactor(Now));
     }
 
     [Fact]
     public void An_enabled_two_factor_cannot_be_enabled_or_reenrolled_again()
     {
         var employee = CreateEmployee();
-        employee.StartTwoFactorEnrollment("SECRETBASE32", Now);
-        employee.EnableTwoFactor(Now);
+        employee.User.StartTwoFactorEnrollment("SECRETBASE32", Now);
+        employee.User.EnableTwoFactor(Now);
 
-        Should.Throw<DomainException>(() => employee.EnableTwoFactor(Now));
-        Should.Throw<DomainException>(() => employee.StartTwoFactorEnrollment("OTROSECRETO", Now));
-        employee.TwoFactorSecret.ShouldBe("SECRETBASE32");
+        Should.Throw<DomainException>(() => employee.User.EnableTwoFactor(Now));
+        Should.Throw<DomainException>(() => employee.User.StartTwoFactorEnrollment("OTROSECRETO", Now));
+        employee.User.TwoFactorSecret.ShouldBe("SECRETBASE32");
     }
 
     [Theory]
@@ -189,7 +215,7 @@ public class EmployeeTests
     {
         var employee = CreateEmployee();
 
-        Should.Throw<DomainException>(() => employee.StartTwoFactorEnrollment(secret, Now));
+        Should.Throw<DomainException>(() => employee.User.StartTwoFactorEnrollment(secret, Now));
     }
 
     [Fact]
@@ -239,7 +265,7 @@ public class EmployeeTests
         employee.UpdateDetails(" Juan Pérez ", Email.From("jperez@empresa.com"), null, Now.AddDays(1));
 
         employee.FullName.ShouldBe("Juan Pérez");
-        employee.Email.Value.ShouldBe("jperez@empresa.com");
+        employee.User.Email.Value.ShouldBe("jperez@empresa.com");
         employee.PhoneNumber.ShouldBeNull();
         employee.UpdatedAt.ShouldBe(Now.AddDays(1));
     }
