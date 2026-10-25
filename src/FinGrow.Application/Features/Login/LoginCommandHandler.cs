@@ -56,7 +56,7 @@ internal sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result
 
         var user = await _users.GetByEmailAsync(email, cancellationToken);
 
-        if (user is null || user.Role != request.Role || !_passwordHasher.Verify(request.Password, user.PasswordHash))
+        if (user is null || !_passwordHasher.Verify(request.Password, user.PasswordHash))
         {
             return Result.Failure<LoginResult>(CredencialesInvalidas);
         }
