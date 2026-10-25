@@ -12,10 +12,6 @@ internal sealed class PasswordResetTokenConfiguration : IEntityTypeConfiguration
 
         builder.HasKey(token => token.Id);
 
-        builder.Property(token => token.Role)
-            .HasMaxLength(PasswordResetToken.MaxRoleLength)
-            .IsRequired();
-
         builder.Property(token => token.TokenHash)
             .HasMaxLength(PasswordResetToken.HashLength)
             .IsRequired();
@@ -23,11 +19,9 @@ internal sealed class PasswordResetTokenConfiguration : IEntityTypeConfiguration
         builder.Property(token => token.CreatedAt).IsRequired();
         builder.Property(token => token.ExpiresAt).IsRequired();
 
-        // UserId es polimorfico como en refresh_tokens (Employee o Company segun Role): la FK real va
-        // contra la empresa, que es lo que se lleva los enlaces en cascada.
-        builder.HasOne<Company>()
+        builder.HasOne<User>()
             .WithMany()
-            .HasForeignKey(token => token.CompanyId)
+            .HasForeignKey(token => token.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasIndex(token => token.TokenHash).IsUnique();

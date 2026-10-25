@@ -1,6 +1,7 @@
 namespace FinGrow.Application.Features.PasswordReset.RequestPasswordReset;
 
 using FinGrow.Application.Common;
+using FinGrow.Application.Features.Session;
 using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Errors;
@@ -18,8 +19,8 @@ internal sealed class RequestPasswordResetCommandHandler : IRequestHandler<Reque
     // Frena a quien aprieta el botón varias veces o usa el formulario para llenarle la casilla a otro.
     internal static readonly TimeSpan ResendInterval = TimeSpan.FromMinutes(1);
 
-    private readonly IEmployeeRepository _employees;
-    private readonly ICompanyRepository _companies;
+    private readonly IUserRepository _users;
+    private readonly SessionAccountResolver _accounts;
     private readonly IPasswordResetTokenRepository _tokens;
     private readonly IOutboundEmailRepository _outboundEmails;
     private readonly IUnitOfWork _unitOfWork;
@@ -27,16 +28,16 @@ internal sealed class RequestPasswordResetCommandHandler : IRequestHandler<Reque
     private readonly PasswordResetOptions _options;
 
     public RequestPasswordResetCommandHandler(
-        IEmployeeRepository employees,
-        ICompanyRepository companies,
+        IUserRepository users,
+        SessionAccountResolver accounts,
         IPasswordResetTokenRepository tokens,
         IOutboundEmailRepository outboundEmails,
         IUnitOfWork unitOfWork,
         IDateTimeProvider clock,
         IOptions<PasswordResetOptions> options)
     {
-        _employees = employees;
-        _companies = companies;
+        _users = users;
+        _accounts = accounts;
         _tokens = tokens;
         _outboundEmails = outboundEmails;
         _unitOfWork = unitOfWork;
@@ -56,23 +57,24 @@ internal sealed class RequestPasswordResetCommandHandler : IRequestHandler<Reque
             return Result.Success();
         }
 
-        var account = await ResettableAccount.FindByEmailAsync(request.Role, email, _employees, _companies, cancellationToken);
+        var user = await _users.GetByEmailAsync(email, cancellationToken);
 
-        if (account is null)
+        if (user is not { IsActive: true }
+            || await _accounts.ResolveAsync(user, cancellationToken) is not { } account)
         {
             return Result.Success();
         }
 
         var now = _clock.UtcNow;
 
-        if (await _tokens.AnyIssuedAfterAsync(account.Id, now - ResendInterval, cancellationToken))
+        if (await _tokens.AnyIssuedAfterAsync(user.Id, now - ResendInterval, cancellationToken))
         {
             return Result.Success();
         }
 
         var value = PasswordResetToken.GenerateValue();
-        _tokens.Add(PasswordResetToken.Issue(account.Id, account.CompanyId, account.Role, value, now));
-        _outboundEmails.Add(PasswordResetEmail.Queue(account, _options.LinkFor(value, account.Role), now));
+        _tokens.Add(PasswordResetToken.Issue(user.Id, value, now));
+        _outboundEmails.Add(PasswordResetEmail.Queue(user.Email, account.FullName, _options.LinkFor(value), now));
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 

@@ -24,6 +24,7 @@ public sealed partial class FinGrowDbContext
         typeof(OutboundEmail),
         typeof(Achievement),
         typeof(User),
+        typeof(PasswordResetToken),
     };
 
     // Sin sesion (webhooks, trabajos programados, login, seeders) no hay empresa a la que acotar.
@@ -50,9 +51,6 @@ public sealed partial class FinGrowDbContext
             TenantFilter, snapshot => IsUnscoped || snapshot.CompanyId == CurrentCompanyId);
 
         modelBuilder.Entity<RefreshToken>().HasQueryFilter(
-            TenantFilter, token => IsUnscoped || token.CompanyId == CurrentCompanyId);
-
-        modelBuilder.Entity<PasswordResetToken>().HasQueryFilter(
             TenantFilter, token => IsUnscoped || token.CompanyId == CurrentCompanyId);
 
         // Lo que cuelga de un empleado hereda su empresa: el filtro de Employees se aplica solo dentro

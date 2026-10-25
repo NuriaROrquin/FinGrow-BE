@@ -7,26 +7,23 @@ using FinGrow.Domain.Repositories;
 using MediatR;
 
 internal sealed class ValidatePasswordResetTokenQueryHandler
-    : IRequestHandler<ValidatePasswordResetTokenQuery, Result<PasswordResetResponse>>
+    : IRequestHandler<ValidatePasswordResetTokenQuery, Result>
 {
     private readonly IPasswordResetTokenRepository _tokens;
-    private readonly IEmployeeRepository _employees;
-    private readonly ICompanyRepository _companies;
+    private readonly IUserRepository _users;
     private readonly IDateTimeProvider _clock;
 
     public ValidatePasswordResetTokenQueryHandler(
         IPasswordResetTokenRepository tokens,
-        IEmployeeRepository employees,
-        ICompanyRepository companies,
+        IUserRepository users,
         IDateTimeProvider clock)
     {
         _tokens = tokens;
-        _employees = employees;
-        _companies = companies;
+        _users = users;
         _clock = clock;
     }
 
-    public async Task<Result<PasswordResetResponse>> Handle(
+    public async Task<Result> Handle(
         ValidatePasswordResetTokenQuery request,
         CancellationToken cancellationToken)
     {
@@ -35,11 +32,11 @@ internal sealed class ValidatePasswordResetTokenQueryHandler
             : await _tokens.FindByHashAsync(PasswordResetToken.Hash(request.Token), cancellationToken);
 
         if (token is null || !token.IsUsable(_clock.UtcNow)
-            || await ResettableAccount.FindByIdAsync(token.Role, token.UserId, _employees, _companies, cancellationToken) is null)
+            || await _users.GetByIdAsync(token.UserId, cancellationToken) is not { IsActive: true })
         {
-            return Result.Failure<PasswordResetResponse>(PasswordResetErrors.EnlaceInvalido);
+            return Result.Failure(PasswordResetErrors.EnlaceInvalido);
         }
 
-        return Result.Success(new PasswordResetResponse(token.Role));
+        return Result.Success();
     }
 }

@@ -12,7 +12,6 @@ using FinGrow.Domain.Errors;
 public sealed class PasswordResetToken : AggregateRoot
 {
     public const int HashLength = 64;
-    public const int MaxRoleLength = RefreshToken.MaxRoleLength;
 
     public static readonly TimeSpan Lifetime = TimeSpan.FromHours(1);
 
@@ -20,28 +19,16 @@ public sealed class PasswordResetToken : AggregateRoot
     {
     }
 
-    private PasswordResetToken(
-        Guid id,
-        Guid userId,
-        Guid companyId,
-        string role,
-        string tokenHash,
-        DateTimeOffset createdAt)
+    private PasswordResetToken(Guid id, Guid userId, string tokenHash, DateTimeOffset createdAt)
         : base(id)
     {
         UserId = userId;
-        CompanyId = companyId;
-        Role = role;
         TokenHash = tokenHash;
         CreatedAt = createdAt;
         ExpiresAt = createdAt.Add(Lifetime);
     }
 
     public Guid UserId { get; private set; }
-
-    public Guid CompanyId { get; private set; }
-
-    public string Role { get; private set; } = string.Empty;
 
     public string TokenHash { get; private set; } = string.Empty;
 
@@ -51,26 +38,11 @@ public sealed class PasswordResetToken : AggregateRoot
 
     public DateTimeOffset? UsedAt { get; private set; }
 
-    public static PasswordResetToken Issue(
-        Guid userId,
-        Guid companyId,
-        string role,
-        string value,
-        DateTimeOffset createdAt)
+    public static PasswordResetToken Issue(Guid userId, string value, DateTimeOffset createdAt)
     {
         if (userId == Guid.Empty)
         {
             throw new DomainException("Un enlace de recuperacion siempre pertenece a un usuario.");
-        }
-
-        if (companyId == Guid.Empty)
-        {
-            throw new DomainException("Un enlace de recuperacion siempre pertenece a una empresa.");
-        }
-
-        if (string.IsNullOrWhiteSpace(role))
-        {
-            throw new DomainException("Un enlace de recuperacion siempre tiene un rol asociado.");
         }
 
         if (string.IsNullOrWhiteSpace(value))
@@ -78,7 +50,7 @@ public sealed class PasswordResetToken : AggregateRoot
             throw new DomainException("El valor del enlace de recuperacion es obligatorio.");
         }
 
-        return new PasswordResetToken(Guid.CreateVersion7(), userId, companyId, role, Hash(value), createdAt);
+        return new PasswordResetToken(Guid.CreateVersion7(), userId, Hash(value), createdAt);
     }
 
     public static string GenerateValue() =>
