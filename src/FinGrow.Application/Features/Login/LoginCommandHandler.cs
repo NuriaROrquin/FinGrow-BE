@@ -1,4 +1,4 @@
-﻿namespace FinGrow.Application.Features.Login;
+namespace FinGrow.Application.Features.Login;
 
 using FinGrow.Application.Common;
 using FinGrow.Application.DTOs;
@@ -8,7 +8,7 @@ using FinGrow.Domain.Repositories;
 using FinGrow.Domain.ValueObjects;
 using MediatR;
 
-internal sealed class LoginEmployeeCommandHandler : IRequestHandler<LoginEmployeeCommand, Result<LoginResult>>
+internal sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<LoginResult>>
 {
     private static readonly Error CredencialesInvalidas =
         Error.Unauthorized("Auth.CredencialesInvalidas", "El email o la contraseña son incorrectos.");
@@ -16,30 +16,33 @@ internal sealed class LoginEmployeeCommandHandler : IRequestHandler<LoginEmploye
     private static readonly Error AccesoDesactivado =
         Error.Forbidden("Auth.AccesoDesactivado", "Tu acceso a FinGrow está desactivado. Consultá con tu empresa.");
 
-    private readonly IEmployeeRepository _employeeRepository;
+    private readonly IUserRepository _users;
+    private readonly SessionAccountResolver _accounts;
     private readonly IPasswordHasher _passwordHasher;
     private readonly SessionIssuer _sessionIssuer;
     private readonly ITokenService _tokenService;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IDateTimeProvider _clock;
 
-    public LoginEmployeeCommandHandler(
-        IEmployeeRepository employeeRepository,
+    public LoginCommandHandler(
+        IUserRepository users,
+        SessionAccountResolver accounts,
         IPasswordHasher passwordHasher,
         SessionIssuer sessionIssuer,
         ITokenService tokenService,
         IUnitOfWork unitOfWork,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider clock)
     {
-        _employeeRepository = employeeRepository;
+        _users = users;
+        _accounts = accounts;
         _passwordHasher = passwordHasher;
         _sessionIssuer = sessionIssuer;
         _tokenService = tokenService;
         _unitOfWork = unitOfWork;
-        _dateTimeProvider = dateTimeProvider;
+        _clock = clock;
     }
 
-    public async Task<Result<LoginResult>> Handle(LoginEmployeeCommand request, CancellationToken cancellationToken)
+    public async Task<Result<LoginResult>> Handle(LoginCommand request, CancellationToken cancellationToken)
     {
         Email email;
         try
@@ -51,26 +54,31 @@ internal sealed class LoginEmployeeCommandHandler : IRequestHandler<LoginEmploye
             return Result.Failure<LoginResult>(CredencialesInvalidas);
         }
 
-        var employee = await _employeeRepository.GetByEmailAsync(email, cancellationToken);
+        var user = await _users.GetByEmailAsync(email, cancellationToken);
 
-        if (employee is null || !_passwordHasher.Verify(request.Password, employee.PasswordHash))
+        if (user is null || user.Role != request.Role || !_passwordHasher.Verify(request.Password, user.PasswordHash))
         {
             return Result.Failure<LoginResult>(CredencialesInvalidas);
         }
 
-        if (!employee.IsActive)
+        if (!user.IsActive)
         {
             return Result.Failure<LoginResult>(AccesoDesactivado);
         }
 
-        if (employee.IsTwoFactorEnabled)
+        if (user.IsTwoFactorEnabled)
         {
-            return Result.Success(LoginResult.RequiresTwoFactor(_tokenService.GenerateTwoFactorChallenge(employee.Id)));
+            return Result.Success(LoginResult.RequiresTwoFactor(_tokenService.GenerateTwoFactorChallenge(user.Id)));
         }
 
-        employee.RegisterLogin(_dateTimeProvider.UtcNow);
+        if (await _accounts.ResolveAsync(user, cancellationToken) is not { } account)
+        {
+            return Result.Failure<LoginResult>(CredencialesInvalidas);
+        }
 
-        var session = _sessionIssuer.Issue(employee.Id, employee.CompanyId, Rol.Empleado, employee.FullName);
+        user.RegisterLogin(_clock.UtcNow);
+
+        var session = _sessionIssuer.Issue(account.UserId, account.CompanyId, account.Role, account.FullName);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 

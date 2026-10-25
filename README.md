@@ -630,6 +630,21 @@ Si la IA no responde, las preocupaciones salen igual y `recommendationsAvailable
 caché de `AiService:RecommendationsCacheHours` también aplica, con su propia clave. No hay tabla nueva:
 todo se calcula en la consulta sobre `financial_health_scores` y `company_metrics_snapshots`.
 
+### Tendencias positivas y oportunidades de mejora (HU-63)
+
+`GET /api/company/metrics/trends` arma la tarjeta "Tendencias" de la pestaña "Análisis" del panel de la
+empresa, solo para el rol `Empresa`. Compara el último mes con foto de `metrics-snapshot` contra el mes
+inmediatamente anterior. Son reglas fijas: no se llama a la IA.
+
+| Parte | De dónde sale |
+|---|---|
+| Habilitación | Sin foto todavía, `period` viene en `null`. Sin la foto del mes anterior, `previousPeriod` viene en `null` y no hay tendencias. Si alguno de los dos meses tiene menos empleados activos que `Metrics:CompanyMinimumEmployees`, `isAnonymized` viene en `true` y sin tendencias |
+| Indicadores | De la foto: tasa de participación, puntaje promedio (solo si la política lo deja mostrar), porcentaje de empleados activos con presupuesto (`BudgetAdoption`), con meta activa (`GoalAdoption`) y con integración (`IntegrationAdoption`), y metas alcanzadas. De `financial_health_scores`: el porcentaje de afectados por cada preocupación de HU-61, si hubo al menos el umbral de empleados medidos y la preocupación afecta a nadie o a al menos el umbral. De los cursos: los completados en el mes (el mes de la última lección) |
+| Tendencia | Para cada indicador visible en los dos meses, `change` = actual − anterior. Con menos de 2 de diferencia (puntos porcentuales, puntos de puntaje o unidades, según `unit`) es estable y no viaja. Si mejora va en `positiveTrends`; si empeora, en `opportunities`. En las preocupaciones mejorar es bajar. Las dos listas van ordenadas de mayor a menor cambio |
+
+No hay tabla nueva: todo se calcula en la consulta sobre `company_metrics_snapshots`,
+`financial_health_scores` y `lesson_completions`.
+
 ### Logros
 
 El catálogo (`achievements`) es fijo: lo define `AchievementCatalog` (`Domain/Entities/`) y lo
@@ -876,9 +891,10 @@ Siete entidades y tres value objects. El esquema se crea con la migración `Init
 
 | Tabla | Raíz de agregado | Qué guarda |
 |---|---|---|
-| `companies` | Company | Empresa contratante: razón social, CUIT, credenciales (contraseña y secreto del doble factor, cifrado), moneda por defecto |
+| `users` | User | Las credenciales de empleados y empresas: email (único entre los dos), hash de contraseña, rol, secreto del doble factor (cifrado), último ingreso y si la cuenta está activa. Tiene el mismo id que su empleado o su empresa |
+| `companies` | Company | Empresa contratante: razón social, CUIT, datos corporativos, moneda por defecto. Su `id` es FK a `users` |
 | `departments` | (parte de Company) | Departamentos de la empresa; se desactivan, no se borran |
-| `employees` | Employee | La persona que usa la app; pertenece a una empresa y opcionalmente a un departamento |
+| `employees` | Employee | La persona que usa la app; pertenece a una empresa y opcionalmente a un departamento. Su `id` es FK a `users` |
 | `transactions` | Transaction | Ingresos y gastos, con importe siempre positivo y el signo dado por `type` |
 | `budgets` | Budget | Tope por categoría y período |
 | `goals` | Goal | Metas de ahorro con objetivo, avance y fecha límite |

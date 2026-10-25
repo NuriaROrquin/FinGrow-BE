@@ -17,7 +17,8 @@ internal sealed class VerifyTwoFactorLoginCommandHandler : IRequestHandler<Verif
 
     private readonly ITokenService _tokenService;
     private readonly ITotpService _totp;
-    private readonly IEmployeeRepository _employees;
+    private readonly IUserRepository _users;
+    private readonly SessionAccountResolver _accounts;
     private readonly SessionIssuer _sessionIssuer;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _clock;
@@ -25,14 +26,16 @@ internal sealed class VerifyTwoFactorLoginCommandHandler : IRequestHandler<Verif
     public VerifyTwoFactorLoginCommandHandler(
         ITokenService tokenService,
         ITotpService totp,
-        IEmployeeRepository employees,
+        IUserRepository users,
+        SessionAccountResolver accounts,
         SessionIssuer sessionIssuer,
         IUnitOfWork unitOfWork,
         IDateTimeProvider clock)
     {
         _tokenService = tokenService;
         _totp = totp;
-        _employees = employees;
+        _users = users;
+        _accounts = accounts;
         _sessionIssuer = sessionIssuer;
         _unitOfWork = unitOfWork;
         _clock = clock;
@@ -40,28 +43,33 @@ internal sealed class VerifyTwoFactorLoginCommandHandler : IRequestHandler<Verif
 
     public async Task<Result<LoginResponse>> Handle(VerifyTwoFactorLoginCommand request, CancellationToken cancellationToken)
     {
-        if (_tokenService.ReadTwoFactorChallenge(request.ChallengeToken) is not { } employeeId)
+        if (_tokenService.ReadTwoFactorChallenge(request.ChallengeToken) is not { } userId)
         {
             return Result.Failure<LoginResponse>(DesafioInvalido);
         }
 
-        var employee = await _employees.GetByIdAsync(employeeId, cancellationToken);
+        var user = await _users.GetByIdAsync(userId, cancellationToken);
 
-        if (employee is null || !employee.IsActive || !employee.IsTwoFactorEnabled)
+        if (user is null || user.Role != request.Role || !user.IsActive || !user.IsTwoFactorEnabled)
         {
             return Result.Failure<LoginResponse>(DesafioInvalido);
         }
 
         var now = _clock.UtcNow;
 
-        if (!_totp.VerifyCode(employee.TwoFactorSecret!, request.Code, now))
+        if (!_totp.VerifyCode(user.TwoFactorSecret!, request.Code, now))
         {
             return Result.Failure<LoginResponse>(CodigoInvalido);
         }
 
-        employee.RegisterLogin(now);
+        if (await _accounts.ResolveAsync(user, cancellationToken) is not { } account)
+        {
+            return Result.Failure<LoginResponse>(DesafioInvalido);
+        }
 
-        var session = _sessionIssuer.Issue(employee.Id, employee.CompanyId, Rol.Empleado, employee.FullName);
+        user.RegisterLogin(now);
+
+        var session = _sessionIssuer.Issue(account.UserId, account.CompanyId, account.Role, account.FullName);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 

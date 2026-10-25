@@ -35,7 +35,7 @@ public class TwoFactorEnrollmentHandlerTests
 
     private readonly FakeCompanyRepository _companies = new();
 
-    private TwoFactorAccountFinder CreateFinder() => new(_currentUser, _employees, _companies);
+    private TwoFactorAccountFinder CreateFinder() => new(_currentUser, new FakeUserRepository(_employees, _companies));
 
     private SetupTwoFactorCommandHandler CreateSetupHandler() =>
         new(CreateFinder(), _totp, _unitOfWork, new FakeDateTimeProvider(Now));
@@ -68,10 +68,10 @@ public class TwoFactorEnrollmentHandlerTests
     public async Task Status_is_disabled_until_the_enrollment_is_confirmed()
     {
         var employee = AddLoggedInEmployee();
-        employee.StartTwoFactorEnrollment("SECRETBASE32", Now);
+        employee.User.StartTwoFactorEnrollment("SECRETBASE32", Now);
 
         var pending = await CreateStatusHandler().Handle(new GetTwoFactorStatusQuery(), CancellationToken.None);
-        employee.EnableTwoFactor(Now);
+        employee.User.EnableTwoFactor(Now);
         var enabled = await CreateStatusHandler().Handle(new GetTwoFactorStatusQuery(), CancellationToken.None);
 
         pending.Value.Enabled.ShouldBeFalse();
@@ -97,8 +97,8 @@ public class TwoFactorEnrollmentHandlerTests
         result.IsSuccess.ShouldBeTrue();
         result.Value.Secret.ShouldBe("SECRETBASE32");
         result.Value.ProvisioningUri.ShouldContain("empleado@empresa.com");
-        employee.TwoFactorSecret.ShouldBe("SECRETBASE32");
-        employee.IsTwoFactorEnabled.ShouldBeFalse();
+        employee.User.TwoFactorSecret.ShouldBe("SECRETBASE32");
+        employee.User.IsTwoFactorEnabled.ShouldBeFalse();
         _unitOfWork.SaveCount.ShouldBe(1);
     }
 
@@ -111,15 +111,15 @@ public class TwoFactorEnrollmentHandlerTests
         _totp.NextSecret = "OTROSECRETO";
         await CreateSetupHandler().Handle(new SetupTwoFactorCommand(), CancellationToken.None);
 
-        employee.TwoFactorSecret.ShouldBe("OTROSECRETO");
+        employee.User.TwoFactorSecret.ShouldBe("OTROSECRETO");
     }
 
     [Fact]
     public async Task Setup_is_rejected_when_two_factor_is_already_enabled()
     {
         var employee = AddLoggedInEmployee();
-        employee.StartTwoFactorEnrollment("SECRETBASE32", Now);
-        employee.EnableTwoFactor(Now);
+        employee.User.StartTwoFactorEnrollment("SECRETBASE32", Now);
+        employee.User.EnableTwoFactor(Now);
 
         var result = await CreateSetupHandler().Handle(new SetupTwoFactorCommand(), CancellationToken.None);
 
@@ -140,13 +140,13 @@ public class TwoFactorEnrollmentHandlerTests
     public async Task Enable_with_a_valid_code_activates_two_factor()
     {
         var employee = AddLoggedInEmployee();
-        employee.StartTwoFactorEnrollment("SECRETBASE32", Now);
+        employee.User.StartTwoFactorEnrollment("SECRETBASE32", Now);
 
         var result = await CreateEnableHandler().Handle(new EnableTwoFactorCommand(FakeTotpService.ValidCode), CancellationToken.None);
 
         result.IsSuccess.ShouldBeTrue();
-        employee.IsTwoFactorEnabled.ShouldBeTrue();
-        employee.TwoFactorEnabledAt.ShouldBe(Now);
+        employee.User.IsTwoFactorEnabled.ShouldBeTrue();
+        employee.User.TwoFactorEnabledAt.ShouldBe(Now);
         _unitOfWork.SaveCount.ShouldBe(1);
     }
 
@@ -154,13 +154,13 @@ public class TwoFactorEnrollmentHandlerTests
     public async Task Enable_with_an_invalid_code_leaves_two_factor_disabled()
     {
         var employee = AddLoggedInEmployee();
-        employee.StartTwoFactorEnrollment("SECRETBASE32", Now);
+        employee.User.StartTwoFactorEnrollment("SECRETBASE32", Now);
 
         var result = await CreateEnableHandler().Handle(new EnableTwoFactorCommand("000000"), CancellationToken.None);
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("Account.CodigoInvalido");
-        employee.IsTwoFactorEnabled.ShouldBeFalse();
+        employee.User.IsTwoFactorEnabled.ShouldBeFalse();
         _unitOfWork.SaveCount.ShouldBe(0);
     }
 
@@ -179,8 +179,8 @@ public class TwoFactorEnrollmentHandlerTests
     public async Task Enable_is_rejected_when_two_factor_is_already_enabled()
     {
         var employee = AddLoggedInEmployee();
-        employee.StartTwoFactorEnrollment("SECRETBASE32", Now);
-        employee.EnableTwoFactor(Now);
+        employee.User.StartTwoFactorEnrollment("SECRETBASE32", Now);
+        employee.User.EnableTwoFactor(Now);
 
         var result = await CreateEnableHandler().Handle(new EnableTwoFactorCommand(FakeTotpService.ValidCode), CancellationToken.None);
 
@@ -199,7 +199,7 @@ public class TwoFactorEnrollmentHandlerTests
 
         setup.IsSuccess.ShouldBeTrue();
         enable.IsSuccess.ShouldBeTrue();
-        company.IsTwoFactorEnabled.ShouldBeTrue();
+        company.User.IsTwoFactorEnabled.ShouldBeTrue();
         status.Value.Enabled.ShouldBeTrue();
     }
 
@@ -207,27 +207,27 @@ public class TwoFactorEnrollmentHandlerTests
     public async Task Disable_with_a_valid_code_turns_two_factor_off()
     {
         var company = AddLoggedInCompany();
-        company.StartTwoFactorEnrollment("SECRETBASE32", Now);
-        company.EnableTwoFactor(Now);
+        company.User.StartTwoFactorEnrollment("SECRETBASE32", Now);
+        company.User.EnableTwoFactor(Now);
 
         var result = await CreateDisableHandler().Handle(new DisableTwoFactorCommand(FakeTotpService.ValidCode), CancellationToken.None);
 
         result.IsSuccess.ShouldBeTrue();
-        company.IsTwoFactorEnabled.ShouldBeFalse();
-        company.TwoFactorSecret.ShouldBeNull();
+        company.User.IsTwoFactorEnabled.ShouldBeFalse();
+        company.User.TwoFactorSecret.ShouldBeNull();
     }
 
     [Fact]
     public async Task Disable_with_an_invalid_code_keeps_two_factor_on()
     {
         var employee = AddLoggedInEmployee();
-        employee.StartTwoFactorEnrollment("SECRETBASE32", Now);
-        employee.EnableTwoFactor(Now);
+        employee.User.StartTwoFactorEnrollment("SECRETBASE32", Now);
+        employee.User.EnableTwoFactor(Now);
 
         var result = await CreateDisableHandler().Handle(new DisableTwoFactorCommand("000000"), CancellationToken.None);
 
         result.Error.Code.ShouldBe("Account.CodigoInvalido");
-        employee.IsTwoFactorEnabled.ShouldBeTrue();
+        employee.User.IsTwoFactorEnabled.ShouldBeTrue();
     }
 
     [Fact]

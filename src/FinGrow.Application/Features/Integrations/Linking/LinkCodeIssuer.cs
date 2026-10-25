@@ -42,7 +42,7 @@ internal sealed class LinkCodeIssuer
 
         var employee = await _employees.GetByIdAsync(employeeId, cancellationToken);
 
-        if (employee is null || !employee.IsActive)
+        if (employee is null || !employee.User.IsActive)
         {
             return Result.Failure<IssuedLinkCode>(
                 Error.Forbidden("Integrations.NotAnEmployee", $"Solo un empleado activo puede vincular {provider}."));

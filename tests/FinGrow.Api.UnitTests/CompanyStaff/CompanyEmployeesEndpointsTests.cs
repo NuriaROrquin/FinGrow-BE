@@ -101,7 +101,7 @@ public class CompanyEmployeesEndpointsTests
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         employee.FullName.ShouldBe("Ana María Gómez");
-        employee.Email.Value.ShouldBe("amgomez@acme.com");
+        employee.User.Email.Value.ShouldBe("amgomez@acme.com");
     }
 
     [Fact]
@@ -164,7 +164,7 @@ public class CompanyEmployeesEndpointsTests
             new { isActive = false });
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        employee.IsActive.ShouldBeFalse();
+        employee.User.IsActive.ShouldBeFalse();
         factory.Employees.ShouldContain(employee);
         factory.RevokedUsers.ShouldHaveSingleItem().ShouldBe(employee.Id);
 
@@ -187,7 +187,7 @@ public class CompanyEmployeesEndpointsTests
             new { });
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        employee.IsActive.ShouldBeTrue();
+        employee.User.IsActive.ShouldBeTrue();
     }
 
     [Fact]

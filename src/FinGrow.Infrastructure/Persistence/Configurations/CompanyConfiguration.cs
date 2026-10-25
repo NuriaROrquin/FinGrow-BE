@@ -24,12 +24,6 @@ internal sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
             .HasMaxLength(TaxId.Length)
             .IsRequired();
 
-        builder.Property(company => company.Email)
-            .HasColumnName("email")
-            .HasConversion(email => email.Value, value => Email.From(value))
-            .HasMaxLength(Email.MaxLength)
-            .IsRequired();
-
         builder.Property(company => company.Industry)
             .HasMaxLength(Company.MaxIndustryLength);
 
@@ -40,16 +34,6 @@ internal sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
             .HasMaxLength(Company.MaxFiscalAddressLength);
 
         builder.Property(company => company.FoundedYear);
-
-        builder.Property(company => company.PasswordHash)
-            .HasMaxLength(200)
-            .IsRequired();
-
-        builder.Property(company => company.TwoFactorSecret)
-            .HasAnnotation(EncryptedStringConverter.Annotation, true);
-
-        builder.Property(company => company.TwoFactorEnabledAt);
-        builder.Ignore(company => company.IsTwoFactorEnabled);
 
         builder.Property(company => company.DefaultCurrency)
             .HasConversion<string>()
@@ -69,12 +53,17 @@ internal sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
         builder.Property(company => company.FiscalYearStartMonth)
             .IsRequired();
 
-        builder.Property(company => company.IsActive).IsRequired();
         builder.Property(company => company.CreatedAt).IsRequired();
         builder.Property(company => company.UpdatedAt).IsRequired();
 
         builder.HasIndex(company => company.TaxId).IsUnique();
-        builder.HasIndex(company => company.Email).IsUnique();
+
+        builder.HasOne(company => company.User)
+            .WithOne()
+            .HasForeignKey<Company>(company => company.Id)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Navigation(company => company.User).AutoInclude();
 
         // La coleccion se expone como IReadOnlyCollection; EF escribe sobre la lista privada.
         builder.Metadata

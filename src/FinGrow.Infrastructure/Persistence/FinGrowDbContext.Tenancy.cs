@@ -23,6 +23,7 @@ public sealed partial class FinGrowDbContext
         typeof(JobRun),
         typeof(OutboundEmail),
         typeof(Achievement),
+        typeof(User),
     };
 
     // Sin sesion (webhooks, trabajos programados, login, seeders) no hay empresa a la que acotar.

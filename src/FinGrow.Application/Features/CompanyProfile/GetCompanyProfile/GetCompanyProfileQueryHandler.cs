@@ -36,12 +36,12 @@ internal sealed class GetCompanyProfileQueryHandler : IRequestHandler<GetCompany
         }
 
         var employeeCount = (await _employees.ListByCompanyAsync(companyId, cancellationToken))
-            .Count(employee => employee.IsActive);
+            .Count(employee => employee.User.IsActive);
 
         return Result.Success(new CompanyProfileResponse(
             company.Name,
             company.TaxId.Value,
-            company.Email.Value,
+            company.User.Email.Value,
             company.Industry,
             company.PhoneNumber,
             company.FiscalAddress,

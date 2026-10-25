@@ -13,6 +13,7 @@ public class CreateEmployeeCommandHandlerTests
             _scenario.CurrentUser,
             _scenario.Companies,
             _scenario.Employees,
+            _scenario.Users,
             _scenario.OutboundEmails,
             _scenario.PasswordHasher,
             _scenario.UnitOfWork,
@@ -35,11 +36,11 @@ public class CreateEmployeeCommandHandlerTests
         employee.CompanyId.ShouldBe(_scenario.Company.Id);
         employee.DepartmentId.ShouldBe(sales.Id);
         employee.FullName.ShouldBe("Juan Pérez");
-        employee.Email.Value.ShouldBe("juan.perez@acme.com");
-        employee.IsActive.ShouldBeTrue();
+        employee.User.Email.Value.ShouldBe("juan.perez@acme.com");
+        employee.User.IsActive.ShouldBeTrue();
         employee.HiredOn.ShouldBe(new DateOnly(2026, 10, 11));
         employee.PreferredCurrency.ShouldBe(Currency.ARS);
-        employee.PasswordHash.ShouldBe(result.Value.TemporaryPassword);
+        employee.User.PasswordHash.ShouldBe(result.Value.TemporaryPassword);
         result.Value.Employee.Id.ShouldBe(employee.Id);
         result.Value.Employee.DepartmentName.ShouldBe("Ventas");
         _scenario.UnitOfWork.SaveCount.ShouldBe(1);
@@ -87,6 +88,19 @@ public class CreateEmployeeCommandHandlerTests
         result.Error.Type.ShouldBe(ErrorType.Conflict);
         result.Error.Code.ShouldBe("Employee.EmailTaken");
         _scenario.Employees.Employees.Count.ShouldBe(1);
+        _scenario.UnitOfWork.SaveCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task An_email_used_by_a_company_is_rejected_with_conflict()
+    {
+        var result = await CreateHandler().Handle(
+            new CreateEmployeeCommand("Ana Gómez", "rrhh@acme.com", null, null),
+            CancellationToken.None);
+
+        result.Error.Type.ShouldBe(ErrorType.Conflict);
+        result.Error.Code.ShouldBe("Employee.EmailTaken");
+        _scenario.Employees.Employees.ShouldBeEmpty();
         _scenario.UnitOfWork.SaveCount.ShouldBe(0);
     }
 

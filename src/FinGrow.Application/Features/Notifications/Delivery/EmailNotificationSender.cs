@@ -35,7 +35,7 @@ internal sealed class EmailNotificationSender(
         var htmlBody = $"<h1>{WebUtility.HtmlEncode(notification.Title)}</h1><p>{WebUtility.HtmlEncode(notification.Body)}</p>";
 
         outboundEmails.Add(OutboundEmail.Queue(
-            employee.Email,
+            employee.User.Email,
             notification.Title,
             htmlBody,
             textBody,
