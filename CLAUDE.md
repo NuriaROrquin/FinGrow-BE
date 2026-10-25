@@ -421,6 +421,15 @@ Application, antes de serializar la respuesta, y no escondiendo columnas en el f
   oportunidad de mejora (en las preocupaciones, mejorar es bajar). Los cursos completados del mes se
   calculan al vuelo (`ICompanyEducationMetricsReadRepository.CountCompletedCoursesAsync`): un curso
   cuenta en el mes en que se completó su última lección, igual que en `/metrics/education`.
+- **El reporte mensual se arma en un solo lugar** (HU-65, `GET /api/company/metrics/report`).
+  `CompanyMonthlyReportBuilder` (`Features/Metrics/MonthlyReport`) arma, para un mes con foto, la
+  participación, el puntaje promedio con su banda, los cursos completados y las tendencias contra el
+  mes anterior, todo leído con `CompanyMonthIndicators` como la tarjeta de tendencias. El panel lo
+  exporta a PDF (siempre el último mes con foto) y HU-82 lo va a mandar por mail: si el mail necesita
+  otro dato, se agrega al builder y no se arma aparte. Un dato que no se puede mostrar no viaja en
+  cero: cada indicador dice por qué falta (`CompanyReportValueStatus`: sin foto de ese mes, menos
+  empleados activos que el umbral o menos empleados con puntaje que el umbral). El nombre de la
+  empresa viaja en el reporte; los datos de una persona, nunca.
 - **Toda modificación del contrato debe tener una prueba.** Los tests deben comprobar el umbral
   de tres empleados, el aislamiento entre empresas y que la respuesta serializada no expone
   identificadores, montos, saldos ni movimientos individuales. `AnonymizedContractRules`
