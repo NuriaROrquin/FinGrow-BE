@@ -52,6 +52,22 @@ public class InvestmentsListEndpointTests
     }
 
     [Fact]
+    public async Task The_portfolio_can_be_sorted_by_asset_type()
+    {
+        using var factory = new InvestmentsWebApplicationFactory();
+        var client = AuthenticatedClient(factory);
+
+        var response = await client.GetAsync(new Uri(
+            "/api/investments?sortBy=AssetType&sortDirection=Ascending",
+            UriKind.Relative));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var filters = factory.Investments.RequestedFilters.ShouldNotBeNull();
+        filters.SortBy.ShouldBe(InvestmentSortField.AssetType);
+        filters.SortDirection.ShouldBe(SortDirection.Ascending);
+    }
+
+    [Fact]
     public async Task Without_parameters_the_first_page_comes_sorted_by_the_latest_purchase()
     {
         using var factory = new InvestmentsWebApplicationFactory();

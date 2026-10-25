@@ -60,14 +60,14 @@ internal sealed class GetTransactionHistoryQueryHandler(
             filters.PaymentMethod,
             filters.DateFrom,
             filters.DateTo,
+            filters.SortBy,
+            filters.SortDirection,
             cancellationToken);
 
         var receiptIds = await receiptRepository.GetIdsByTransactionAsync(
             page.Items.Select(transaction => transaction.Id).ToList(), cancellationToken);
 
         var items = page.Items
-            .OrderByDescending(transaction => transaction.OccurredOn)
-            .ThenByDescending(transaction => transaction.Id)
             .Select(transaction => new TransactionHistoryItem(
                 transaction.Id,
                 transaction.OccurredOn,
