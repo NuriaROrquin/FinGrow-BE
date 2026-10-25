@@ -14,22 +14,16 @@ using Microsoft.AspNetCore.Mvc;
 [Route("login")]
 public sealed class AuthController(IMediator mediator) : ControllerBase
 {
-    [HttpPost("empleado")]
-    public async Task<IActionResult> LoginEmpleado(LoginRequest request, CancellationToken cancellationToken) =>
+    [HttpPost]
+    public async Task<IActionResult> Ingresar(LoginRequest request, CancellationToken cancellationToken) =>
         StartSessionOrChallenge(await mediator.Send(
-            new LoginCommand(request.Email, request.Password, UserRole.Employee),
+            new LoginCommand(request.Email, request.Password),
             cancellationToken));
 
     [HttpPost("empleado/2fa")]
     public async Task<IActionResult> VerificarDobleFactor(TwoFactorLoginRequest request, CancellationToken cancellationToken) =>
         StartSession(await mediator.Send(
             new VerifyTwoFactorLoginCommand(request.ChallengeToken, request.Code, UserRole.Employee),
-            cancellationToken));
-
-    [HttpPost("empresa")]
-    public async Task<IActionResult> LoginEmpresa(LoginRequest request, CancellationToken cancellationToken) =>
-        StartSessionOrChallenge(await mediator.Send(
-            new LoginCommand(request.Email, request.Password, UserRole.Company),
             cancellationToken));
 
     [HttpPost("empresa/2fa")]

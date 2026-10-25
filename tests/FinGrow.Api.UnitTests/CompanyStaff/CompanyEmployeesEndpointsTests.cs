@@ -37,7 +37,7 @@ public class CompanyEmployeesEndpointsTests
         welcome.TextBody.ShouldContain(temporaryPassword!);
 
         var login = await factory.CreateClient().PostAsJsonAsync(
-            new Uri("/login/empleado", UriKind.Relative),
+            new Uri("/login", UriKind.Relative),
             new { email = "juan.perez@acme.com", password = temporaryPassword });
         login.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
@@ -169,7 +169,7 @@ public class CompanyEmployeesEndpointsTests
         factory.RevokedUsers.ShouldHaveSingleItem().ShouldBe(employee.Id);
 
         var login = await factory.CreateClient().PostAsJsonAsync(
-            new Uri("/login/empleado", UriKind.Relative),
+            new Uri("/login", UriKind.Relative),
             new { email = "juan@acme.com", password = temporaryPassword });
         login.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
         (await login.Content.ReadAsStringAsync()).ShouldContain("Tu acceso a FinGrow está desactivado");
