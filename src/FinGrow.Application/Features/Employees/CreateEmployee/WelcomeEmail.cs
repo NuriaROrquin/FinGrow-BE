@@ -17,7 +17,7 @@ internal static class WelcomeEmail
 
             {company.Name} te dio de alta en FinGrow. Para entrar usá estos datos:
 
-            Email: {employee.Email.Value}
+            Email: {employee.User.Email.Value}
             Contraseña temporal: {temporaryPassword}
 
             Te recomendamos cambiar la contraseña desde tu perfil la primera vez que entres.
@@ -26,12 +26,12 @@ internal static class WelcomeEmail
         var html = $"""
             <p>Hola {Encode(employee.FullName)},</p>
             <p>{Encode(company.Name)} te dio de alta en FinGrow. Para entrar usá estos datos:</p>
-            <p>Email: <strong>{Encode(employee.Email.Value)}</strong><br>
+            <p>Email: <strong>{Encode(employee.User.Email.Value)}</strong><br>
             Contraseña temporal: <strong>{Encode(temporaryPassword)}</strong></p>
             <p>Te recomendamos cambiar la contraseña desde tu perfil la primera vez que entres.</p>
             """;
 
-        return OutboundEmail.Queue(employee.Email, Subject, html, text, queuedAt);
+        return OutboundEmail.Queue(employee.User.Email, Subject, html, text, queuedAt);
     }
 
     private static string Encode(string value) => WebUtility.HtmlEncode(value);

@@ -335,7 +335,6 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("FinGrow.Domain.Entities.Company", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -348,12 +347,6 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)")
                         .HasColumnName("default_currency");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
-                        .HasColumnName("email");
 
                     b.Property<string>("FiscalAddress")
                         .HasMaxLength(300)
@@ -373,10 +366,6 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("industry");
 
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_active");
-
                     b.Property<string>("Language")
                         .IsRequired()
                         .HasMaxLength(5)
@@ -388,12 +377,6 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
-
-                    b.Property<string>("PasswordHash")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("password_hash");
 
                     b.Property<string>("PhoneNumber")
                         .HasMaxLength(30)
@@ -412,25 +395,12 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("theme");
 
-                    b.Property<DateTimeOffset?>("TwoFactorEnabledAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("two_factor_enabled_at");
-
-                    b.Property<string>("TwoFactorSecret")
-                        .HasColumnType("text")
-                        .HasColumnName("two_factor_secret")
-                        .HasAnnotation("FinGrow:Encrypted", true);
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
                     b.HasKey("Id")
                         .HasName("pk_companies");
-
-                    b.HasIndex("Email")
-                        .IsUnique()
-                        .HasDatabaseName("ix_companies_email");
 
                     b.HasIndex("TaxId")
                         .IsUnique()
@@ -731,7 +701,6 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("FinGrow.Domain.Entities.Employee", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -762,12 +731,6 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("department_id");
 
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
-                        .HasColumnName("email");
-
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -778,30 +741,16 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("date")
                         .HasColumnName("hired_on");
 
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_active");
-
                     b.Property<string>("Language")
                         .IsRequired()
                         .HasMaxLength(2)
                         .HasColumnType("character varying(2)")
                         .HasColumnName("language");
 
-                    b.Property<DateTimeOffset?>("LastLoginAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_login_at");
-
                     b.Property<string>("NationalId")
                         .HasMaxLength(8)
                         .HasColumnType("character varying(8)")
                         .HasColumnName("national_id");
-
-                    b.Property<string>("PasswordHash")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("password_hash");
 
                     b.Property<string>("PhoneNumber")
                         .HasMaxLength(30)
@@ -820,15 +769,6 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(10)")
                         .HasColumnName("theme");
 
-                    b.Property<DateTimeOffset?>("TwoFactorEnabledAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("two_factor_enabled_at");
-
-                    b.Property<string>("TwoFactorSecret")
-                        .HasColumnType("text")
-                        .HasColumnName("two_factor_secret")
-                        .HasAnnotation("FinGrow:Encrypted", true);
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -841,10 +781,6 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("DepartmentId")
                         .HasDatabaseName("ix_employees_department_id");
-
-                    b.HasIndex("Email")
-                        .IsUnique()
-                        .HasDatabaseName("ix_employees_email");
 
                     b.ToTable("employees", (string)null);
                 });
@@ -1915,6 +1851,66 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("FinGrow.Domain.Entities.User", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("email");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<DateTimeOffset?>("LastLoginAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_login_at");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("password_hash");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("role");
+
+                    b.Property<DateTimeOffset?>("TwoFactorEnabledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("two_factor_enabled_at");
+
+                    b.Property<string>("TwoFactorSecret")
+                        .HasColumnType("text")
+                        .HasColumnName("two_factor_secret")
+                        .HasAnnotation("FinGrow:Encrypted", true);
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_users");
+
+                    b.HasIndex("Email")
+                        .IsUnique()
+                        .HasDatabaseName("ix_users_email");
+
+                    b.ToTable("users", (string)null);
+                });
+
             modelBuilder.Entity("FinGrow.Domain.Entities.Budget", b =>
                 {
                     b.HasOne("FinGrow.Domain.Entities.Employee", "Employee")
@@ -1965,6 +1961,18 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
 
                     b.Navigation("Limit")
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("FinGrow.Domain.Entities.Company", b =>
+                {
+                    b.HasOne("FinGrow.Domain.Entities.User", "User")
+                        .WithOne()
+                        .HasForeignKey("FinGrow.Domain.Entities.Company", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_companies_users_id");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.CompanyMetricsSnapshot", b =>
@@ -2162,9 +2170,18 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_employees_departments_department_id");
 
+                    b.HasOne("FinGrow.Domain.Entities.User", "User")
+                        .WithOne()
+                        .HasForeignKey("FinGrow.Domain.Entities.Employee", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_employees_users_id");
+
                     b.Navigation("Company");
 
                     b.Navigation("Department");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.EmployeeAchievement", b =>
@@ -2522,6 +2539,13 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_refresh_tokens_companies_company_id");
+
+                    b.HasOne("FinGrow.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_refresh_tokens_users_user_id");
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.Transaction", b =>

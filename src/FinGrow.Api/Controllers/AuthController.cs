@@ -6,6 +6,7 @@ using FinGrow.Api.Extensions;
 using FinGrow.Application.Common;
 using FinGrow.Application.DTOs;
 using FinGrow.Application.Features.Login;
+using FinGrow.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,20 +15,28 @@ using Microsoft.AspNetCore.Mvc;
 public sealed class AuthController(IMediator mediator) : ControllerBase
 {
     [HttpPost("empleado")]
-    public async Task<IActionResult> LoginEmpleado(LoginEmployeeCommand command, CancellationToken cancellationToken) =>
-        StartSessionOrChallenge(await mediator.Send(command, cancellationToken));
+    public async Task<IActionResult> LoginEmpleado(LoginRequest request, CancellationToken cancellationToken) =>
+        StartSessionOrChallenge(await mediator.Send(
+            new LoginCommand(request.Email, request.Password, UserRole.Employee),
+            cancellationToken));
 
     [HttpPost("empleado/2fa")]
-    public async Task<IActionResult> VerificarDobleFactor(VerifyTwoFactorLoginCommand command, CancellationToken cancellationToken) =>
-        StartSession(await mediator.Send(command, cancellationToken));
+    public async Task<IActionResult> VerificarDobleFactor(TwoFactorLoginRequest request, CancellationToken cancellationToken) =>
+        StartSession(await mediator.Send(
+            new VerifyTwoFactorLoginCommand(request.ChallengeToken, request.Code, UserRole.Employee),
+            cancellationToken));
 
     [HttpPost("empresa")]
-    public async Task<IActionResult> LoginEmpresa(LoginCompanyCommand command, CancellationToken cancellationToken) =>
-        StartSessionOrChallenge(await mediator.Send(command, cancellationToken));
+    public async Task<IActionResult> LoginEmpresa(LoginRequest request, CancellationToken cancellationToken) =>
+        StartSessionOrChallenge(await mediator.Send(
+            new LoginCommand(request.Email, request.Password, UserRole.Company),
+            cancellationToken));
 
     [HttpPost("empresa/2fa")]
-    public async Task<IActionResult> VerificarDobleFactorEmpresa(VerifyCompanyTwoFactorLoginCommand command, CancellationToken cancellationToken) =>
-        StartSession(await mediator.Send(command, cancellationToken));
+    public async Task<IActionResult> VerificarDobleFactorEmpresa(TwoFactorLoginRequest request, CancellationToken cancellationToken) =>
+        StartSession(await mediator.Send(
+            new VerifyTwoFactorLoginCommand(request.ChallengeToken, request.Code, UserRole.Company),
+            cancellationToken));
 
     private IActionResult StartSessionOrChallenge(Result<LoginResult> result)
     {

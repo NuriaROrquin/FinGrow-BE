@@ -11,6 +11,7 @@ internal sealed partial class DeleteEmployeeCommandHandler : IRequestHandler<Del
 {
     private readonly ICurrentUser _currentUser;
     private readonly IEmployeeRepository _employees;
+    private readonly IUserRepository _users;
     private readonly ITransactionReceiptRepository _receipts;
     private readonly INotificationRepository _notifications;
     private readonly IRefreshTokenRepository _refreshTokens;
@@ -22,6 +23,7 @@ internal sealed partial class DeleteEmployeeCommandHandler : IRequestHandler<Del
     public DeleteEmployeeCommandHandler(
         ICurrentUser currentUser,
         IEmployeeRepository employees,
+        IUserRepository users,
         ITransactionReceiptRepository receipts,
         INotificationRepository notifications,
         IRefreshTokenRepository refreshTokens,
@@ -32,6 +34,7 @@ internal sealed partial class DeleteEmployeeCommandHandler : IRequestHandler<Del
     {
         _currentUser = currentUser;
         _employees = employees;
+        _users = users;
         _receipts = receipts;
         _notifications = notifications;
         _refreshTokens = refreshTokens;
@@ -58,6 +61,7 @@ internal sealed partial class DeleteEmployeeCommandHandler : IRequestHandler<Del
         var receiptKeys = await _receipts.ListStorageKeysByEmployeeAsync(employee.Id, cancellationToken);
 
         _employees.Remove(employee);
+        _users.Remove(employee.User);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         await _refreshTokens.RevokeAllForUserAsync(employee.Id, _clock.UtcNow, cancellationToken);
         await _notifications.RemoveAllForAsync(NotificationRecipient.Employee(employee.Id), cancellationToken);

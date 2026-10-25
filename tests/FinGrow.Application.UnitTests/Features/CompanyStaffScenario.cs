@@ -29,6 +29,8 @@ internal sealed class CompanyStaffScenario
 
     public FakeEmployeeRepository Employees { get; } = new();
 
+    public FakeUserRepository Users => new(Employees, Companies);
+
     public FakeOutboundEmailRepository OutboundEmails { get; } = new();
 
     public FakeCurrentUser CurrentUser { get; } = new();

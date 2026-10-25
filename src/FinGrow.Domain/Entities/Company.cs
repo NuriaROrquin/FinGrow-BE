@@ -9,7 +9,7 @@ using FinGrow.Domain.ValueObjects;
 /// La empresa contratante del beneficio. Es la raiz del aislamiento de datos: todo lo que
 /// ve un panel empresarial cuelga de un CompanyId (ver T-10).
 /// </summary>
-public sealed class Company : AggregateRoot, ITwoFactorAccount
+public sealed class Company : AggregateRoot
 {
     public const int MaxNameLength = 200;
     public const int MaxIndustryLength = 100;
@@ -34,13 +34,11 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
     {
         Name = name;
         TaxId = taxId;
-        Email = email;
-        PasswordHash = passwordHash;
+        User = User.Create(id, email, passwordHash, UserRole.Company, createdAt);
         DefaultCurrency = defaultCurrency;
         Theme = Theme.Light;
         Language = Language.es;
         FiscalYearStartMonth = 1;
-        IsActive = true;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
     }
@@ -50,7 +48,7 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
 
     public TaxId TaxId { get; private set; } = null!;
 
-    public Email Email { get; private set; } = null!;
+    public User User { get; private set; } = null!;
 
     public string? Industry { get; private set; }
 
@@ -60,8 +58,6 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
 
     public int? FoundedYear { get; private set; }
 
-    public string PasswordHash { get; private set; } = string.Empty;
-
     public Currency DefaultCurrency { get; private set; }
 
     public Theme Theme { get; private set; }
@@ -70,17 +66,9 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
 
     public int FiscalYearStartMonth { get; private set; }
 
-    public bool IsActive { get; private set; }
-
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
-
-    public string? TwoFactorSecret { get; private set; }
-
-    public DateTimeOffset? TwoFactorEnabledAt { get; private set; }
-
-    public bool IsTwoFactorEnabled => TwoFactorEnabledAt is not null;
 
     public IReadOnlyCollection<Department> Departments => _departments.AsReadOnly();
 
@@ -100,7 +88,7 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
             EnsureValidName(name),
             taxId,
             email,
-            EnsureHash(passwordHash),
+            passwordHash,
             defaultCurrency,
             createdAt);
     }
@@ -174,7 +162,7 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
         ArgumentNullException.ThrowIfNull(email);
 
         Name = EnsureValidName(name);
-        Email = email;
+        User.ChangeEmail(email, updatedAt);
         DefaultCurrency = defaultCurrency;
         UpdatedAt = updatedAt;
     }
@@ -206,7 +194,7 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
 
         Name = EnsureValidName(name);
         TaxId = taxId;
-        Email = email;
+        User.ChangeEmail(email, updatedAt);
         UpdatedAt = updatedAt;
     }
 
@@ -233,60 +221,15 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
         FoundedYear = foundedYear;
     }
 
-    public void ChangePassword(string passwordHash, DateTimeOffset updatedAt)
-    {
-        PasswordHash = EnsureHash(passwordHash);
-        UpdatedAt = updatedAt;
-    }
-
     public void Deactivate(DateTimeOffset updatedAt)
     {
-        IsActive = false;
+        User.Deactivate(updatedAt);
         UpdatedAt = updatedAt;
     }
 
     public void Activate(DateTimeOffset updatedAt)
     {
-        IsActive = true;
-        UpdatedAt = updatedAt;
-    }
-
-    public void StartTwoFactorEnrollment(string secret, DateTimeOffset updatedAt)
-    {
-        if (IsTwoFactorEnabled)
-        {
-            throw new DomainException("El doble factor ya esta activo.");
-        }
-
-        if (string.IsNullOrWhiteSpace(secret))
-        {
-            throw new DomainException("El secreto del doble factor es obligatorio.");
-        }
-
-        TwoFactorSecret = secret;
-        UpdatedAt = updatedAt;
-    }
-
-    public void EnableTwoFactor(DateTimeOffset enabledAt)
-    {
-        if (IsTwoFactorEnabled)
-        {
-            throw new DomainException("El doble factor ya esta activo.");
-        }
-
-        if (TwoFactorSecret is null)
-        {
-            throw new DomainException("No se puede activar el doble factor sin haber iniciado el alta.");
-        }
-
-        TwoFactorEnabledAt = enabledAt;
-        UpdatedAt = enabledAt;
-    }
-
-    public void DisableTwoFactor(DateTimeOffset updatedAt)
-    {
-        TwoFactorSecret = null;
-        TwoFactorEnabledAt = null;
+        User.Activate(updatedAt);
         UpdatedAt = updatedAt;
     }
 
@@ -306,11 +249,6 @@ public sealed class Company : AggregateRoot, ITwoFactorAccount
             _ => trimmed
         };
     }
-
-    private static string EnsureHash(string passwordHash) =>
-        string.IsNullOrWhiteSpace(passwordHash)
-            ? throw new DomainException("La contrasena es obligatoria.")
-            : passwordHash;
 
     private static TEnum EnsureDefined<TEnum>(TEnum value, string fieldName)
         where TEnum : struct, Enum =>

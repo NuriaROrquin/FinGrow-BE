@@ -235,8 +235,6 @@ public class WhatsAppWebhookTests
         public Task<Employee?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
             Task.FromResult(_employee.Id == id ? _employee : null);
 
-        public Task<Employee?> GetByEmailAsync(Email email, CancellationToken cancellationToken) =>
-            Task.FromResult(_employee.Email == email ? _employee : null);
 
         public Task<IReadOnlyDictionary<Guid, int>> CountByDepartmentAsync(Guid companyId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
