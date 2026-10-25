@@ -7,10 +7,12 @@ using FinGrow.Application.Features.Metrics.GetCompanyMetrics;
 using FinGrow.Application.Features.Metrics.GetCompanyMetricsComparison;
 using FinGrow.Application.Features.Metrics.GetCompanyEducationMetrics;
 using FinGrow.Application.Features.Metrics.GetCompanyInsights;
+using FinGrow.Application.Features.Metrics.GetCompanyMonthlyReport;
 using FinGrow.Application.Features.Metrics.GetCompanyTrends;
 using FinGrow.Application.Features.Metrics.GetDepartmentMetricsOverview;
 using FinGrow.Application.Features.Metrics.GetDepartmentMetrics;
 using FinGrow.Application.Features.Metrics.GetParticipation;
+using FinGrow.Application.Features.Metrics.MonthlyReport;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -67,6 +69,13 @@ public sealed class CompanyMetricsController(ISender sender) : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Trends(CancellationToken cancellationToken) =>
         (await sender.Send(new GetCompanyTrendsQuery(), cancellationToken)).ToActionResult();
+
+    [HttpGet("metrics/report")]
+    [ProducesResponseType<CompanyMonthlyReportResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Report(CancellationToken cancellationToken) =>
+        (await sender.Send(new GetCompanyMonthlyReportQuery(), cancellationToken)).ToActionResult();
 
     [HttpGet("metrics/participation")]
     [ProducesResponseType<CompanyParticipationResponse>(StatusCodes.Status200OK)]
