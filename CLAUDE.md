@@ -396,10 +396,37 @@ Application, antes de serializar la respuesta, y no escondiendo columnas en el f
 - **El alcance de empresa se verifica siempre.** El handler usa el `CompanyId` de
   `ICurrentUser`; el acceso a un departamento de otra empresa se trata como inexistente y no
   confirma que el recurso existe.
+- **Las preocupaciones de la plantilla son reglas, las recomendaciones son IA** (HU-61 y HU-64,
+  `GET /api/company/metrics/insights`). `CompanyConcernsCalculator` cuenta, sobre los puntajes del
+  último mes con foto, cuántos empleados tienen cada factor por debajo de 50; la IA solo recomienda
+  a partir de eso. Hay dos umbrales de anonimato: el de empleados medidos (si no llega, no se muestra
+  nada) y el de afectados por preocupación (si no llega, esa preocupación no se muestra ni viaja a
+  la IA, porque con uno o dos afectados la empresa podría adivinar quiénes son). Lo que viaja a
+  FinGrow-AI se arma solo en `CompanyInsightsInputBuilder`. Si cambiás el umbral de 50, cambiá
+  también la definición de cada preocupación en el prompt de `company_insights` de FinGrow-AI:
+  `CompanyConcern` es contrato con su `FinancialConcern`.
+- **Las tendencias comparan el último mes con foto contra el mes anterior, y son reglas** (HU-63,
+  `GET /api/company/metrics/trends`). No es la comparación de HU-59 (`/metrics/comparison`, que
+  va del primer mes del rango al último): acá siempre son dos meses consecutivos, y sin la foto del
+  mes anterior la respuesta viaja con `PreviousPeriod = null`. La comparación vive en
+  `Features/Metrics/Trends` para que la reutilicen HU-65 y HU-82: `CompanyMonthIndicators` lee los
+  indicadores que la empresa puede ver de un mes (participación, puntaje promedio, adopción de
+  presupuesto, metas e integraciones, metas alcanzadas, cursos completados y el porcentaje de cada
+  preocupación de HU-61) y `CompanyTrendsCalculator` los compara. Un indicador que no se puede
+  mostrar en alguno de los dos meses no se compara; si alguno de los dos meses no llega al umbral de
+  empleados activos, viaja `IsAnonymized` sin tendencias. Una preocupación se muestra con 0 % o con
+  al menos el umbral de afectados: con uno o dos se podría adivinar quiénes son. Un cambio menor a
+  `CompanyTrendsCalculator.SignificantChange` (2 puntos porcentuales, 2 puntos de puntaje o 2
+  unidades) es estable y no se informa; lo que mejora es tendencia positiva y lo que empeora es
+  oportunidad de mejora (en las preocupaciones, mejorar es bajar). Los cursos completados del mes se
+  calculan al vuelo (`ICompanyEducationMetricsReadRepository.CountCompletedCoursesAsync`): un curso
+  cuenta en el mes en que se completó su última lección, igual que en `/metrics/education`.
 - **Toda modificación del contrato debe tener una prueba.** Los tests deben comprobar el umbral
   de tres empleados, el aislamiento entre empresas y que la respuesta serializada no expone
-  identificadores, montos, saldos ni movimientos individuales. Un test arquitectónico debe
-  fallar si los DTOs incorporan propiedades identificables.
+  identificadores, montos, saldos ni movimientos individuales. `AnonymizedContractRules`
+  (`tests/FinGrow.ArchitectureTests`) falla si un DTO de `Features/Metrics` o
+  `CompanyParticipationResponse` incorpora una propiedad identificable, o si
+  `CompanyRecommendationsInput` incorpora un `Guid` o un texto.
 
 ## Puntaje de salud financiera
 

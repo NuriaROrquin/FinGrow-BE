@@ -720,6 +720,22 @@ public sealed class FakeAiService : IAiService
 
         return Task.FromResult(RecommendationsResult);
     }
+
+    public List<CompanyRecommendationsInput> CompanyRecommendationRequests { get; } = new();
+
+    public Task<FinancialRecommendations> RecommendCompanyAsync(
+        CompanyRecommendationsInput input,
+        CancellationToken cancellationToken = default)
+    {
+        if (Unreachable)
+        {
+            throw new HttpRequestException("FinGrow-AI unreachable");
+        }
+
+        CompanyRecommendationRequests.Add(input);
+
+        return Task.FromResult(RecommendationsResult);
+    }
 }
 
 public sealed class FakeRefreshTokenRepository : IRefreshTokenRepository
@@ -895,17 +911,40 @@ public sealed class FakeFinancialHealthScoreRepository : IFinancialHealthScoreRe
 {
     public List<FinancialHealthScore> Scores { get; } = new();
 
+    /// <summary>Empresa de cada empleado con puntaje; uno sin entrada cuenta para cualquier empresa.</summary>
+    public Dictionary<Guid, Guid> CompanyByEmployee { get; } = new();
+
     public Task<IReadOnlyList<FinancialHealthScore>> ListByCompanyAsync(
         Guid companyId,
         DateOnly periodStart,
         CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<FinancialHealthScore>>(Scores
-            .Where(score => score.PeriodStart == periodStart)
+            .Where(score => score.PeriodStart == periodStart
+                && (!CompanyByEmployee.TryGetValue(score.EmployeeId, out var owner) || owner == companyId))
             .ToList());
 
     public void Add(FinancialHealthScore score) => Scores.Add(score);
 
     public void Remove(FinancialHealthScore score) => Scores.Remove(score);
+}
+
+public sealed class FakeCompanyEducationMetricsReadRepository : ICompanyEducationMetricsReadRepository
+{
+    public CompanyEducationMetrics Metrics { get; set; } = new(0, 0, 0, 0);
+
+    public Dictionary<(Guid CompanyId, DateOnly PeriodStart), int> CompletedCourses { get; } = new();
+
+    public Task<CompanyEducationMetrics> GetAsync(
+        Guid companyId,
+        DateOnly last30DaysStart,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Metrics);
+
+    public Task<int> CountCompletedCoursesAsync(
+        Guid companyId,
+        MetricsPeriod period,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(CompletedCourses.TryGetValue((companyId, period.Start), out var count) ? count : 0);
 }
 
 public sealed class FakeInvestmentRepository : IInvestmentRepository
