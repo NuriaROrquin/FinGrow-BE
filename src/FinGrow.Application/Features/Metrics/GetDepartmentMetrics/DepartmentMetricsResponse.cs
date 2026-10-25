@@ -1,6 +1,7 @@
 namespace FinGrow.Application.Features.Metrics.GetDepartmentMetrics;
 
 using FinGrow.Domain.Entities;
+using FinGrow.Domain.Enums;
 using FinGrow.Domain.ValueObjects;
 
 public sealed record DepartmentMetricsResponse(
@@ -13,11 +14,13 @@ public sealed record DepartmentMetricsResponse(
     int EmployeesWithActiveGoal,
     int GoalsAchieved,
     int EmployeesWithIntegration,
-    decimal? AverageFinancialHealthScore)
+    decimal? AverageFinancialHealthScore,
+    FinancialHealthBand? HealthBand)
 {
     public static DepartmentMetricsResponse FromSnapshot(
         DepartmentMetricsSnapshot snapshot,
-        int fiscalYearStartMonth) =>
+        int fiscalYearStartMonth,
+        decimal? averageFinancialHealthScore) =>
         new(
             snapshot.PeriodStart,
             FinGrow.Domain.ValueObjects.FiscalYear.From(snapshot.PeriodStart, fiscalYearStartMonth).StartYear,
@@ -28,5 +31,8 @@ public sealed record DepartmentMetricsResponse(
             snapshot.Metrics.EmployeesWithActiveGoal,
             snapshot.Metrics.GoalsAchieved,
             snapshot.Metrics.EmployeesWithIntegration,
-            snapshot.Metrics.AverageFinancialHealthScore);
+            averageFinancialHealthScore,
+            averageFinancialHealthScore is { } score
+                ? FinancialHealthScale.BandOf(score)
+                : null);
 }

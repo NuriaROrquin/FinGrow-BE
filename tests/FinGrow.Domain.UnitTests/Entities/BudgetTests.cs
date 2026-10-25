@@ -29,12 +29,12 @@ public class BudgetTests
     }
 
     [Fact]
-    public void A_budget_is_created_without_limits_and_without_a_currency()
+    public void A_budget_is_created_with_a_currency_even_without_limits()
     {
         var budget = CreateMonthlyBudget();
 
         budget.Limits.ShouldBeEmpty();
-        budget.Currency.ShouldBeNull();
+        budget.Currency.ShouldBe(Currency.ARS);
         budget.LimitFor(ExpenseCategory.Alimentos).ShouldBeNull();
     }
 

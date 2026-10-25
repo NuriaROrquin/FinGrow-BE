@@ -219,21 +219,46 @@ internal sealed class AiService : IAiService
             : ParsedBillEmail.Of(outcome, payload.Model);
     }
 
-    public async Task<FinancialRecommendations> RecommendAsync(
+    public Task<FinancialRecommendations> RecommendAsync(
         RecommendationsInput input,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(input);
 
-        var request = ToRecommendRequest(input);
-        var cacheKey = RecommendationsCacheKey(request);
+        return PostRecommendationsAsync(
+            "/api/v1/financial-insights/recommendations",
+            "ai-recommendations",
+            ToRecommendRequest(input),
+            cancellationToken);
+    }
+
+    public Task<FinancialRecommendations> RecommendBudgetAsync(
+        BudgetRecommendationsInput input,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+
+        return PostRecommendationsAsync(
+            "/api/v1/budget-insights/recommendations",
+            "ai-budget-recommendations",
+            ToBudgetRecommendRequest(input),
+            cancellationToken);
+    }
+
+    private async Task<FinancialRecommendations> PostRecommendationsAsync<TRequest>(
+        string path,
+        string cachePrefix,
+        TRequest request,
+        CancellationToken cancellationToken)
+    {
+        var cacheKey = RecommendationsCacheKey(cachePrefix, request);
 
         if (cacheKey is not null && _recommendationsCache!.TryGetValue(cacheKey, out FinancialRecommendations? cached) && cached is not null)
         {
             return cached;
         }
 
-        using var response = await _httpClient.PostAsJsonAsync("/api/v1/financial-insights/recommendations", request, cancellationToken);
+        using var response = await _httpClient.PostAsJsonAsync(path, request, cancellationToken);
 
         response.EnsureSuccessStatusCode();
 
@@ -268,7 +293,7 @@ internal sealed class AiService : IAiService
         return result;
     }
 
-    private string? RecommendationsCacheKey(RecommendRequest request)
+    private string? RecommendationsCacheKey<TRequest>(string prefix, TRequest request)
     {
         if (_recommendationsCache is null || _recommendationsCacheDuration <= TimeSpan.Zero)
         {
@@ -277,7 +302,7 @@ internal sealed class AiService : IAiService
 
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(request)));
 
-        return $"ai-recommendations:{Convert.ToHexString(hash)}";
+        return $"{prefix}:{Convert.ToHexString(hash)}";
     }
 
     private static RecommendRequest ToRecommendRequest(RecommendationsInput input) => new(
@@ -308,6 +333,24 @@ internal sealed class AiService : IAiService
                 goal.CurrentAmount,
                 goal.MonthlyCommitment,
                 goal.Deadline))
+            .ToList());
+
+    private static BudgetRecommendRequest ToBudgetRecommendRequest(BudgetRecommendationsInput input) => new(
+        input.Language.ToString(),
+        input.Currency.ToString(),
+        input.Months
+            .Select(month => new BudgetMonthPayload(
+                new DateOnly(month.Year, month.Month, 1).ToString("yyyy-MM", CultureInfo.InvariantCulture),
+                month.IsCurrent,
+                month.Limits
+                    .OrderBy(limit => limit.Category)
+                    .Select(limit => new BudgetLimitPayload(limit.Category.ToWireValue(), limit.Limit, limit.Spent))
+                    .ToList(),
+                month.UnbudgetedExpenses
+                    .Where(amount => amount.Value > 0m)
+                    .OrderBy(amount => amount.Key)
+                    .Select(amount => new CategoryAmountPayload(amount.Key.ToWireValue(), amount.Value))
+                    .ToList()))
             .ToList());
 
     private static FinancialRecommendation? ToRecommendation(RecommendationPayload? recommendation)
@@ -626,6 +669,17 @@ internal sealed class AiService : IAiService
         [property: JsonPropertyName("current_amount")] decimal CurrentAmount,
         [property: JsonPropertyName("monthly_commitment")] decimal MonthlyCommitment,
         [property: JsonPropertyName("deadline")] DateOnly Deadline);
+
+    private sealed record BudgetRecommendRequest(
+        [property: JsonPropertyName("language")] string Language,
+        [property: JsonPropertyName("currency")] string Currency,
+        [property: JsonPropertyName("months")] List<BudgetMonthPayload> Months);
+
+    private sealed record BudgetMonthPayload(
+        [property: JsonPropertyName("month")] string Month,
+        [property: JsonPropertyName("is_current")] bool IsCurrent,
+        [property: JsonPropertyName("limits")] List<BudgetLimitPayload> Limits,
+        [property: JsonPropertyName("unbudgeted_expenses")] List<CategoryAmountPayload> UnbudgetedExpenses);
 
     private sealed record RecommendResponse(
         [property: JsonPropertyName("recommendations")] List<RecommendationPayload>? Recommendations,

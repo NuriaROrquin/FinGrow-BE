@@ -32,4 +32,18 @@ internal sealed class BudgetRepository(FinGrowDbContext dbContext) : IBudgetRepo
                       && budget.Period == period
                       && budget.PeriodStart == periodStart,
             cancellationToken);
+
+    public async Task<IReadOnlyList<Budget>> ListMonthlyAsync(
+        Guid employeeId,
+        DateOnly fromPeriodStart,
+        DateOnly toPeriodStart,
+        CancellationToken cancellationToken = default) =>
+        await dbContext.Budgets
+            .AsNoTracking()
+            .Where(budget => budget.EmployeeId == employeeId
+                             && budget.Period == BudgetPeriod.Monthly
+                             && budget.PeriodStart >= fromPeriodStart
+                             && budget.PeriodStart <= toPeriodStart)
+            .OrderBy(budget => budget.PeriodStart)
+            .ToListAsync(cancellationToken);
 }

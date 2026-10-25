@@ -145,6 +145,22 @@ public sealed record FinancialRecommendation(
 
 public sealed record FinancialRecommendations(IReadOnlyList<FinancialRecommendation> Recommendations, string? Model);
 
+/// <summary>
+/// Lo que se le manda a FinGrow-AI para recomendar sobre los presupuestos (HU-25): por cada mes, los
+/// topes contra lo gastado y lo gastado en categorías sin tope. Nunca movimientos sueltos.
+/// </summary>
+public sealed record BudgetRecommendationsInput(
+    Language Language,
+    Currency Currency,
+    IReadOnlyList<BudgetRecommendationMonth> Months);
+
+public sealed record BudgetRecommendationMonth(
+    int Year,
+    int Month,
+    bool IsCurrent,
+    IReadOnlyList<RecommendationBudgetLimit> Limits,
+    IReadOnlyDictionary<ExpenseCategory, decimal> UnbudgetedExpenses);
+
 public interface IAiService
 {
     Task<bool> IsHealthyAsync(CancellationToken cancellationToken = default);
@@ -177,5 +193,9 @@ public interface IAiService
 
     Task<FinancialRecommendations> RecommendAsync(
         RecommendationsInput input,
+        CancellationToken cancellationToken = default);
+
+    Task<FinancialRecommendations> RecommendBudgetAsync(
+        BudgetRecommendationsInput input,
         CancellationToken cancellationToken = default);
 }

@@ -697,6 +697,22 @@ public sealed class FakeAiService : IAiService
 
         return Task.FromResult(RecommendationsResult);
     }
+
+    public List<BudgetRecommendationsInput> BudgetRecommendationRequests { get; } = new();
+
+    public Task<FinancialRecommendations> RecommendBudgetAsync(
+        BudgetRecommendationsInput input,
+        CancellationToken cancellationToken = default)
+    {
+        if (Unreachable)
+        {
+            throw new HttpRequestException("FinGrow-AI unreachable");
+        }
+
+        BudgetRecommendationRequests.Add(input);
+
+        return Task.FromResult(RecommendationsResult);
+    }
 }
 
 public sealed class FakeRefreshTokenRepository : IRefreshTokenRepository
@@ -810,6 +826,19 @@ public sealed class FakeMetricsSnapshotRepository : IMetricsSnapshotRepository
                 && (from == null || snapshot.PeriodStart >= from)
                 && (to == null || snapshot.PeriodStart <= to))
             .OrderBy(snapshot => snapshot.PeriodStart)
+            .ToList());
+
+    public Task<IReadOnlyList<DepartmentMetricsSnapshot>> ListDepartmentsAsync(
+        Guid companyId,
+        DateOnly? from,
+        DateOnly? to,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<DepartmentMetricsSnapshot>>(DepartmentSnapshots
+            .Where(snapshot => snapshot.CompanyId == companyId
+                && (from == null || snapshot.PeriodStart >= from)
+                && (to == null || snapshot.PeriodStart <= to))
+            .OrderBy(snapshot => snapshot.PeriodStart)
+            .ThenBy(snapshot => snapshot.DepartmentId)
             .ToList());
 
     public void Add(CompanyMetricsSnapshot snapshot) => CompanySnapshots.Add(snapshot);
@@ -1029,6 +1058,19 @@ public sealed class FakeBudgetRepository : IBudgetRepository
         CancellationToken cancellationToken = default) =>
         Task.FromResult(Budgets.FirstOrDefault(budget =>
             budget.EmployeeId == employeeId && budget.Period == period && budget.PeriodStart == periodStart));
+
+    public Task<IReadOnlyList<Budget>> ListMonthlyAsync(
+        Guid employeeId,
+        DateOnly fromPeriodStart,
+        DateOnly toPeriodStart,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Budget>>(Budgets
+            .Where(budget => budget.EmployeeId == employeeId
+                && budget.Period == BudgetPeriod.Monthly
+                && budget.PeriodStart >= fromPeriodStart
+                && budget.PeriodStart <= toPeriodStart)
+            .OrderBy(budget => budget.PeriodStart)
+            .ToList());
 }
 
 public sealed class FakeBudgetSpendingReadRepository : IBudgetSpendingReadRepository

@@ -15,7 +15,10 @@ public sealed record CompanyMetricsResponse(
     int EmployeesWithIntegration,
     decimal? AverageFinancialHealthScore)
 {
-    public static CompanyMetricsResponse FromSnapshot(CompanyMetricsSnapshot snapshot, int fiscalYearStartMonth) =>
+    public static CompanyMetricsResponse FromSnapshot(
+        CompanyMetricsSnapshot snapshot,
+        int fiscalYearStartMonth,
+        decimal? averageFinancialHealthScore) =>
         new(
             snapshot.PeriodStart,
             FinGrow.Domain.ValueObjects.FiscalYear.From(snapshot.PeriodStart, fiscalYearStartMonth).StartYear,
@@ -26,5 +29,5 @@ public sealed record CompanyMetricsResponse(
             snapshot.Metrics.EmployeesWithActiveGoal,
             snapshot.Metrics.GoalsAchieved,
             snapshot.Metrics.EmployeesWithIntegration,
-            snapshot.Metrics.AverageFinancialHealthScore);
+            averageFinancialHealthScore);
 }

@@ -63,6 +63,22 @@ internal sealed class MetricsSnapshotRepository : IMetricsSnapshotRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<DepartmentMetricsSnapshot>> ListDepartmentsAsync(
+        Guid companyId,
+        DateOnly? from,
+        DateOnly? to,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.DepartmentMetricsSnapshots
+            .AsNoTracking()
+            .Where(snapshot => snapshot.CompanyId == companyId
+                && (from == null || snapshot.PeriodStart >= from)
+                && (to == null || snapshot.PeriodStart <= to))
+            .OrderBy(snapshot => snapshot.PeriodStart)
+            .ThenBy(snapshot => snapshot.DepartmentId)
+            .ToListAsync(cancellationToken);
+    }
+
     public void Add(CompanyMetricsSnapshot snapshot) => _dbContext.CompanyMetricsSnapshots.Add(snapshot);
 
     public void Add(DepartmentMetricsSnapshot snapshot) => _dbContext.DepartmentMetricsSnapshots.Add(snapshot);
