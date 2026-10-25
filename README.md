@@ -613,6 +613,23 @@ borrar un presupuesto o una categoría (HU-79) cambia el análisis en la consult
 responde, el resumen sale igual y `recommendationsAvailable` viene en `false`. La caché de
 `AiService:RecommendationsCacheHours` también aplica, con una clave distinta de la de HU-44.
 
+### Preocupaciones y recomendaciones para la empresa (HU-61 y HU-64)
+
+`GET /api/company/metrics/insights` arma la pestaña "Principales Preocupaciones" y la tarjeta
+"Recomendaciones" del panel de la empresa, solo para el rol `Empresa`. Mira el último mes con foto de
+`metrics-snapshot` (el último mes cerrado que se pudo medir) y los puntajes de salud financiera de ese
+mes.
+
+| Parte | De dónde sale |
+|---|---|
+| Habilitación | Al menos `Metrics:CompanyMinimumEmployees` empleados con puntaje en el mes (3 por defecto). Sin foto todavía, `period` viene en `null`; con menos empleados medidos, `isAnonymized` en `true` y sin preocupaciones ni recomendaciones. En los dos casos no se llama a la IA |
+| Preocupaciones | Reglas fijas sobre los factores del puntaje (`CompanyConcernsCalculator`): un factor por debajo de 50 es una preocupación. `LowSavings` es ahorrar menos del 10 % de los ingresos; `ThinCushion`, un colchón de menos de un mes y medio de gasto; `BudgetOverruns`, pasarse en más de la mitad de los topes del presupuesto; `MissedGoalContributions`, aportar menos de la mitad de la cuota de las metas. Las dos últimas se miden solo entre quienes tienen presupuesto o metas con cuota (`evaluatedEmployees`). Van ordenadas por porcentaje de afectados, y una que afecta a menos empleados que el umbral no se muestra ni viaja a la IA |
+| Recomendaciones | Tres, generadas por FinGrow-AI (`company-insights`). Recibe el mes, cuántos empleados se midieron, las preocupaciones visibles, el puntaje promedio (si la política lo deja mostrar) y la participación del mes, y responde en el idioma de la empresa. Nunca recibe ids, nombres ni departamentos. Siempre llegan con `action = None`: son acciones que la empresa hace fuera de FinGrow |
+
+Si la IA no responde, las preocupaciones salen igual y `recommendationsAvailable` viene en `false`. La
+caché de `AiService:RecommendationsCacheHours` también aplica, con su propia clave. No hay tabla nueva:
+todo se calcula en la consulta sobre `financial_health_scores` y `company_metrics_snapshots`.
+
 ### Logros
 
 El catálogo (`achievements`) es fijo: lo define `AchievementCatalog` (`Domain/Entities/`) y lo
@@ -934,6 +951,9 @@ cumplan:
 - Infrastructure no depende de Api.
 - Ningún controller usa tipos de Infrastructure.
 - Los handlers de Application (`*Handler`) son `internal` y viven bajo `Application.Features`.
+- Las respuestas de las métricas de empresa no tienen campos que identifiquen a un empleado
+  (`EmployeeId`, `UserId`, nombres, emails, ids de movimientos, metas o inversiones), y lo que se
+  le manda a FinGrow-AI sobre una empresa no lleva ningún `Guid` ni texto (`AnonymizedContractRules`).
 
 Si alguien las rompe, el build falla. GitHub Actions los ejecuta en cada push y pull request.
 

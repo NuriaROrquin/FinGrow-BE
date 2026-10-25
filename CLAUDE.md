@@ -373,10 +373,21 @@ Application, antes de serializar la respuesta, y no escondiendo columnas en el f
 - **El alcance de empresa se verifica siempre.** El handler usa el `CompanyId` de
   `ICurrentUser`; el acceso a un departamento de otra empresa se trata como inexistente y no
   confirma que el recurso existe.
+- **Las preocupaciones de la plantilla son reglas, las recomendaciones son IA** (HU-61 y HU-64,
+  `GET /api/company/metrics/insights`). `CompanyConcernsCalculator` cuenta, sobre los puntajes del
+  último mes con foto, cuántos empleados tienen cada factor por debajo de 50; la IA solo recomienda
+  a partir de eso. Hay dos umbrales de anonimato: el de empleados medidos (si no llega, no se muestra
+  nada) y el de afectados por preocupación (si no llega, esa preocupación no se muestra ni viaja a
+  la IA, porque con uno o dos afectados la empresa podría adivinar quiénes son). Lo que viaja a
+  FinGrow-AI se arma solo en `CompanyInsightsInputBuilder`. Si cambiás el umbral de 50, cambiá
+  también la definición de cada preocupación en el prompt de `company_insights` de FinGrow-AI:
+  `CompanyConcern` es contrato con su `FinancialConcern`.
 - **Toda modificación del contrato debe tener una prueba.** Los tests deben comprobar el umbral
   de tres empleados, el aislamiento entre empresas y que la respuesta serializada no expone
-  identificadores, montos, saldos ni movimientos individuales. Un test arquitectónico debe
-  fallar si los DTOs incorporan propiedades identificables.
+  identificadores, montos, saldos ni movimientos individuales. `AnonymizedContractRules`
+  (`tests/FinGrow.ArchitectureTests`) falla si un DTO de `Features/Metrics` o
+  `CompanyParticipationResponse` incorpora una propiedad identificable, o si
+  `CompanyRecommendationsInput` incorpora un `Guid` o un texto.
 
 ## Puntaje de salud financiera
 
