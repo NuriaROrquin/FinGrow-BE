@@ -79,7 +79,7 @@ public class WithdrawAccountCommandHandlerTests
         _employees.Employees.ShouldContain(employee);
         employee.IsWithdrawn.ShouldBeTrue();
         employee.WithdrawnAt.ShouldBe(Now);
-        employee.IsActive.ShouldBeFalse();
+        employee.User.IsActive.ShouldBeFalse();
     }
 
     [Fact]
@@ -92,7 +92,7 @@ public class WithdrawAccountCommandHandlerTests
         result.Error.Type.ShouldBe(ErrorType.Validation);
         result.Error.Code.ShouldBe("Account.ContrasenaIncorrecta");
         employee.IsWithdrawn.ShouldBeFalse();
-        employee.IsActive.ShouldBeTrue();
+        employee.User.IsActive.ShouldBeTrue();
         _eraser.ErasedEmployees.ShouldBeEmpty();
     }
 

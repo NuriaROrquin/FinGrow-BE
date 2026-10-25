@@ -19,15 +19,12 @@ leer el modelo.
 
 ## Dónde está el modelo de datos
 
-| Documento | Qué contiene |
-|---|---|
-| [docs/database-schema.md](docs/database-schema.md) | **El esquema que existe hoy**: 7 tablas, sus restricciones y su comportamiento al borrar |
-| [docs/database-schema-target.md](docs/database-schema-target.md) | El DER completo de las 65 historias: 31 tablas en 7 módulos, y las divergencias con lo construido |
-| [docs/backlog-huecos.md](docs/backlog-huecos.md) | Huecos del backlog detectados al modelar |
+La fuente de verdad son las configuraciones de EF (`Infrastructure/Persistence/Configurations/`)
+y las migraciones. La sección *Modelo de dominio* del README resume qué guarda cada tabla.
 
-**Regla: toda migración nueva actualiza `docs/database-schema.md` en el mismo commit.** La
-fuente de verdad es la migración; el documento es una foto que se desactualiza sola si nadie la
-mueve, y un DER que miente es peor que no tener ninguno.
+**Regla: toda migración que agregue una tabla o cambie qué guarda una la refleja en el README en
+el mismo commit.** El resumen es una foto que se desactualiza sola si nadie la mueve, y un modelo
+que miente es peor que no tener ninguno.
 
 ## Reglas del dominio que se violan sin querer
 
@@ -206,12 +203,38 @@ Una entidad nueva tiene que aplicar el filtro o figurar en `GlobalEntityTypes`
 - **Sin sesión no hay empresa**: webhooks, trabajos, login y seeders corren sin filtro. Con sesión
   siempre aplica: un token sin `company_id` no ve ninguna fila.
 - **Lo que cruza empresas a propósito** usa `IgnoreQueryFilters(new[] { FinGrowDbContext.TenantFilter })`
-  y lo justifica con un comentario (el email único de `GetByEmailAsync`, el promedio de votos de un curso).
+  y lo justifica con un comentario (el promedio de votos de un curso). `users` no tiene filtro: está
+  en `GlobalEntityTypes` porque el email es único entre todas las empresas.
 - **Un recurso de otra empresa responde `NotFound`**: el filtro hace que ni se vea.
 
 **Entre empleados de la misma empresa el filtro no alcanza**: cada caso de uso compara el dueño con
 `ICurrentUser.UserId`. `Ownership.Require` (`Application/Common/`) resuelve el par: inexistente →
 `NotFound`, de otro empleado → `Forbidden` (403). Usalo en los handlers que cargan un recurso por id.
+
+## Credenciales (T-37)
+
+Email, hash de contraseña, rol, doble factor, último ingreso y si la cuenta está activa viven en
+`users` (`User`), no en `employees` ni en `companies`. Lo que no se deduce leyendo:
+
+- **El usuario tiene el mismo id que su empleado o su empresa.** `employees.id` y `companies.id`
+  son FK a `users.id` con cascada, y `Employee.Create` y `Company.Create` crean el `User` adentro.
+  Por eso el claim `UserId` del JWT y `refresh_tokens.user_id` (ahora FK a `users`) no cambiaron, y
+  las sesiones emitidas antes de la migración siguen valiendo.
+- **El email es único entre empleados y empresas.** Un empleado no puede usar el email de una
+  empresa ni al revés: el alta y la edición del empleado y el perfil de la empresa lo validan
+  contra `IUserRepository` y responden 409.
+- **Un solo login para los dos roles.** `POST /login` y `POST /login/2fa` no reciben el rol: como
+  el email es único, el `User` que lo tiene dice si es empleado o empresa, y la sesión vuelve con
+  ese rol para que el front sepa a qué panel ir. Cambio de contraseña, doble factor y refresh
+  trabajan sobre el `User` del token. La única bifurcación por rol es `SessionAccountResolver`,
+  que arma la sesión con el nombre y la empresa del empleado o de la empresa.
+- **Desactivar es del usuario.** `Employee.Deactivate` y `Activate` cambian su `User`, y las
+  consultas que cuentan activos filtran por `employee.User.IsActive`. `Employee` y `Company` cargan
+  su `User` siempre (`AutoInclude`).
+- **Borrar un empleado borra su usuario** (`DeleteEmployeeCommandHandler`): si no, el email
+  quedaría tomado por una cuenta que ya no existe.
+- **La migración `AddUsers` frena si hay emails repetidos** entre empleados y empresas: los lista y
+  no toca nada. Hay que corregirlos a mano y volver a desplegar.
 
 ## Panel de la empresa
 
@@ -224,7 +247,7 @@ ante un recurso de otra empresa, para no confirmar que existe.
   (`CreatedEmployeeResponse`); en la base queda solo el hash. Además se le manda por correo
   (`WelcomeEmail`), encolado en el mismo `SaveChanges` que el empleado.
 - **El email de un empleado es único en toda la plataforma**, no por empresa: es su credencial
-  de login.
+  de login y vive en `users` (ver *Credenciales*).
 - **Eliminar un empleado es definitivo.** La cascada se lleva sus movimientos, metas,
   presupuestos, inversiones e integraciones; el handler borra además sus notificaciones (no
   tienen FK porque el destinatario es polimórfico) y los archivos de sus comprobantes. Si el
@@ -237,9 +260,10 @@ ante un recurso de otra empresa, para no confirmar que existe.
 - **El empleado se puede dar de baja solo** (`POST /account/withdrawal`, HU-74), confirmando
   con su contraseña. `IEmployeeDataEraser` borra en una transacción sus datos financieros
   (movimientos, presupuestos, metas, inversiones, integraciones, puntajes, logros y
-  notificaciones); sus comprobantes quedan sueltos para `receipts-cleanup`. La fila del empleado
-  queda con `withdrawn_at`, sin DNI, dirección, nacimiento ni 2FA: la empresa lo sigue viendo en
-  su nómina como dado de baja. Es definitiva (un `CHECK` impide reactivarla) y el login le
+  notificaciones); sus comprobantes quedan sueltos para `receipts-cleanup`. Su `User` queda con
+  `withdrawn_at`, inactivo y sin 2FA, y el empleado sin DNI, dirección ni nacimiento: la empresa lo
+  sigue viendo en su nómina como dado de baja. Es definitiva (un `CHECK` en `users` impide
+  reactivarla, y la recuperación de contraseña solo atiende usuarios activos) y el login le
   responde lo mismo que a una contraseña equivocada. `metrics-snapshot` no rehace la foto de un
   mes cerrado si alguien se dio de baja después: la perdería sin sus datos.
 - **El departamento de un empleado tiene historial** (`employee_department_assignments`, hija
@@ -381,10 +405,46 @@ Application, antes de serializar la respuesta, y no escondiendo columnas en el f
 - **El alcance de empresa se verifica siempre.** El handler usa el `CompanyId` de
   `ICurrentUser`; el acceso a un departamento de otra empresa se trata como inexistente y no
   confirma que el recurso existe.
+- **Las preocupaciones de la plantilla son reglas, las recomendaciones son IA** (HU-61 y HU-64,
+  `GET /api/company/metrics/insights`). `CompanyConcernsCalculator` cuenta, sobre los puntajes del
+  último mes con foto, cuántos empleados tienen cada factor por debajo de 50; la IA solo recomienda
+  a partir de eso. Hay dos umbrales de anonimato: el de empleados medidos (si no llega, no se muestra
+  nada) y el de afectados por preocupación (si no llega, esa preocupación no se muestra ni viaja a
+  la IA, porque con uno o dos afectados la empresa podría adivinar quiénes son). Lo que viaja a
+  FinGrow-AI se arma solo en `CompanyInsightsInputBuilder`. Si cambiás el umbral de 50, cambiá
+  también la definición de cada preocupación en el prompt de `company_insights` de FinGrow-AI:
+  `CompanyConcern` es contrato con su `FinancialConcern`.
+- **Las tendencias comparan el último mes con foto contra el mes anterior, y son reglas** (HU-63,
+  `GET /api/company/metrics/trends`). No es la comparación de HU-59 (`/metrics/comparison`, que
+  va del primer mes del rango al último): acá siempre son dos meses consecutivos, y sin la foto del
+  mes anterior la respuesta viaja con `PreviousPeriod = null`. La comparación vive en
+  `Features/Metrics/Trends` para que la reutilicen HU-65 y HU-82: `CompanyMonthIndicators` lee los
+  indicadores que la empresa puede ver de un mes (participación, puntaje promedio, adopción de
+  presupuesto, metas e integraciones, metas alcanzadas, cursos completados y el porcentaje de cada
+  preocupación de HU-61) y `CompanyTrendsCalculator` los compara. Un indicador que no se puede
+  mostrar en alguno de los dos meses no se compara; si alguno de los dos meses no llega al umbral de
+  empleados activos, viaja `IsAnonymized` sin tendencias. Una preocupación se muestra con 0 % o con
+  al menos el umbral de afectados: con uno o dos se podría adivinar quiénes son. Un cambio menor a
+  `CompanyTrendsCalculator.SignificantChange` (2 puntos porcentuales, 2 puntos de puntaje o 2
+  unidades) es estable y no se informa; lo que mejora es tendencia positiva y lo que empeora es
+  oportunidad de mejora (en las preocupaciones, mejorar es bajar). Los cursos completados del mes se
+  calculan al vuelo (`ICompanyEducationMetricsReadRepository.CountCompletedCoursesAsync`): un curso
+  cuenta en el mes en que se completó su última lección, igual que en `/metrics/education`.
+- **El reporte mensual se arma en un solo lugar** (HU-65, `GET /api/company/metrics/report`).
+  `CompanyMonthlyReportBuilder` (`Features/Metrics/MonthlyReport`) arma, para un mes con foto, la
+  participación, el puntaje promedio con su banda, los cursos completados y las tendencias contra el
+  mes anterior, todo leído con `CompanyMonthIndicators` como la tarjeta de tendencias. El panel lo
+  exporta a PDF (siempre el último mes con foto) y HU-82 lo va a mandar por mail: si el mail necesita
+  otro dato, se agrega al builder y no se arma aparte. Un dato que no se puede mostrar no viaja en
+  cero: cada indicador dice por qué falta (`CompanyReportValueStatus`: sin foto de ese mes, menos
+  empleados activos que el umbral o menos empleados con puntaje que el umbral). El nombre de la
+  empresa viaja en el reporte; los datos de una persona, nunca.
 - **Toda modificación del contrato debe tener una prueba.** Los tests deben comprobar el umbral
   de tres empleados, el aislamiento entre empresas y que la respuesta serializada no expone
-  identificadores, montos, saldos ni movimientos individuales. Un test arquitectónico debe
-  fallar si los DTOs incorporan propiedades identificables.
+  identificadores, montos, saldos ni movimientos individuales. `AnonymizedContractRules`
+  (`tests/FinGrow.ArchitectureTests`) falla si un DTO de `Features/Metrics` o
+  `CompanyParticipationResponse` incorpora una propiedad identificable, o si
+  `CompanyRecommendationsInput` incorpora un `Guid` o un texto.
 
 ## Puntaje de salud financiera
 
@@ -493,6 +553,27 @@ primer intento durante `OutboundEmail.FirstAttemptGrace`: así el trabajo no lo 
 - **El cliente de Resend no reintenta**: repetir el `POST` cuando Resend ya lo recibió duplica el
   correo. Los reintentos son de `outbound_emails`.
 
+## Recuperar la contraseña (HU-72)
+
+`POST /password-reset` encola un correo con un enlace a `PasswordReset:ResetUrl?token=...`; el
+front lo valida al abrirlo (`POST /password-reset/validate`) y lo canjea con la contraseña nueva
+(`POST /password-reset/confirm`). Las tres responden 204 sin cuerpo: como el login es uno solo,
+el front vuelve siempre a la portada. Lo que no se deduce leyendo:
+
+- **El pedido siempre responde 204**, exista o no la cuenta, esté desactivada o se haya pedido otro
+  enlace hace menos de un minuto. No le agregues un 404 "para ayudar": revela qué emails existen.
+- **En la base queda solo el hash del token** (`password_reset_tokens`), como en `refresh_tokens`.
+  Vence a la hora y es de un solo uso; al canjear uno se invalidan todos los pendientes del usuario
+  y se revocan sus refresh tokens, igual que al cambiar la contraseña.
+- **Vencido, usado o inexistente dan el mismo error** (`PasswordReset.EnlaceInvalido`, 400), y
+  también un enlace de una cuenta que la empresa desactivó después de pedirlo.
+- **El doble factor no cambia**: quien lo tiene activo lo sigue necesitando para entrar.
+- **Se busca el `User` por email, sin rol**, igual que en el login: el email es único entre
+  empleados y empresas (ver *Credenciales*). La contraseña se cambia sobre el `User` y el enlace
+  (`password_reset_tokens.user_id`) es FK a `users` con cascada, así que borrar la cuenta se
+  lleva sus enlaces. No tiene empresa: está en `GlobalEntityTypes`, como `users`. El nombre del
+  saludo sale de `SessionAccountResolver`.
+
 ## Eventos de dominio y alertas
 
 Un agregado levanta un evento con `Raise` y `DomainEventsInterceptor` (`Infrastructure/Persistence/`)
@@ -553,15 +634,10 @@ necesita `IDomainEventDispatcher`, `AddInfrastructure()` solo arranca junto a `A
   inspección de nombres de Rider, porque el valor se guarda tal cual en la base.
 - **Comentarios solo donde el código no alcanza.** Un comentario justifica una decisión que no
   se deduce leyendo (por qué existe una valuación inicial, por qué el índice incluye `period`);
-  no narra lo que hace la línea de abajo ni repite lo que ya dice este archivo o `docs/`. Si
+  no narra lo que hace la línea de abajo ni repite lo que ya dice este archivo o el README. Si
   al releer un comentario se puede borrar sin perder información, se borra.
 
-## Trabajo pendiente que afecta al modelo
-
-Queda una divergencia entre lo construido y el DER objetivo: la tabla `users` para
-credenciales, 2FA y preferencias (HU-01, HU-04, HU-46, HU-49). Arrastra una migración sobre
-tablas ya construidas: revisá [docs/database-schema-target.md](docs/database-schema-target.md)
-antes de tomar esas historias.
+## Movimientos propuestos
 
 `ai_confidence`, `ai_model` y el estado `Discarded` de `transactions` ya existen (HU-15). HU-12
 reutiliza `ai_confidence` para la confianza del OCR: es un dato del movimiento propuesto, no de

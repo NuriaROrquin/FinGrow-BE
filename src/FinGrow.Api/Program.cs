@@ -3,10 +3,12 @@ using FinGrow.Api.Authentication;
 using FinGrow.Api.Extensions;
 using FinGrow.Api.Gmail;
 using FinGrow.Api.Jobs;
+using FinGrow.Api.Logging;
 using FinGrow.Api.MercadoPago;
 using FinGrow.Api.Notifications;
 using FinGrow.Application;
 using FinGrow.Application.Features.Metrics;
+using FinGrow.Application.Features.PasswordReset;
 using FinGrow.Infrastructure;
 using FinGrow.Infrastructure.Persistence;
 using Serilog;
@@ -14,7 +16,8 @@ using Serilog;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.UseSerilog((context, configuration) =>
-    configuration.ReadFrom.Configuration(context.Configuration));
+    configuration.ReadFrom.Configuration(context.Configuration)
+        .WriteToAxiom(context.Configuration, context.HostingEnvironment));
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -30,6 +33,10 @@ builder.Services.AddOptions<MercadoPagoReturnOptions>()
     .ValidateOnStart();
 builder.Services.AddOptions<GmailReturnOptions>()
     .Bind(builder.Configuration.GetSection(GmailReturnOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+builder.Services.AddOptions<PasswordResetOptions>()
+    .Bind(builder.Configuration.GetSection(PasswordResetOptions.SectionName))
     .ValidateDataAnnotations()
     .ValidateOnStart();
 builder.Services.AddOptions<JobsOptions>()

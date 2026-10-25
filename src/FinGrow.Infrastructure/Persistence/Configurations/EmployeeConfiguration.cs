@@ -1,8 +1,6 @@
 namespace FinGrow.Infrastructure.Persistence.Configurations;
 
 using FinGrow.Domain.Entities;
-using FinGrow.Domain.ValueObjects;
-using FinGrow.Infrastructure.Persistence.Protection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -10,20 +8,12 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
 {
     public void Configure(EntityTypeBuilder<Employee> builder)
     {
-        // La baja del empleado (HU-74) es definitiva: con fecha de baja no puede volver a tener acceso.
-        builder.ToTable("employees", table =>
-            table.HasCheckConstraint("ck_employees_withdrawn_is_inactive", "withdrawn_at IS NULL OR NOT is_active"));
+        builder.ToTable("employees");
 
         builder.HasKey(employee => employee.Id);
 
         builder.Property(employee => employee.FullName)
             .HasMaxLength(Employee.MaxFullNameLength)
-            .IsRequired();
-
-        builder.Property(employee => employee.Email)
-            .HasColumnName("email")
-            .HasConversion(email => email.Value, value => Email.From(value))
-            .HasMaxLength(Email.MaxLength)
             .IsRequired();
 
         builder.Property(employee => employee.PhoneNumber)
@@ -36,10 +26,6 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
 
         builder.Property(employee => employee.Address)
             .HasMaxLength(Employee.MaxAddressLength);
-
-        builder.Property(employee => employee.PasswordHash)
-            .HasMaxLength(200)
-            .IsRequired();
 
         builder.Property(employee => employee.PreferredCurrency)
             .HasConversion<string>()
@@ -61,18 +47,16 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
             .HasMaxLength(20)
             .IsRequired();
 
-        builder.Property(employee => employee.TwoFactorSecret)
-            .HasAnnotation(EncryptedStringConverter.Annotation, true);
-
-        builder.Property(employee => employee.TwoFactorEnabledAt);
-        builder.Ignore(employee => employee.IsTwoFactorEnabled);
-
         builder.Property(employee => employee.HiredOn).IsRequired();
-        builder.Property(employee => employee.IsActive).IsRequired();
-        builder.Property(employee => employee.WithdrawnAt);
-        builder.Ignore(employee => employee.IsWithdrawn);
         builder.Property(employee => employee.CreatedAt).IsRequired();
         builder.Property(employee => employee.UpdatedAt).IsRequired();
+
+        builder.HasOne(employee => employee.User)
+            .WithOne()
+            .HasForeignKey<Employee>(employee => employee.Id)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Navigation(employee => employee.User).AutoInclude();
 
         // Restrict: borrar una empresa con gente adentro tiene que fallar y obligar a decidir
         // que pasa con el historial financiero de esas personas.
@@ -97,7 +81,6 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
             .UsePropertyAccessMode(PropertyAccessMode.Field)
             .AutoInclude();
 
-        builder.HasIndex(employee => employee.Email).IsUnique();
         builder.HasIndex(employee => employee.CompanyId);
         builder.HasIndex(employee => employee.DepartmentId);
     }

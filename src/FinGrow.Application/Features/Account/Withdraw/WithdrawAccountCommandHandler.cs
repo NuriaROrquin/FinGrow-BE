@@ -59,7 +59,7 @@ internal sealed partial class WithdrawAccountCommandHandler : IRequestHandler<Wi
             return Result.Failure(NoAutenticado);
         }
 
-        if (!_passwordHasher.Verify(request.Password, employee.PasswordHash))
+        if (!_passwordHasher.Verify(request.Password, employee.User.PasswordHash))
         {
             return Result.Failure(ContrasenaIncorrecta);
         }

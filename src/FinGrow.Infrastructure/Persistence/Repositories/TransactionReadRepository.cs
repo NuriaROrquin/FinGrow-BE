@@ -1,5 +1,8 @@
 namespace FinGrow.Infrastructure.Persistence.Repositories;
 
+using System.Linq.Expressions;
+using FinGrow.Application.Common;
+using FinGrow.Application.Features.Transactions.GetHistory;
 using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
@@ -7,6 +10,49 @@ using Microsoft.EntityFrameworkCore;
 
 internal sealed class TransactionReadRepository : ITransactionReadRepository
 {
+    private static readonly Expression<Func<Transaction, int>> CategoryByLabel = SortExpressions.RankBy<Transaction>(
+        transaction => transaction.ExpenseCategory == ExpenseCategory.AhorroInversion,
+        transaction => transaction.ExpenseCategory == ExpenseCategory.Alimentos,
+        transaction => transaction.ExpenseCategory == ExpenseCategory.Educacion,
+        transaction => transaction.ExpenseCategory == ExpenseCategory.Entretenimiento,
+        transaction => transaction.IncomeCategory == IncomeCategory.Freelance,
+        transaction => transaction.ExpenseCategory == ExpenseCategory.Indumentaria,
+        transaction => transaction.IncomeCategory == IncomeCategory.Inversiones,
+        transaction => transaction.ExpenseCategory == ExpenseCategory.Otros
+            || transaction.IncomeCategory == IncomeCategory.Otros,
+        transaction => transaction.IncomeCategory == IncomeCategory.Regalo,
+        transaction => transaction.IncomeCategory == IncomeCategory.Salario,
+        transaction => transaction.ExpenseCategory == ExpenseCategory.Salud,
+        transaction => transaction.ExpenseCategory == ExpenseCategory.Servicios,
+        transaction => transaction.ExpenseCategory == ExpenseCategory.Transporte,
+        transaction => transaction.ExpenseCategory == ExpenseCategory.Vivienda);
+
+    private static readonly Expression<Func<Transaction, int>> PaymentMethodByLabel = SortExpressions.RankBy<Transaction>(
+        transaction => transaction.PaymentMethod == PaymentMethod.DigitalWallet,
+        transaction => transaction.PaymentMethod == PaymentMethod.Cash,
+        transaction => transaction.PaymentMethod == PaymentMethod.CreditCard,
+        transaction => transaction.PaymentMethod == PaymentMethod.DebitCard,
+        transaction => transaction.PaymentMethod == PaymentMethod.BankTransfer);
+
+    private static readonly Expression<Func<Transaction, int>> SourceByLabel = SortExpressions.RankBy<Transaction>(
+        transaction => transaction.Source == TransactionSource.Manual,
+        transaction => transaction.Source == TransactionSource.ReceiptScan,
+        transaction => transaction.Source == TransactionSource.Gmail,
+        transaction => transaction.Source == TransactionSource.MercadoPago,
+        transaction => transaction.Source == TransactionSource.Telegram,
+        transaction => transaction.Source == TransactionSource.WhatsApp);
+
+    private static readonly Expression<Func<Transaction, int>> StatusByLabel = SortExpressions.RankBy<Transaction>(
+        transaction => transaction.Status == TransactionStatus.Confirmed,
+        transaction => transaction.Status == TransactionStatus.Discarded,
+        transaction => transaction.Status == TransactionStatus.Eliminated,
+        transaction => transaction.Status == TransactionStatus.Pending);
+
+    private static readonly Expression<Func<Transaction, decimal>> SignedAmount = transaction =>
+        transaction.Type == TransactionType.Expense
+            ? -Math.Abs(transaction.Amount.Amount)
+            : Math.Abs(transaction.Amount.Amount);
+
     private readonly FinGrowDbContext _dbContext;
 
     public TransactionReadRepository(FinGrowDbContext dbContext) => _dbContext = dbContext;
@@ -199,6 +245,8 @@ internal sealed class TransactionReadRepository : ITransactionReadRepository
         PaymentMethod? paymentMethod,
         DateOnly? fromDate,
         DateOnly? toDate,
+        TransactionSortField sortBy,
+        SortDirection sortDirection,
         CancellationToken cancellationToken = default)
     {
         var filteredQuery = BuildFilteredQuery(
@@ -214,9 +262,7 @@ internal sealed class TransactionReadRepository : ITransactionReadRepository
 
         var totalCount = await filteredQuery.CountAsync(cancellationToken);
 
-        var items = await filteredQuery
-            .OrderByDescending(transaction => transaction.OccurredOn)
-            .ThenByDescending(transaction => transaction.Id)
+        var items = await Sort(filteredQuery, sortBy, sortDirection)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
@@ -305,6 +351,31 @@ internal sealed class TransactionReadRepository : ITransactionReadRepository
         }
 
         return filteredQuery;
+    }
+
+    private static IQueryable<Transaction> Sort(
+        IQueryable<Transaction> query,
+        TransactionSortField sortBy,
+        SortDirection sortDirection)
+    {
+        var ascending = sortDirection == SortDirection.Ascending;
+
+        var ordered = sortBy switch
+        {
+            TransactionSortField.Description => query.OrderByDirection(
+                transaction => EF.Functions.Collate(transaction.Description, SortExpressions.SpanishCollation),
+                ascending),
+            TransactionSortField.Category => query.OrderByDirection(CategoryByLabel, ascending),
+            TransactionSortField.PaymentMethod => query.OrderByDirection(PaymentMethodByLabel, ascending),
+            TransactionSortField.Source => query.OrderByDirection(SourceByLabel, ascending),
+            TransactionSortField.Status => query.OrderByDirection(StatusByLabel, ascending),
+            TransactionSortField.Amount => query.OrderByDirection(SignedAmount, ascending),
+            _ => query.OrderByDirection(transaction => transaction.OccurredOn, ascending),
+        };
+
+        return ordered
+            .ThenByDescending(transaction => transaction.OccurredOn)
+            .ThenByDescending(transaction => transaction.Id);
     }
 
     private static decimal GetTotal(IEnumerable<TypeCurrencyTotal> totals, TransactionType type, Currency currency) =>

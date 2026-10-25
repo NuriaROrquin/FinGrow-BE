@@ -38,7 +38,7 @@ public class ChangeEmployeeAccessCommandHandlerTests
         result.IsSuccess.ShouldBeTrue();
         result.Value.IsActive.ShouldBeFalse();
         result.Value.DepartmentName.ShouldBe("Ventas");
-        employee.IsActive.ShouldBeFalse();
+        employee.User.IsActive.ShouldBeFalse();
         _scenario.Employees.Employees.ShouldContain(employee);
         session.IsActive(CompanyStaffScenario.Now).ShouldBeFalse();
         _scenario.UnitOfWork.SaveCount.ShouldBe(1);
@@ -53,7 +53,7 @@ public class ChangeEmployeeAccessCommandHandlerTests
         var result = await CreateHandler().Handle(new ChangeEmployeeAccessCommand(employee.Id, true), CancellationToken.None);
 
         result.Value.IsActive.ShouldBeTrue();
-        employee.IsActive.ShouldBeTrue();
+        employee.User.IsActive.ShouldBeTrue();
     }
 
     [Fact]
@@ -66,7 +66,7 @@ public class ChangeEmployeeAccessCommandHandlerTests
 
         result.Error.Type.ShouldBe(ErrorType.Conflict);
         result.Error.Code.ShouldBe("Employee.Withdrawn");
-        employee.IsActive.ShouldBeFalse();
+        employee.User.IsActive.ShouldBeFalse();
         _scenario.UnitOfWork.SaveCount.ShouldBe(0);
     }
 
@@ -93,6 +93,6 @@ public class ChangeEmployeeAccessCommandHandlerTests
         var result = await CreateHandler().Handle(new ChangeEmployeeAccessCommand(foreign.Id, false), CancellationToken.None);
 
         result.Error.Type.ShouldBe(ErrorType.NotFound);
-        foreign.IsActive.ShouldBeTrue();
+        foreign.User.IsActive.ShouldBeTrue();
     }
 }

@@ -12,7 +12,16 @@ public class CompanyTests
     [Fact]
     public void A_company_is_created_active()
     {
-        CreateCompany().IsActive.ShouldBeTrue();
+        CreateCompany().User.IsActive.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void The_login_of_a_company_shares_its_id_and_has_the_company_role()
+    {
+        var company = CreateCompany();
+
+        company.User.Id.ShouldBe(company.Id);
+        company.User.Role.ShouldBe(UserRole.Company);
     }
 
     [Fact]
@@ -230,7 +239,7 @@ public class CompanyTests
 
         company.Name.ShouldBe("Nueva Empresa S.A.");
         company.TaxId.Value.ShouldBe("30712345671");
-        company.Email.Value.ShouldBe("contacto@nuevaempresa.com");
+        company.User.Email.Value.ShouldBe("contacto@nuevaempresa.com");
         company.Industry.ShouldBe("Tecnología");
         company.PhoneNumber.ShouldBe("+54 11 4321-8765");
         company.FiscalAddress.ShouldBe("Av. Corrientes 1234, CABA");

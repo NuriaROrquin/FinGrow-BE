@@ -13,7 +13,7 @@ internal sealed class NotificationAudienceRepository(FinGrowDbContext dbContext)
 
     public async Task<IReadOnlyList<Guid>> ListActiveEmployeeIdsAsync(CancellationToken cancellationToken = default) =>
         await dbContext.Employees
-            .Where(employee => employee.IsActive)
+            .Where(employee => employee.User.IsActive)
             .Select(employee => employee.Id)
             .ToListAsync(cancellationToken);
 }

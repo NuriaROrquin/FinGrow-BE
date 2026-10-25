@@ -53,4 +53,38 @@ public class GetCompanyMetricsQueryHandlerTests
         metrics.ActiveEmployees.ShouldBe(5);
         metrics.ParticipationRate.ShouldBe(80m);
     }
+
+    [Fact]
+    public async Task Hides_only_the_period_when_active_employees_are_below_the_minimum()
+    {
+        _snapshots.Add(CompanyMetricsSnapshot.Take(
+            _scenario.Company.Id,
+            MetricsPeriod.Of(2026, 9),
+            PeriodMetrics.From(2, 2, 30, 1, 1, 1, 1, 2, 140),
+            CompanyStaffScenario.CreatedAt));
+        _snapshots.Add(CompanyMetricsSnapshot.Take(
+            _scenario.Company.Id,
+            October,
+            PeriodMetrics.From(5, 4, 30, 3, 2, 1, 2, 3, 219),
+            CompanyStaffScenario.Now));
+
+        var result = await CreateHandler().Handle(
+            new GetCompanyMetricsQuery(),
+            CancellationToken.None);
+
+        result.IsSuccess.ShouldBeTrue();
+        var hidden = result.Value[0];
+        hidden.ActiveEmployees.ShouldBe(2);
+        hidden.ParticipatingEmployees.ShouldBeNull();
+        hidden.ParticipationRate.ShouldBeNull();
+        hidden.ConfirmedTransactions.ShouldBeNull();
+        hidden.AverageFinancialHealthScore.ShouldBeNull();
+        hidden.FinancialHealthBand.ShouldBeNull();
+        hidden.IsMetricsHidden.ShouldBeTrue();
+
+        var visible = result.Value[1];
+        visible.IsMetricsHidden.ShouldBeFalse();
+        visible.ParticipatingEmployees.ShouldBe(4);
+        visible.FinancialHealthBand.ShouldBe(FinGrow.Domain.Enums.FinancialHealthBand.Stable);
+    }
 }
