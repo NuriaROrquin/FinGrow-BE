@@ -20,6 +20,11 @@ internal sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refre
             .HasMaxLength(RefreshToken.HashLength)
             .IsRequired();
 
+        builder.Property(token => token.UserAgent)
+            .HasMaxLength(RefreshToken.MaxUserAgentLength);
+
+        builder.Property(token => token.SessionId).IsRequired();
+        builder.Property(token => token.StartedAt).IsRequired();
         builder.Property(token => token.CreatedAt).IsRequired();
         builder.Property(token => token.ExpiresAt).IsRequired();
 
@@ -37,5 +42,8 @@ internal sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refre
 
         // Cubre la revocacion masiva (RevokeAllForUserAsync) y la busqueda de sesiones activas.
         builder.HasIndex(token => new { token.UserId, token.RevokedAt });
+
+        // Cerrar una sesion puntual (HU-73) busca su token vigente por SessionId.
+        builder.HasIndex(token => token.SessionId);
     }
 }

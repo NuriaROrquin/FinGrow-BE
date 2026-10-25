@@ -236,6 +236,22 @@ Email, hash de contraseña, rol, doble factor, último ingreso y si la cuenta es
 - **La migración `AddUsers` frena si hay emails repetidos** entre empleados y empresas: los lista y
   no toca nada. Hay que corregirlos a mano y volver a desplegar.
 
+## Sesiones abiertas (HU-73)
+
+`GET /session/all`, `DELETE /session/{sessionId}` y `DELETE /session/others` listan y cierran
+las sesiones del usuario del token, empleado o empresa. Dos cosas que no se deducen leyendo:
+
+- **Una sesión es una cadena de refresh tokens**, no una fila: cada refresh revoca el token y
+  emite otro con el mismo `SessionId` y `StartedAt` (`RefreshToken.Rotate`). La "última
+  actividad" es el `CreatedAt` del token vigente, o sea la última renovación. Si emitís un token
+  con `Issue` en vez de `Rotate` al renovar, la sesión aparece como nueva.
+- **La sesión actual sale de la cookie `fingrow-refresh`**, que el navegador solo manda a
+  `/session`: por eso estas rutas no cuelgan de `/api`. Sin esa cookie no se marca ninguna como
+  actual y "cerrar las demás" responde `Conflict` en vez de cerrar todas.
+
+Se guarda solo el User-Agent (`IClientDevice`), del que salen navegador y sistema. No hay IP ni
+ubicación a propósito: la pantalla no inventa una ciudad.
+
 ## Panel de la empresa
 
 `api/company/departments` y `api/company/employees` (`[Authorize(Roles = Rol.Empresa)]`)
