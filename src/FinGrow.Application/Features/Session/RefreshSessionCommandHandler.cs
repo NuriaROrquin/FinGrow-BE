@@ -13,23 +13,23 @@ internal sealed class RefreshSessionCommandHandler : IRequestHandler<RefreshSess
         Error.Unauthorized("Auth.SesionInvalida", "La sesion no es valida, esta vencida o fue cerrada.");
 
     private readonly IRefreshTokenRepository _refreshTokens;
-    private readonly IEmployeeRepository _employees;
-    private readonly ICompanyRepository _companies;
+    private readonly IUserRepository _users;
+    private readonly SessionAccountResolver _accounts;
     private readonly SessionIssuer _sessionIssuer;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _clock;
 
     public RefreshSessionCommandHandler(
         IRefreshTokenRepository refreshTokens,
-        IEmployeeRepository employees,
-        ICompanyRepository companies,
+        IUserRepository users,
+        SessionAccountResolver accounts,
         SessionIssuer sessionIssuer,
         IUnitOfWork unitOfWork,
         IDateTimeProvider clock)
     {
         _refreshTokens = refreshTokens;
-        _employees = employees;
-        _companies = companies;
+        _users = users;
+        _accounts = accounts;
         _sessionIssuer = sessionIssuer;
         _unitOfWork = unitOfWork;
         _clock = clock;
@@ -50,11 +50,12 @@ internal sealed class RefreshSessionCommandHandler : IRequestHandler<RefreshSess
             return Result.Failure<LoginResponse>(SesionInvalida);
         }
 
-        var (fullName, isActiveAccount) = current.Role == Rol.Empresa
-            ? await ResolveCompanyAsync(current.UserId, cancellationToken)
-            : await ResolveEmployeeAsync(current.UserId, cancellationToken);
+        var user = await _users.GetByIdAsync(current.UserId, cancellationToken);
+        var account = user is { IsActive: true }
+            ? await _accounts.ResolveAsync(user, cancellationToken)
+            : null;
 
-        if (fullName is null || !isActiveAccount)
+        if (account is null)
         {
             // La cuenta fue dada de baja o borrada despues de haber emitido este refresh token:
             // lo revocamos aunque todavia no haya vencido para no dejar una sesion huerfana.
@@ -65,22 +66,10 @@ internal sealed class RefreshSessionCommandHandler : IRequestHandler<RefreshSess
         }
 
         current.Revoke(now);
-        var session = _sessionIssuer.Issue(current.UserId, current.CompanyId, current.Role, fullName);
+        var session = _sessionIssuer.Issue(account.UserId, account.CompanyId, account.Role, account.FullName);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(session);
-    }
-
-    private async Task<(string? FullName, bool IsActive)> ResolveEmployeeAsync(Guid id, CancellationToken cancellationToken)
-    {
-        var employee = await _employees.GetByIdAsync(id, cancellationToken);
-        return (employee?.FullName, employee?.IsActive ?? false);
-    }
-
-    private async Task<(string? FullName, bool IsActive)> ResolveCompanyAsync(Guid id, CancellationToken cancellationToken)
-    {
-        var company = await _companies.GetByIdAsync(id, cancellationToken);
-        return (company?.Name, company?.IsActive ?? false);
     }
 }

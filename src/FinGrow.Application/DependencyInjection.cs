@@ -59,6 +59,7 @@ public static class DependencyInjection
         services.AddScoped<IolAccessTokenProvider>();
         services.AddScoped<IolSynchronizer>();
         services.AddScoped<SessionIssuer>();
+        services.AddScoped<SessionAccountResolver>();
         services.AddScoped<TwoFactorAccountFinder>();
         services.AddScoped<DepartmentResponseBuilder>();
         services.AddScoped<DepartmentManagerEligibility>();

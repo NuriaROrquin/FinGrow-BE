@@ -12,6 +12,7 @@ internal sealed class UpdateEmployeeCommandHandler : IRequestHandler<UpdateEmplo
     private readonly ICurrentUser _currentUser;
     private readonly ICompanyRepository _companies;
     private readonly IEmployeeRepository _employees;
+    private readonly IUserRepository _users;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _clock;
 
@@ -19,12 +20,14 @@ internal sealed class UpdateEmployeeCommandHandler : IRequestHandler<UpdateEmplo
         ICurrentUser currentUser,
         ICompanyRepository companies,
         IEmployeeRepository employees,
+        IUserRepository users,
         IUnitOfWork unitOfWork,
         IDateTimeProvider clock)
     {
         _currentUser = currentUser;
         _companies = companies;
         _employees = employees;
+        _users = users;
         _unitOfWork = unitOfWork;
         _clock = clock;
     }
@@ -46,7 +49,7 @@ internal sealed class UpdateEmployeeCommandHandler : IRequestHandler<UpdateEmplo
 
         var email = Email.From(request.Email);
 
-        if (await _employees.GetByEmailAsync(email, cancellationToken) is { } owner && owner.Id != employee.Id)
+        if (await _users.GetByEmailAsync(email, cancellationToken) is { } owner && owner.Id != employee.Id)
         {
             return Result.Failure<CompanyEmployeeResponse>(EmployeeErrors.EmailTaken(email));
         }
