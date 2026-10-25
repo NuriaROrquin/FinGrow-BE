@@ -265,7 +265,10 @@ ante un recurso de otra empresa, para no confirmar que existe.
   sigue viendo en su nómina como dado de baja. Es definitiva (un `CHECK` en `users` impide
   reactivarla, y la recuperación de contraseña solo atiende usuarios activos) y el login le
   responde lo mismo que a una contraseña equivocada. `metrics-snapshot` no rehace la foto de un
-  mes cerrado si alguien se dio de baja después: la perdería sin sus datos.
+  mes cerrado si alguien se dio de baja después: la perdería sin sus datos, y
+  `achievements-evaluation` saltea a quien se dio de baja para no devolverle logros con lo que
+  queda (las lecciones completadas no se borran). El email sigue tomado en `users`: para volver a
+  dar de alta a esa persona, la empresa primero elimina al empleado dado de baja.
 - **El departamento de un empleado tiene historial** (`employee_department_assignments`, hija
   del agregado `Employee`): `AssignToDepartment` cierra la asignación vigente y abre otra, y un
   índice único parcial impide dos abiertas a la vez. `metrics-snapshot` toma el departamento que
