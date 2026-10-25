@@ -47,6 +47,11 @@ internal sealed partial class AchievementsEvaluationJob(
         {
             foreach (var employee in await employees.ListByCompanyAsync(company.Id, cancellationToken))
             {
+                if (employee.IsWithdrawn)
+                {
+                    continue;
+                }
+
                 instantGranted += await GrantAsync(
                     employee.Id,
                     (granter, ct) => granter.GrantInstantAsync(employee.Id, AchievementCatalog.InstantCodes, instantMode, ct),
