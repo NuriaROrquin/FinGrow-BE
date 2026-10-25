@@ -1585,10 +1585,6 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("company_id");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -1596,12 +1592,6 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("ExpiresAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("expires_at");
-
-                    b.Property<string>("Role")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("role");
 
                     b.Property<string>("TokenHash")
                         .IsRequired()
@@ -1619,9 +1609,6 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_password_reset_tokens");
-
-                    b.HasIndex("CompanyId")
-                        .HasDatabaseName("ix_password_reset_tokens_company_id");
 
                     b.HasIndex("TokenHash")
                         .IsUnique()
@@ -2588,12 +2575,12 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("FinGrow.Domain.Entities.PasswordResetToken", b =>
                 {
-                    b.HasOne("FinGrow.Domain.Entities.Company", null)
+                    b.HasOne("FinGrow.Domain.Entities.User", null)
                         .WithMany()
-                        .HasForeignKey("CompanyId")
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
-                        .HasConstraintName("fk_password_reset_tokens_companies_company_id");
+                        .HasConstraintName("fk_password_reset_tokens_users_user_id");
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.RefreshToken", b =>

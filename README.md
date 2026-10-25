@@ -923,6 +923,7 @@ Siete entidades y tres value objects. El esquema se crea con la migración `Init
 | Tabla | Raíz de agregado | Qué guarda |
 |---|---|---|
 | `users` | User | Las credenciales de empleados y empresas: email (único entre los dos), hash de contraseña, rol, secreto del doble factor (cifrado), último ingreso y si la cuenta está activa. Tiene el mismo id que su empleado o su empresa |
+| `password_reset_tokens` | PasswordResetToken | Los enlaces de "¿Olvidaste tu contraseña?" (HU-72): el hash del token (nunca el valor), cuándo se emitió, cuándo vence y cuándo se usó. Cuelga de `users` con cascada y no tiene empresa: se busca la cuenta por email sin saber el rol |
 | `companies` | Company | Empresa contratante: razón social, CUIT, datos corporativos, moneda por defecto. Su `id` es FK a `users` |
 | `departments` | (parte de Company) | Departamentos de la empresa; se desactivan, no se borran |
 | `employees` | Employee | La persona que usa la app; pertenece a una empresa y opcionalmente a un departamento. Su `id` es FK a `users` |
