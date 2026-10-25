@@ -75,7 +75,7 @@ public class VerifyTwoFactorLoginCommandHandlerTests
         var employee = AddEmployee();
 
         var result = await CreateHandler().Handle(
-            new VerifyTwoFactorLoginCommand(ChallengeFor(employee.Id), FakeTotpService.ValidCode, UserRole.Employee),
+            new VerifyTwoFactorLoginCommand(ChallengeFor(employee.Id), FakeTotpService.ValidCode),
             CancellationToken.None);
 
         result.IsSuccess.ShouldBeTrue();
@@ -92,7 +92,7 @@ public class VerifyTwoFactorLoginCommandHandlerTests
         var company = AddCompany();
 
         var result = await CreateHandler().Handle(
-            new VerifyTwoFactorLoginCommand(ChallengeFor(company.Id), FakeTotpService.ValidCode, UserRole.Company),
+            new VerifyTwoFactorLoginCommand(ChallengeFor(company.Id), FakeTotpService.ValidCode),
             CancellationToken.None);
 
         result.IsSuccess.ShouldBeTrue();
@@ -107,7 +107,7 @@ public class VerifyTwoFactorLoginCommandHandlerTests
         var employee = AddEmployee();
 
         var result = await CreateHandler().Handle(
-            new VerifyTwoFactorLoginCommand(ChallengeFor(employee.Id), "000000", UserRole.Employee),
+            new VerifyTwoFactorLoginCommand(ChallengeFor(employee.Id), "000000"),
             CancellationToken.None);
 
         result.IsFailure.ShouldBeTrue();
@@ -123,7 +123,7 @@ public class VerifyTwoFactorLoginCommandHandlerTests
         AddEmployee();
 
         var result = await CreateHandler().Handle(
-            new VerifyTwoFactorLoginCommand("not-a-challenge", FakeTotpService.ValidCode, UserRole.Employee),
+            new VerifyTwoFactorLoginCommand("not-a-challenge", FakeTotpService.ValidCode),
             CancellationToken.None);
 
         result.IsFailure.ShouldBeTrue();
@@ -136,23 +136,10 @@ public class VerifyTwoFactorLoginCommandHandlerTests
         AddCompany();
 
         var result = await CreateHandler().Handle(
-            new VerifyTwoFactorLoginCommand(ChallengeFor(Guid.NewGuid()), FakeTotpService.ValidCode, UserRole.Company),
+            new VerifyTwoFactorLoginCommand(ChallengeFor(Guid.NewGuid()), FakeTotpService.ValidCode),
             CancellationToken.None);
 
         result.Error.Code.ShouldBe("Auth.DesafioInvalido");
-    }
-
-    [Fact]
-    public async Task A_challenge_of_an_employee_is_rejected_by_the_company_login()
-    {
-        var employee = AddEmployee();
-
-        var result = await CreateHandler().Handle(
-            new VerifyTwoFactorLoginCommand(ChallengeFor(employee.Id), FakeTotpService.ValidCode, UserRole.Company),
-            CancellationToken.None);
-
-        result.Error.Code.ShouldBe("Auth.DesafioInvalido");
-        _refreshTokens.Tokens.ShouldBeEmpty();
     }
 
     [Fact]
@@ -161,7 +148,7 @@ public class VerifyTwoFactorLoginCommandHandlerTests
         var employee = AddEmployee(twoFactorEnabled: false);
 
         var result = await CreateHandler().Handle(
-            new VerifyTwoFactorLoginCommand(ChallengeFor(employee.Id), FakeTotpService.ValidCode, UserRole.Employee),
+            new VerifyTwoFactorLoginCommand(ChallengeFor(employee.Id), FakeTotpService.ValidCode),
             CancellationToken.None);
 
         result.IsFailure.ShouldBeTrue();
@@ -175,7 +162,7 @@ public class VerifyTwoFactorLoginCommandHandlerTests
         employee.Deactivate(Now);
 
         var result = await CreateHandler().Handle(
-            new VerifyTwoFactorLoginCommand(ChallengeFor(employee.Id), FakeTotpService.ValidCode, UserRole.Employee),
+            new VerifyTwoFactorLoginCommand(ChallengeFor(employee.Id), FakeTotpService.ValidCode),
             CancellationToken.None);
 
         result.IsFailure.ShouldBeTrue();

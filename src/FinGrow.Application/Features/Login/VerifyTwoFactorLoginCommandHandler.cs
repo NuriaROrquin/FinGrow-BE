@@ -50,7 +50,7 @@ internal sealed class VerifyTwoFactorLoginCommandHandler : IRequestHandler<Verif
 
         var user = await _users.GetByIdAsync(userId, cancellationToken);
 
-        if (user is null || user.Role != request.Role || !user.IsActive || !user.IsTwoFactorEnabled)
+        if (user is null || !user.IsActive || !user.IsTwoFactorEnabled)
         {
             return Result.Failure<LoginResponse>(DesafioInvalido);
         }

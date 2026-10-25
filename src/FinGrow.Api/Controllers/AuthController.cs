@@ -6,7 +6,6 @@ using FinGrow.Api.Extensions;
 using FinGrow.Application.Common;
 using FinGrow.Application.DTOs;
 using FinGrow.Application.Features.Login;
-using FinGrow.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -20,16 +19,10 @@ public sealed class AuthController(IMediator mediator) : ControllerBase
             new LoginCommand(request.Email, request.Password),
             cancellationToken));
 
-    [HttpPost("empleado/2fa")]
+    [HttpPost("2fa")]
     public async Task<IActionResult> VerificarDobleFactor(TwoFactorLoginRequest request, CancellationToken cancellationToken) =>
         StartSession(await mediator.Send(
-            new VerifyTwoFactorLoginCommand(request.ChallengeToken, request.Code, UserRole.Employee),
-            cancellationToken));
-
-    [HttpPost("empresa/2fa")]
-    public async Task<IActionResult> VerificarDobleFactorEmpresa(TwoFactorLoginRequest request, CancellationToken cancellationToken) =>
-        StartSession(await mediator.Send(
-            new VerifyTwoFactorLoginCommand(request.ChallengeToken, request.Code, UserRole.Company),
+            new VerifyTwoFactorLoginCommand(request.ChallengeToken, request.Code),
             cancellationToken));
 
     private IActionResult StartSessionOrChallenge(Result<LoginResult> result)
