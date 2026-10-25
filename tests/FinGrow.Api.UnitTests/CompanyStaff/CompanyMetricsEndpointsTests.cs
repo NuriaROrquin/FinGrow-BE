@@ -10,6 +10,8 @@ public class CompanyMetricsEndpointsTests
 
     private static readonly Uri TrendsPath = new("/api/company/metrics/trends", UriKind.Relative);
 
+    private static readonly Uri ReportPath = new("/api/company/metrics/report", UriKind.Relative);
+
     private static void AddActiveEmployees(CompanyStaffWebApplicationFactory factory, int participating, int idle)
     {
         for (var index = 0; index < participating + idle; index++)
@@ -85,6 +87,17 @@ public class CompanyMetricsEndpointsTests
         var client = factory.CreateClientFor(Rol.Empleado);
 
         var response = await client.GetAsync(TrendsPath);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task The_monthly_report_rejects_an_employee_token_with_403()
+    {
+        using var factory = new CompanyStaffWebApplicationFactory();
+        var client = factory.CreateClientFor(Rol.Empleado);
+
+        var response = await client.GetAsync(ReportPath);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
