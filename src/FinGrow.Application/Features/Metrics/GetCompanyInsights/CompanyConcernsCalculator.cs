@@ -25,32 +25,42 @@ internal static class CompanyConcernsCalculator
     {
         ArgumentNullException.ThrowIfNull(factors);
 
-        return new[]
-            {
-                Of(CompanyConcern.LowSavings, factors.Select(factor => (decimal?)factor.Savings)),
-                Of(CompanyConcern.ThinCushion, factors.Select(factor => (decimal?)factor.Cushion)),
-                Of(CompanyConcern.BudgetOverruns, factors.Select(factor => factor.Budget)),
-                Of(CompanyConcern.MissedGoalContributions, factors.Select(factor => factor.Goals)),
-            }
+        return Enum.GetValues<CompanyConcern>()
+            .Select(concern => Measure(concern, factors))
             .OfType<CompanyConcernSummary>()
+            .Where(concern => concern.AffectedEmployees > 0)
             .OrderByDescending(concern => concern.Percentage)
             .ThenByDescending(concern => concern.AffectedEmployees)
             .ThenBy(concern => concern.Concern)
             .ToList();
     }
 
-    private static CompanyConcernSummary? Of(CompanyConcern concern, IEnumerable<decimal?> values)
+    public static CompanyConcernSummary? Measure(
+        CompanyConcern concern,
+        IReadOnlyCollection<FinancialHealthFactors> factors)
     {
-        var evaluated = values.OfType<decimal>().ToList();
-        var affected = evaluated.Count(value => value < ConcernThreshold);
+        ArgumentNullException.ThrowIfNull(factors);
 
-        if (affected == 0)
+        var evaluated = factors.Select(factor => FactorOf(concern, factor)).OfType<decimal>().ToList();
+
+        if (evaluated.Count == 0)
         {
             return null;
         }
 
+        var affected = evaluated.Count(value => value < ConcernThreshold);
         var percentage = decimal.Round(affected * 100m / evaluated.Count, 2, MidpointRounding.ToEven);
 
         return new CompanyConcernSummary(concern, affected, evaluated.Count, percentage);
     }
+
+    private static decimal? FactorOf(CompanyConcern concern, FinancialHealthFactors factor) =>
+        concern switch
+        {
+            CompanyConcern.LowSavings => factor.Savings,
+            CompanyConcern.ThinCushion => factor.Cushion,
+            CompanyConcern.BudgetOverruns => factor.Budget,
+            CompanyConcern.MissedGoalContributions => factor.Goals,
+            _ => throw new ArgumentOutOfRangeException(nameof(concern), concern, null),
+        };
 }
