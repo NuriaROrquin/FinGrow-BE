@@ -161,6 +161,26 @@ public sealed record BudgetRecommendationMonth(
     IReadOnlyList<RecommendationBudgetLimit> Limits,
     IReadOnlyDictionary<ExpenseCategory, decimal> UnbudgetedExpenses);
 
+/// <summary>
+/// Lo que se le manda a FinGrow-AI para recomendarle a una empresa (HU-61 y HU-64): conteos y
+/// porcentajes agregados de un mes. Nunca un id, un nombre ni un texto libre; lo verifica
+/// <c>AnonymizedContractRules</c>.
+/// </summary>
+public sealed record CompanyRecommendationsInput(
+    Language Language,
+    int Year,
+    int Month,
+    int MeasuredEmployees,
+    decimal? AverageScore,
+    decimal? ParticipationRate,
+    IReadOnlyList<CompanyConcernSummary> Concerns);
+
+public sealed record CompanyConcernSummary(
+    CompanyConcern Concern,
+    int AffectedEmployees,
+    int EvaluatedEmployees,
+    decimal Percentage);
+
 public interface IAiService
 {
     Task<bool> IsHealthyAsync(CancellationToken cancellationToken = default);
@@ -197,5 +217,9 @@ public interface IAiService
 
     Task<FinancialRecommendations> RecommendBudgetAsync(
         BudgetRecommendationsInput input,
+        CancellationToken cancellationToken = default);
+
+    Task<FinancialRecommendations> RecommendCompanyAsync(
+        CompanyRecommendationsInput input,
         CancellationToken cancellationToken = default);
 }

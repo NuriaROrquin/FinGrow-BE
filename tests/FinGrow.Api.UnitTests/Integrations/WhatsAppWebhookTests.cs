@@ -365,6 +365,11 @@ public class WhatsAppWebhookTests
             BudgetRecommendationsInput input,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+
+        public Task<FinancialRecommendations> RecommendCompanyAsync(
+            CompanyRecommendationsInput input,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class VoiceNoteMediaClient : ITwilioMediaClient
