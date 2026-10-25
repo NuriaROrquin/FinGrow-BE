@@ -8,7 +8,7 @@ public class PasswordResetTokenTests
     private static readonly DateTimeOffset Now = new(2026, 10, 20, 10, 0, 0, TimeSpan.Zero);
 
     private static PasswordResetToken Issue(string value = "valor") =>
-        PasswordResetToken.Issue(Guid.NewGuid(), Guid.NewGuid(), "Empleado", value, Now);
+        PasswordResetToken.Issue(Guid.NewGuid(), value, Now);
 
     [Fact]
     public void Only_the_hash_of_the_value_is_stored()
@@ -62,6 +62,6 @@ public class PasswordResetTokenTests
     [Fact]
     public void It_always_belongs_to_a_user()
     {
-        Should.Throw<DomainException>(() => PasswordResetToken.Issue(Guid.Empty, Guid.NewGuid(), "Empleado", "valor", Now));
+        Should.Throw<DomainException>(() => PasswordResetToken.Issue(Guid.Empty, "valor", Now));
     }
 }

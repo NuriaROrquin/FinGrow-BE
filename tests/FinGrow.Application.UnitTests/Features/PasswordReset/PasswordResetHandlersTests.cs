@@ -5,6 +5,7 @@ using FinGrow.Application.Features.PasswordReset;
 using FinGrow.Application.Features.PasswordReset.RequestPasswordReset;
 using FinGrow.Application.Features.PasswordReset.ResetPassword;
 using FinGrow.Application.Features.PasswordReset.ValidateToken;
+using FinGrow.Application.Features.Session;
 using FinGrow.Application.UnitTests.Fakes;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
@@ -24,6 +25,8 @@ public class PasswordResetHandlersTests
     private readonly FakeRefreshTokenRepository _refreshTokens = new();
     private readonly FakeUnitOfWork _unitOfWork = new();
     private readonly FakeDateTimeProvider _clock = new(Now);
+
+    private FakeUserRepository Users => new(_employees, _companies);
 
     private Employee AddEmployee(string email = "ana@empresa.com")
     {
@@ -56,17 +59,17 @@ public class PasswordResetHandlersTests
         return company;
     }
 
-    private string IssueToken(Guid userId, Guid companyId, string role, DateTimeOffset? createdAt = null)
+    private string IssueToken(Guid userId, DateTimeOffset? createdAt = null)
     {
         var value = PasswordResetToken.GenerateValue();
-        _tokens.Add(PasswordResetToken.Issue(userId, companyId, role, value, createdAt ?? Now));
+        _tokens.Add(PasswordResetToken.Issue(userId, value, createdAt ?? Now));
         return value;
     }
 
     private RequestPasswordResetCommandHandler RequestHandler() =>
         new(
-            _employees,
-            _companies,
+            Users,
+            new SessionAccountResolver(_employees, _companies),
             _tokens,
             _outboundEmails,
             _unitOfWork,
@@ -74,10 +77,10 @@ public class PasswordResetHandlersTests
             Options.Create(new PasswordResetOptions { ResetUrl = ResetUrl }));
 
     private ResetPasswordCommandHandler ResetHandler() =>
-        new(_tokens, _employees, _companies, new FakePasswordHasher(), _refreshTokens, _unitOfWork, _clock);
+        new(_tokens, Users, new FakePasswordHasher(), _refreshTokens, _unitOfWork, _clock);
 
     private ValidatePasswordResetTokenQueryHandler ValidateHandler() =>
-        new(_tokens, _employees, _companies, _clock);
+        new(_tokens, Users, _clock);
 
     [Fact]
     public async Task Requesting_a_link_queues_an_email_with_a_single_use_token()
@@ -85,19 +88,18 @@ public class PasswordResetHandlersTests
         var employee = AddEmployee();
 
         var result = await RequestHandler().Handle(
-            new RequestPasswordResetCommand("ana@empresa.com", Rol.Empleado),
+            new RequestPasswordResetCommand("ana@empresa.com"),
             CancellationToken.None);
 
         result.IsSuccess.ShouldBeTrue();
         var token = _tokens.Tokens.ShouldHaveSingleItem();
         token.UserId.ShouldBe(employee.Id);
-        token.Role.ShouldBe(Rol.Empleado);
         token.ExpiresAt.ShouldBe(Now + PasswordResetToken.Lifetime);
 
         var email = _outboundEmails.Emails.ShouldHaveSingleItem();
-        email.Recipient.ShouldBe(employee.Email);
+        email.Recipient.ShouldBe(employee.User.Email);
+        email.TextBody!.ShouldContain("Hola Ana Pérez,");
         email.TextBody!.ShouldContain($"{ResetUrl}?token=");
-        email.TextBody!.ShouldContain("&tipo=empleado");
         _unitOfWork.SaveCount.ShouldBe(1);
     }
 
@@ -106,11 +108,11 @@ public class PasswordResetHandlersTests
     {
         AddEmployee();
 
-        await RequestHandler().Handle(new RequestPasswordResetCommand("ana@empresa.com", Rol.Empleado), CancellationToken.None);
+        await RequestHandler().Handle(new RequestPasswordResetCommand("ana@empresa.com"), CancellationToken.None);
 
         var body = _outboundEmails.Emails.Single().TextBody!;
         var start = body.IndexOf("?token=", StringComparison.Ordinal) + "?token=".Length;
-        var value = body[start..].Split('&')[0];
+        var value = body[start..].Split('\n')[0].Trim();
         PasswordResetToken.Hash(value).ShouldBe(_tokens.Tokens.Single().TokenHash);
     }
 
@@ -121,7 +123,7 @@ public class PasswordResetHandlersTests
     {
         AddEmployee();
 
-        var result = await RequestHandler().Handle(new RequestPasswordResetCommand(email, Rol.Empleado), CancellationToken.None);
+        var result = await RequestHandler().Handle(new RequestPasswordResetCommand(email), CancellationToken.None);
 
         result.IsSuccess.ShouldBeTrue();
         _tokens.Tokens.ShouldBeEmpty();
@@ -134,7 +136,7 @@ public class PasswordResetHandlersTests
         AddEmployee().Deactivate(Now);
 
         var result = await RequestHandler().Handle(
-            new RequestPasswordResetCommand("ana@empresa.com", Rol.Empleado),
+            new RequestPasswordResetCommand("ana@empresa.com"),
             CancellationToken.None);
 
         result.IsSuccess.ShouldBeTrue();
@@ -142,32 +144,44 @@ public class PasswordResetHandlersTests
     }
 
     [Fact]
-    public async Task The_role_decides_which_accounts_are_searched()
+    public async Task A_company_is_found_by_its_email_without_asking_for_the_role()
     {
-        AddEmployee(email: "empresa@empresa.com");
+        AddEmployee();
         var company = AddCompany();
 
-        await RequestHandler().Handle(new RequestPasswordResetCommand("empresa@empresa.com", Rol.Empresa), CancellationToken.None);
+        await RequestHandler().Handle(new RequestPasswordResetCommand("empresa@empresa.com"), CancellationToken.None);
 
         var token = _tokens.Tokens.ShouldHaveSingleItem();
         token.UserId.ShouldBe(company.Id);
-        token.Role.ShouldBe(Rol.Empresa);
-        _outboundEmails.Emails.Single().TextBody!.ShouldContain("&tipo=empresa");
+        var email = _outboundEmails.Emails.ShouldHaveSingleItem();
+        email.Recipient.ShouldBe(company.User.Email);
+        email.TextBody!.ShouldContain("Hola Empresa Demo S.A.,");
+    }
+
+    [Fact]
+    public async Task A_deactivated_company_gets_no_email()
+    {
+        AddCompany().Deactivate(Now);
+
+        await RequestHandler().Handle(new RequestPasswordResetCommand("empresa@empresa.com"), CancellationToken.None);
+
+        _tokens.Tokens.ShouldBeEmpty();
+        _outboundEmails.Emails.ShouldBeEmpty();
     }
 
     [Fact]
     public async Task A_second_request_within_the_resend_interval_sends_nothing_new()
     {
         AddEmployee();
-        await RequestHandler().Handle(new RequestPasswordResetCommand("ana@empresa.com", Rol.Empleado), CancellationToken.None);
+        await RequestHandler().Handle(new RequestPasswordResetCommand("ana@empresa.com"), CancellationToken.None);
 
         _clock.UtcNow = Now + TimeSpan.FromSeconds(30);
-        await RequestHandler().Handle(new RequestPasswordResetCommand("ana@empresa.com", Rol.Empleado), CancellationToken.None);
+        await RequestHandler().Handle(new RequestPasswordResetCommand("ana@empresa.com"), CancellationToken.None);
 
         _outboundEmails.Emails.Count.ShouldBe(1);
 
         _clock.UtcNow = Now + RequestPasswordResetCommandHandler.ResendInterval;
-        await RequestHandler().Handle(new RequestPasswordResetCommand("ana@empresa.com", Rol.Empleado), CancellationToken.None);
+        await RequestHandler().Handle(new RequestPasswordResetCommand("ana@empresa.com"), CancellationToken.None);
 
         _outboundEmails.Emails.Count.ShouldBe(2);
     }
@@ -176,60 +190,59 @@ public class PasswordResetHandlersTests
     public async Task Resetting_changes_the_password_burns_every_link_and_closes_the_sessions()
     {
         var employee = AddEmployee();
-        var older = IssueToken(employee.Id, employee.CompanyId, Rol.Empleado, Now - TimeSpan.FromMinutes(10));
-        var value = IssueToken(employee.Id, employee.CompanyId, Rol.Empleado);
+        var older = IssueToken(employee.Id, Now - TimeSpan.FromMinutes(10));
+        var value = IssueToken(employee.Id);
         var session = RefreshToken.Issue(employee.Id, employee.CompanyId, Rol.Empleado, RefreshToken.GenerateValue(), Now);
         _refreshTokens.Add(session);
 
         var result = await ResetHandler().Handle(new ResetPasswordCommand(value, "nueva-5678"), CancellationToken.None);
 
         result.IsSuccess.ShouldBeTrue();
-        result.Value.Role.ShouldBe(Rol.Empleado);
-        employee.PasswordHash.ShouldBe("nueva-5678");
+        employee.User.PasswordHash.ShouldBe("nueva-5678");
         _tokens.Tokens.ShouldAllBe(token => token.UsedAt == Now);
         session.RevokedAt.ShouldBe(Now);
 
         var reuse = await ResetHandler().Handle(new ResetPasswordCommand(older, "otra-9999"), CancellationToken.None);
         reuse.Error.ShouldBe(PasswordResetErrors.EnlaceInvalido);
-        employee.PasswordHash.ShouldBe("nueva-5678");
+        employee.User.PasswordHash.ShouldBe("nueva-5678");
     }
 
     [Fact]
     public async Task Resetting_keeps_two_factor_enabled()
     {
         var employee = AddEmployee();
-        employee.StartTwoFactorEnrollment("SECRETBASE32", Now);
-        employee.EnableTwoFactor(Now);
-        var value = IssueToken(employee.Id, employee.CompanyId, Rol.Empleado);
+        employee.User.StartTwoFactorEnrollment("SECRETBASE32", Now);
+        employee.User.EnableTwoFactor(Now);
+        var value = IssueToken(employee.Id);
 
         await ResetHandler().Handle(new ResetPasswordCommand(value, "nueva-5678"), CancellationToken.None);
 
-        employee.IsTwoFactorEnabled.ShouldBeTrue();
+        employee.User.IsTwoFactorEnabled.ShouldBeTrue();
     }
 
     [Fact]
-    public async Task A_company_reset_tells_the_front_to_go_back_to_the_company_login()
+    public async Task A_company_resets_its_password_with_the_same_link_flow()
     {
         var company = AddCompany();
-        var value = IssueToken(company.Id, company.Id, Rol.Empresa);
+        var value = IssueToken(company.Id);
 
         var result = await ResetHandler().Handle(new ResetPasswordCommand(value, "nueva-5678"), CancellationToken.None);
 
-        result.Value.Role.ShouldBe(Rol.Empresa);
-        company.PasswordHash.ShouldBe("nueva-5678");
+        result.IsSuccess.ShouldBeTrue();
+        company.User.PasswordHash.ShouldBe("nueva-5678");
     }
 
     [Fact]
     public async Task An_expired_link_changes_nothing()
     {
         var employee = AddEmployee();
-        var value = IssueToken(employee.Id, employee.CompanyId, Rol.Empleado);
+        var value = IssueToken(employee.Id);
         _clock.UtcNow = Now + PasswordResetToken.Lifetime;
 
         var result = await ResetHandler().Handle(new ResetPasswordCommand(value, "nueva-5678"), CancellationToken.None);
 
         result.Error.ShouldBe(PasswordResetErrors.EnlaceInvalido);
-        employee.PasswordHash.ShouldBe("vieja-1234");
+        employee.User.PasswordHash.ShouldBe("vieja-1234");
         _unitOfWork.SaveCount.ShouldBe(0);
     }
 
@@ -237,7 +250,7 @@ public class PasswordResetHandlersTests
     public async Task A_link_of_an_account_deactivated_after_asking_no_longer_works()
     {
         var employee = AddEmployee();
-        var value = IssueToken(employee.Id, employee.CompanyId, Rol.Empleado);
+        var value = IssueToken(employee.Id);
         employee.Deactivate(Now);
 
         var validation = await ValidateHandler().Handle(new ValidatePasswordResetTokenQuery(value), CancellationToken.None);
@@ -245,18 +258,18 @@ public class PasswordResetHandlersTests
 
         validation.Error.ShouldBe(PasswordResetErrors.EnlaceInvalido);
         reset.Error.ShouldBe(PasswordResetErrors.EnlaceInvalido);
-        employee.PasswordHash.ShouldBe("vieja-1234");
+        employee.User.PasswordHash.ShouldBe("vieja-1234");
     }
 
     [Fact]
-    public async Task Validating_a_usable_link_returns_its_role_without_using_it()
+    public async Task Validating_a_usable_link_does_not_use_it()
     {
         var employee = AddEmployee();
-        var value = IssueToken(employee.Id, employee.CompanyId, Rol.Empleado);
+        var value = IssueToken(employee.Id);
 
         var result = await ValidateHandler().Handle(new ValidatePasswordResetTokenQuery(value), CancellationToken.None);
 
-        result.Value.Role.ShouldBe(Rol.Empleado);
+        result.IsSuccess.ShouldBeTrue();
         _tokens.Tokens.Single().UsedAt.ShouldBeNull();
     }
 
