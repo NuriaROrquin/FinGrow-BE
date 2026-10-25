@@ -907,6 +907,25 @@ public sealed class FakeFinancialHealthScoreRepository : IFinancialHealthScoreRe
     public void Remove(FinancialHealthScore score) => Scores.Remove(score);
 }
 
+public sealed class FakeCompanyEducationMetricsReadRepository : ICompanyEducationMetricsReadRepository
+{
+    public CompanyEducationMetrics Metrics { get; set; } = new(0, 0, 0, 0);
+
+    public Dictionary<(Guid CompanyId, DateOnly PeriodStart), int> CompletedCourses { get; } = new();
+
+    public Task<CompanyEducationMetrics> GetAsync(
+        Guid companyId,
+        DateOnly last30DaysStart,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Metrics);
+
+    public Task<int> CountCompletedCoursesAsync(
+        Guid companyId,
+        MetricsPeriod period,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(CompletedCourses.TryGetValue((companyId, period.Start), out var count) ? count : 0);
+}
+
 public sealed class FakeInvestmentRepository : IInvestmentRepository
 {
     public List<Investment> Investments { get; } = new();
