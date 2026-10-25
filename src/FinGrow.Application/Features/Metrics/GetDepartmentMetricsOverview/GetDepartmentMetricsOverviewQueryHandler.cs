@@ -51,6 +51,7 @@ internal sealed class GetDepartmentMetricsOverviewQueryHandler(
                         null,
                         null,
                         false,
+                        false,
                         anonymizationPolicy.DepartmentMinimumEmployees,
                         null);
                 }
@@ -66,12 +67,16 @@ internal sealed class GetDepartmentMetricsOverviewQueryHandler(
                         null,
                         null,
                         null,
+                        false,
                         true,
                         anonymizationPolicy.DepartmentMinimumEmployees,
                         MetricsAnonymizationPolicy.NotEnoughEmployees.Description);
                 }
 
                 var averageScore = anonymizationPolicy.DepartmentAverageScore(latestSnapshot.Metrics);
+                FinancialHealthBand? band = averageScore is { } score
+                    ? FinancialHealthScale.BandOf(score)
+                    : null;
 
                 return new DepartmentMetricsOverviewResponse(
                     department.Id,
@@ -81,9 +86,8 @@ internal sealed class GetDepartmentMetricsOverviewQueryHandler(
                     latestSnapshot.Metrics.ParticipatingEmployees,
                     latestSnapshot.Metrics.ParticipationRate,
                     averageScore,
-                    averageScore is { } score
-                        ? FinancialHealthScale.BandOf(score)
-                        : null,
+                    band,
+                    band is { } visibleBand && FinancialHealthScale.NeedsAttention(visibleBand),
                     false,
                     anonymizationPolicy.DepartmentMinimumEmployees,
                     null);

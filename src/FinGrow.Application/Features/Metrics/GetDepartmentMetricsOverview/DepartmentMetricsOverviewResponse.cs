@@ -12,6 +12,7 @@ public sealed record DepartmentMetricsOverviewResponse(
     decimal? ParticipationRate,
     decimal? AverageFinancialHealthScore,
     FinancialHealthBand? FinancialHealthBand,
+    bool NeedsAttention,
     bool IsMetricsHidden,
     int MinimumGroupSize,
     string? HiddenReason)
