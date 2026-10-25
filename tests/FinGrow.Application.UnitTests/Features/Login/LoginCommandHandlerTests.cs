@@ -65,7 +65,7 @@ public class LoginCommandHandlerTests
             new FakeUserRepository(_employees, _companies),
             new SessionAccountResolver(_employees, _companies),
             new FakePasswordHasher(),
-            new SessionIssuer(tokenService, new FakeRefreshTokenRepository(), new FakeDateTimeProvider(Now)),
+            new SessionIssuer(tokenService, new FakeRefreshTokenRepository(), new FakeDateTimeProvider(Now), new FakeClientDevice()),
             tokenService,
             _unitOfWork,
             new FakeDateTimeProvider(Now));

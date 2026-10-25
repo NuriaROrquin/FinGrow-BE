@@ -9,6 +9,7 @@ public sealed class RefreshToken : AggregateRoot
 {
     public const int HashLength = 64;
     public const int MaxRoleLength = 20;
+    public const int MaxUserAgentLength = 512;
 
     public static readonly TimeSpan Lifetime = TimeSpan.FromDays(30);
 
@@ -22,6 +23,9 @@ public sealed class RefreshToken : AggregateRoot
         Guid companyId,
         string role,
         string tokenHash,
+        Guid sessionId,
+        DateTimeOffset startedAt,
+        string? userAgent,
         DateTimeOffset createdAt,
         DateTimeOffset expiresAt)
         : base(id)
@@ -30,6 +34,9 @@ public sealed class RefreshToken : AggregateRoot
         CompanyId = companyId;
         Role = role;
         TokenHash = tokenHash;
+        SessionId = sessionId;
+        StartedAt = startedAt;
+        UserAgent = userAgent;
         CreatedAt = createdAt;
         ExpiresAt = expiresAt;
     }
@@ -42,6 +49,16 @@ public sealed class RefreshToken : AggregateRoot
 
     public string TokenHash { get; private set; } = string.Empty;
 
+    /// <summary>Identifica la sesion a traves de las rotaciones: cada refresh emite un token nuevo
+    /// que hereda este id, asi que en una sesion abierta hay un solo token activo con este valor.</summary>
+    public Guid SessionId { get; private set; }
+
+    /// <summary>Cuando se inicio sesion. <see cref="CreatedAt"/> es la ultima renovacion.</summary>
+    public DateTimeOffset StartedAt { get; private set; }
+
+    /// <summary>El User-Agent del ultimo pedido que emitio el token; null si no vino ninguno.</summary>
+    public string? UserAgent { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset ExpiresAt { get; private set; }
@@ -53,7 +70,8 @@ public sealed class RefreshToken : AggregateRoot
         Guid companyId,
         string role,
         string value,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        string? userAgent = null)
     {
         if (userId == Guid.Empty)
         {
@@ -75,14 +93,43 @@ public sealed class RefreshToken : AggregateRoot
             throw new DomainException("El valor del refresh token es obligatorio.");
         }
 
+        var id = Guid.CreateVersion7();
+
         return new RefreshToken(
-            Guid.CreateVersion7(),
+            id,
             userId,
             companyId,
             role,
             Hash(value),
+            sessionId: id,
+            startedAt: createdAt,
+            NormalizeUserAgent(userAgent),
             createdAt,
             createdAt.Add(Lifetime));
+    }
+
+    /// <summary>Revoca este token y emite el siguiente de la misma sesion: conserva el id y el
+    /// inicio de la sesion, y el User-Agent nuevo si vino uno (si no, el anterior).</summary>
+    public RefreshToken Rotate(string value, DateTimeOffset now, string? userAgent = null)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new DomainException("El valor del refresh token es obligatorio.");
+        }
+
+        Revoke(now);
+
+        return new RefreshToken(
+            Guid.CreateVersion7(),
+            UserId,
+            CompanyId,
+            Role,
+            Hash(value),
+            SessionId,
+            StartedAt,
+            NormalizeUserAgent(userAgent) ?? UserAgent,
+            now,
+            now.Add(Lifetime));
     }
 
     /// <summary>Genera el valor opaco que se entrega al cliente (256 bits de entropia, base64url).
@@ -102,4 +149,15 @@ public sealed class RefreshToken : AggregateRoot
     /// <summary>Idempotente a proposito: revocar dos veces (p.ej. un logout despues de un cambio
     /// de contrasena) no debe pisar el momento real de la primera revocacion.</summary>
     public void Revoke(DateTimeOffset revokedAt) => RevokedAt ??= revokedAt;
+
+    private static string? NormalizeUserAgent(string? userAgent)
+    {
+        if (string.IsNullOrWhiteSpace(userAgent))
+        {
+            return null;
+        }
+
+        var trimmed = userAgent.Trim();
+        return trimmed.Length <= MaxUserAgentLength ? trimmed : trimmed[..MaxUserAgentLength];
+    }
 }

@@ -65,8 +65,7 @@ internal sealed class RefreshSessionCommandHandler : IRequestHandler<RefreshSess
             return Result.Failure<LoginResponse>(SesionInvalida);
         }
 
-        current.Revoke(now);
-        var session = _sessionIssuer.Issue(account.UserId, account.CompanyId, account.Role, account.FullName);
+        var session = _sessionIssuer.Renew(current, account.FullName);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 

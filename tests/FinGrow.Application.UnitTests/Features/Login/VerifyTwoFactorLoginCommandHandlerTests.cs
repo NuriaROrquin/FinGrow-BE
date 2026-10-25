@@ -63,7 +63,7 @@ public class VerifyTwoFactorLoginCommandHandlerTests
             new FakeTotpService(),
             new FakeUserRepository(_employees, _companies),
             new SessionAccountResolver(_employees, _companies),
-            new SessionIssuer(_tokenService, _refreshTokens, new FakeDateTimeProvider(Now)),
+            new SessionIssuer(_tokenService, _refreshTokens, new FakeDateTimeProvider(Now), new FakeClientDevice()),
             _unitOfWork,
             new FakeDateTimeProvider(Now));
 
