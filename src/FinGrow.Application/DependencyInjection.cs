@@ -17,6 +17,7 @@ using Features.Investments.AccrueInvestments;
 using Features.Investments.QuoteInvestments;
 using Features.Metrics.FinancialHealth;
 using Features.Metrics;
+using Features.Metrics.MonthlyReport;
 using Features.Metrics.SnapshotMetrics;
 using Features.Notifications;
 using Features.Notifications.Alerts.GoalProgress;
@@ -65,6 +66,7 @@ public static class DependencyInjection
         services.AddScoped<DepartmentManagerEligibility>();
         services.AddScoped<FinancialHealthScorer>();
         services.AddSingleton<MetricsAnonymizationPolicy>();
+        services.AddScoped<CompanyMonthlyReportBuilder>();
         services.AddScoped<AchievementGranter>();
         services.AddScoped<MonthlyAchievementsEvaluator>();
 

@@ -676,6 +676,24 @@ inmediatamente anterior. Son reglas fijas: no se llama a la IA.
 No hay tabla nueva: todo se calcula en la consulta sobre `company_metrics_snapshots`,
 `financial_health_scores` y `lesson_completions`.
 
+### Reporte mensual exportable (HU-65)
+
+`GET /api/company/metrics/report` arma el reporte que la empresa exporta a PDF desde el encabezado del
+panel, solo para el rol `Empresa`. Mira el último mes con foto de `metrics-snapshot` y lo compara con el
+mes inmediatamente anterior. Son reglas fijas: no se llama a la IA. Lo arma `CompanyMonthlyReportBuilder`,
+que también va a usar el mail mensual de HU-82.
+
+| Parte | De dónde sale |
+|---|---|
+| Encabezado | `companyName` (la empresa no es una persona), `period` y `previousPeriod`. Sin foto todavía, `period` viene en `null` y no hay indicadores |
+| Anonimato | Si el mes tiene menos empleados activos que `Metrics:CompanyMinimumEmployees`, `isAnonymized` viene en `true`, `participatingEmployees` en `null` y todos los indicadores ocultos. `activeEmployees` viaja igual, porque es la nómina que la empresa ya ve |
+| Indicadores | Participación, puntaje promedio y cursos completados del mes, con su valor del mes anterior y la diferencia. Cada valor trae su estado (`Visible`, `NoData`, `TooFewActiveEmployees`, `TooFewScoredEmployees`): un valor oculto viaja en `null` con el motivo, nunca en cero. `averageScoreBand` es la banda del puntaje (40, 60 y 80), solo si el puntaje es visible |
+| Tendencias | Las mismas reglas y la misma forma que `GET /api/company/metrics/trends` (HU-63), para el mes del reporte |
+
+Preocupaciones y recomendaciones no vienen en este endpoint: el PDF usa las que el panel ya pidió a
+`/metrics/insights`, para no volver a llamar a la IA y que el PDF muestre lo mismo que la pantalla. No hay
+tabla nueva.
+
 ### Logros
 
 El catálogo (`achievements`) es fijo: lo define `AchievementCatalog` (`Domain/Entities/`) y lo
