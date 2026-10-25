@@ -27,4 +27,7 @@ public static class FinancialHealthScale
             >= FragileThreshold => FinancialHealthBand.Fragile,
             _ => FinancialHealthBand.Critical
         };
+
+    public static bool NeedsAttention(FinancialHealthBand band) =>
+        band is FinancialHealthBand.Critical or FinancialHealthBand.Fragile;
 }
