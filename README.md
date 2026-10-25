@@ -133,6 +133,9 @@ variables de entorno usando `__` como separador de sección.
 | `Storage:ForcePathStyle` | `Storage__ForcePathStyle` | Arma las URLs como `<host>/<bucket>` en lugar de `<bucket>.<host>` (default `true`, que es lo que necesitan R2 y S3Mock) |
 | `Storage:TimeoutSeconds` | `Storage__TimeoutSeconds` | Timeout de cada operación contra el almacenamiento (default 30) |
 | `ReceiptsCleanup:GraceDays` | `ReceiptsCleanup__GraceDays` | Días que espera `receipts-cleanup` antes de borrar un comprobante suelto, contados desde que se subió (default 7, entre 1 y 365) |
+| `Axiom:ApiToken` | `Axiom__ApiToken` | Token de API de Axiom (`xaat-...`) con permiso de ingesta sobre el dataset del entorno. Junto con `Axiom:Dataset`, hace que los logs también vayan a Axiom; ver [Logs (Axiom)](#logs-axiom) |
+| `Axiom:Dataset` | `Axiom__Dataset` | Dataset de Axiom del entorno (`fingrow-dev`, `fingrow-prod`) |
+| `Axiom:Domain` | `Axiom__Domain` | Dominio de ingesta de Axiom (default `api.axiom.co`). Un dataset creado en un edge va con el dominio de ese edge, como `us-east-1.aws.edge.axiom.co` o `eu-central-1.aws.edge.axiom.co` |
 
 Los secretos no se commitean. En desarrollo local:
 
@@ -474,6 +477,7 @@ siguiente.
 | `investment-accruals` | `0 6 * * *` (todos los días, 03:00 de Argentina: el interés corre también los fines de semana) | Devenga con su TNA los plazos fijos, las cauciones y las cuentas remuneradas y les registra la valuación del día (ver *Lo que no cotiza en ningún mercado*). No llama a ninguna fuente externa. Correrlo de nuevo el mismo día actualiza esa valuación en lugar de duplicarla, y un plazo fijo vencido no suma valuaciones nuevas. Si falla con un empleado, sigue con el resto y la corrida queda fallida con el motivo |
 | `receipts-cleanup` | `0 7 * * *` (todos los días, 04:00 de Argentina) | Borra los comprobantes sueltos (sin movimiento) subidos hace más de `ReceiptsCleanup:GraceDays` días (default 7): primero el archivo de R2 y después la fila de `transaction_receipts`. Si R2 falla para uno, sigue con el resto, la corrida queda fallida con el motivo y ese comprobante se reintenta en la siguiente. Nunca toca un comprobante asociado a un movimiento |
 | `goal-progress-alerts` | `0 12 * * *` (todos los días, 09:00 de Argentina) | Recorre las metas activas y avisa al empleado cuando una lleva 30 días sin aportes (`GoalStalled`, como máximo uno cada 30 días mientras siga quieta) o cuando se acerca su fecha límite con saldo pendiente (`GoalDeadlineApproaching`, una vez a los 30, a los 7 y a 1 día, con cuánto falta y cuántos días quedan). Si la fecha límite está cerca solo manda esa, que ya dice lo mismo. Correrlo de nuevo el mismo día no repite avisos |
+| `investment-alerts` | `30 12 * * *` (todos los días, 09:30 de Argentina, después de la cotización y de la sincronización de IOL del día anterior) | Avisa cuando el valor del portafolio de un empleado, por moneda, cambia 5 % o más entre sus dos últimas fechas de valuación (`InvestmentValueChanged`; lo comprado después de la fecha anterior no cuenta, y un portafolio sin valuaciones de los últimos 3 días no se evalúa) y cuando a un plazo fijo o una caución le faltan 7 o 1 día para vencer (`InvestmentMaturing`, con la fecha y lo que va a cobrar). No repite la misma fecha de valuación ni el mismo hito de un vencimiento |
 | `email-delivery` | `*/5 * * * *` (cada 5 minutos) | Reintenta los correos de `outbound_emails` que no salieron en el momento (`Failed`, o `Pending` que su primer intento dejó colgado hace más de un minuto), hasta 50 por corrida. Cada fallo espera más para el siguiente intento (5 min, 15 min, 1 h, 4 h) y al quinto el correo queda `Abandoned`. Si alguno no sale, la corrida queda fallida con el motivo de cada uno |
 | `achievements-evaluation` | `0 9 * * *` (todos los días, 06:00 de Argentina) | Otorga los logros de mes cerrado (`ConsistentThreeMonths`, `BudgetKept`, `Saver`) del último mes cerrado y avisa al empleado. Además es la red de seguridad de los logros instantáneos: la primera corrida exitosa otorga los que ya se cumplían antes de que existieran los logros (el front los celebra juntos), y las siguientes registran sin celebrar los que no se pudieron otorgar en el momento. Corre todos los días aunque el mes no cambie: un movimiento confirmado tarde puede completar el mes cerrado. Si falta el dólar MEP para medir el ahorro de alguien con movimientos en dólares, la corrida queda fallida y la siguiente lo reintenta (ver *Logros*) |
 
@@ -511,6 +515,33 @@ curl -fsS -X POST "https://dev-be.fingrow.com.ar/api/jobs/metrics-snapshot/run" 
 La respuesta es la corrida registrada; si `status` es `Failed`, `error` dice por qué y el log de
 la API tiene el detalle completo. `GET /api/jobs` sirve para verificar de un vistazo que cada
 cron esté corriendo: muestra la última corrida de cada trabajo.
+
+### Logs (Axiom)
+
+Los logs salen siempre por consola. Si además están configurados `Axiom:ApiToken` y
+`Axiom:Dataset`, la API los manda a [Axiom](https://axiom.co) por OpenTelemetry (OTLP/HTTP a
+`https://<Axiom:Domain>/v1/logs`), en lotes y en segundo plano: si Axiom no responde, los requests
+no esperan ni fallan y el log sigue estando en la consola. A Axiom va solo lo de nivel
+`Information` para arriba: el `Debug` de Development queda en la consola. Con una sola de las dos variables la API
+no arranca y el log dice cuál falta; sin ninguna, todo funciona como antes (desarrollo local, tests
+y CI).
+
+Cada evento lleva `service.name = fingrow-api` y `deployment.environment` (el valor de
+`ASPNETCORE_ENVIRONMENT`) como atributos del recurso, el mensaje ya armado como cuerpo y las
+propiedades de Serilog como atributos. FinGrow-AI manda al mismo dataset con
+`service.name = fingrow-ai`, así que los dos servicios se consultan juntos.
+
+Para habilitarlo en un entorno:
+
+1. En Axiom, **Datasets → New dataset**, de tipo *Events*: uno por entorno (`fingrow-dev`,
+   `fingrow-prod`).
+2. **Settings → API tokens → New API token**, con permiso de ingesta solo sobre ese dataset. El
+   mismo token sirve para la API y para FinGrow-AI.
+3. En Dokploy, en las variables de entorno del servicio de la API: `Axiom__ApiToken`,
+   `Axiom__Dataset` y, si el dataset vive en un edge, `Axiom__Domain`. Redeploy.
+
+Los logs de `System.Net.Http.HttpClient` quedan en `Warning`: en `Information` imprimen la URL de
+cada pedido, y la de la Bot API de Telegram lleva el token del bot.
 
 ### Puntaje de salud financiera
 
@@ -561,7 +592,9 @@ este cambio quedan sin puntaje.
 
 Las fotos guardan `employees_with_score` y `financial_health_score_sum`; el promedio se deriva
 (`PeriodMetrics.AverageFinancialHealthScore`) y el umbral mínimo de anonimización de T-11 se
-aplica al mostrarlo. La fórmula vive en `FinancialHealthFactors` (`Domain/ValueObjects/`): pesos
+aplica al mostrarlo, contando los empleados con puntaje y no los activos (HU-57): con menos de
+tres, el promedio, su banda y su variación viajan en `null` y el resto de la métrica se muestra
+igual. La fórmula vive en `FinancialHealthFactors` (`Domain/ValueObjects/`): pesos
 y umbrales son constantes de esa clase.
 
 ### Reportes: evolución mensual (HU-41), hitos y recomendaciones (HU-44)
@@ -592,6 +625,56 @@ movimientos en la moneda no llama a la IA. El mismo resumen se contesta desde un
 durante `AiService:RecommendationsCacheHours`: la clave es el contenido completo del pedido, así que
 cualquier movimiento nuevo genera recomendaciones nuevas. La aclaración de que no es asesoramiento
 financiero certificado la muestra el front.
+
+### Análisis de presupuesto (HU-25)
+
+`GET /api/budgets/analysis?currency` arma la tarjeta "Análisis de Presupuesto" de Presupuestos, solo
+para el rol `Empleado`. Mira los presupuestos mensuales de los últimos 6 meses cerrados más el mes en
+curso, y solo los que están en la moneda pedida (la moneda de un presupuesto es la de sus topes). No
+depende del mes que el empleado esté mirando en la pantalla.
+
+| Parte | De dónde sale |
+|---|---|
+| Habilitación | Al menos 2 meses con presupuesto en la moneda, y el del mes en curso cuenta (`hasCurrentMonthBudget`). Como hay un solo mes en curso, siempre queda al menos uno cerrado. Si no alcanza, la respuesta trae cuántos hay y cuántos faltan, sin resumen ni recomendaciones, y no llama a la IA |
+| Resumen | Reglas fijas sobre los meses cerrados (el mes en curso no entra: su gasto todavía es parcial): por categoría con tope, en cuántos meses tuvo tope, en cuántos se pasó (`Budget.HealthOf`, el mismo criterio que la pantalla), el tope y el gasto promedio y el uso promedio; la categoría más excedida; y del último mes cerrado, cuántas categorías respetó el tope y los totales. `ahorro_inversion` no cuenta como exceso ni entra en los conteos de cumplimiento, porque pasarse es ahorrar de más; sí suma en los totales |
+| Recomendaciones | Tres, generadas por FinGrow-AI (`budget-insights`). Recibe por mes los topes contra lo gastado y lo gastado en categorías sin tope, con el mes en curso marcado como parcial, y responde en el idioma del empleado |
+
+Lo gastado sale de `IMonthlySummaryReadRepository`, el mismo resumen de los reportes. Nada se guarda:
+borrar un presupuesto o una categoría (HU-79) cambia el análisis en la consulta siguiente. Si la IA no
+responde, el resumen sale igual y `recommendationsAvailable` viene en `false`. La caché de
+`AiService:RecommendationsCacheHours` también aplica, con una clave distinta de la de HU-44.
+
+### Preocupaciones y recomendaciones para la empresa (HU-61 y HU-64)
+
+`GET /api/company/metrics/insights` arma la pestaña "Principales Preocupaciones" y la tarjeta
+"Recomendaciones" del panel de la empresa, solo para el rol `Empresa`. Mira el último mes con foto de
+`metrics-snapshot` (el último mes cerrado que se pudo medir) y los puntajes de salud financiera de ese
+mes.
+
+| Parte | De dónde sale |
+|---|---|
+| Habilitación | Al menos `Metrics:CompanyMinimumEmployees` empleados con puntaje en el mes (3 por defecto). Sin foto todavía, `period` viene en `null`; con menos empleados medidos, `isAnonymized` en `true` y sin preocupaciones ni recomendaciones. En los dos casos no se llama a la IA |
+| Preocupaciones | Reglas fijas sobre los factores del puntaje (`CompanyConcernsCalculator`): un factor por debajo de 50 es una preocupación. `LowSavings` es ahorrar menos del 10 % de los ingresos; `ThinCushion`, un colchón de menos de un mes y medio de gasto; `BudgetOverruns`, pasarse en más de la mitad de los topes del presupuesto; `MissedGoalContributions`, aportar menos de la mitad de la cuota de las metas. Las dos últimas se miden solo entre quienes tienen presupuesto o metas con cuota (`evaluatedEmployees`). Van ordenadas por porcentaje de afectados, y una que afecta a menos empleados que el umbral no se muestra ni viaja a la IA |
+| Recomendaciones | Tres, generadas por FinGrow-AI (`company-insights`). Recibe el mes, cuántos empleados se midieron, las preocupaciones visibles, el puntaje promedio (si la política lo deja mostrar) y la participación del mes, y responde en el idioma de la empresa. Nunca recibe ids, nombres ni departamentos. Siempre llegan con `action = None`: son acciones que la empresa hace fuera de FinGrow |
+
+Si la IA no responde, las preocupaciones salen igual y `recommendationsAvailable` viene en `false`. La
+caché de `AiService:RecommendationsCacheHours` también aplica, con su propia clave. No hay tabla nueva:
+todo se calcula en la consulta sobre `financial_health_scores` y `company_metrics_snapshots`.
+
+### Tendencias positivas y oportunidades de mejora (HU-63)
+
+`GET /api/company/metrics/trends` arma la tarjeta "Tendencias" de la pestaña "Análisis" del panel de la
+empresa, solo para el rol `Empresa`. Compara el último mes con foto de `metrics-snapshot` contra el mes
+inmediatamente anterior. Son reglas fijas: no se llama a la IA.
+
+| Parte | De dónde sale |
+|---|---|
+| Habilitación | Sin foto todavía, `period` viene en `null`. Sin la foto del mes anterior, `previousPeriod` viene en `null` y no hay tendencias. Si alguno de los dos meses tiene menos empleados activos que `Metrics:CompanyMinimumEmployees`, `isAnonymized` viene en `true` y sin tendencias |
+| Indicadores | De la foto: tasa de participación, puntaje promedio (solo si la política lo deja mostrar), porcentaje de empleados activos con presupuesto (`BudgetAdoption`), con meta activa (`GoalAdoption`) y con integración (`IntegrationAdoption`), y metas alcanzadas. De `financial_health_scores`: el porcentaje de afectados por cada preocupación de HU-61, si hubo al menos el umbral de empleados medidos y la preocupación afecta a nadie o a al menos el umbral. De los cursos: los completados en el mes (el mes de la última lección) |
+| Tendencia | Para cada indicador visible en los dos meses, `change` = actual − anterior. Con menos de 2 de diferencia (puntos porcentuales, puntos de puntaje o unidades, según `unit`) es estable y no viaja. Si mejora va en `positiveTrends`; si empeora, en `opportunities`. En las preocupaciones mejorar es bajar. Las dos listas van ordenadas de mayor a menor cambio |
+
+No hay tabla nueva: todo se calcula en la consulta sobre `company_metrics_snapshots`,
+`financial_health_scores` y `lesson_completions`.
 
 ### Logros
 
@@ -685,7 +768,8 @@ La participación cuenta a un empleado activo que, durante el mes, confirmó al 
 movimiento o hizo un aporte a una meta. El bienestar financiero es el promedio de los puntajes
 de salud financiera que pudieron calcularse para el período; un puntaje requiere actividad
 suficiente y algún ingreso. Ambos respetan el umbral de anonimización del panel empresarial: si
-el snapshot no puede revelarse, no generan alerta.
+el snapshot no puede revelarse, no generan alerta. El bienestar financiero tampoco avisa si
+menos de tres empleados tienen puntaje.
 
 Las alertas de plantilla describen un **cambio neto**, no eventos individuales de contratación,
 eliminación o desactivación. Si no existe un snapshot mensual anterior, no se puede comparar y
@@ -701,6 +785,7 @@ cada 12 horas por origen (un sync de 30 movimientos genera una sola alerta). Lo 
 empleado a mano, por foto o por chat no avisa: ya está mirando la app.
 `IntegrationAccessLost` avisa cuando la sincronización pierde el acceso a una cuenta vinculada (Gmail o IOL), una
 sola vez hasta que el empleado la vuelva a autorizar.
+`NewEducationContent` avisa a todos los empleados con acceso cuando un curso o un artículo se publica por primera vez (`Course.Publish` y `Article.Publish` levantan `EducationContentPublished`, y solo la primera publicación; una segunda no avisa). Cada empleado se avisa en su propio scope y la deduplicación es por contenido, así que un evento reprocesado no repite el aviso.
 
 | Método y ruta | Quién | Qué hace |
 |---|---|---|
@@ -837,9 +922,10 @@ Siete entidades y tres value objects. El esquema se crea con la migración `Init
 
 | Tabla | Raíz de agregado | Qué guarda |
 |---|---|---|
-| `companies` | Company | Empresa contratante: razón social, CUIT, credenciales (contraseña y secreto del doble factor, cifrado), moneda por defecto |
+| `users` | User | Las credenciales de empleados y empresas: email (único entre los dos), hash de contraseña, rol, secreto del doble factor (cifrado), último ingreso y si la cuenta está activa. Tiene el mismo id que su empleado o su empresa |
+| `companies` | Company | Empresa contratante: razón social, CUIT, datos corporativos, moneda por defecto. Su `id` es FK a `users` |
 | `departments` | (parte de Company) | Departamentos de la empresa; se desactivan, no se borran |
-| `employees` | Employee | La persona que usa la app; pertenece a una empresa y opcionalmente a un departamento |
+| `employees` | Employee | La persona que usa la app; pertenece a una empresa y opcionalmente a un departamento. Su `id` es FK a `users` |
 | `transactions` | Transaction | Ingresos y gastos, con importe siempre positivo y el signo dado por `type` |
 | `budgets` | Budget | Tope por categoría y período |
 | `goals` | Goal | Metas de ahorro con objetivo, avance y fecha límite |
@@ -912,6 +998,9 @@ cumplan:
 - Infrastructure no depende de Api.
 - Ningún controller usa tipos de Infrastructure.
 - Los handlers de Application (`*Handler`) son `internal` y viven bajo `Application.Features`.
+- Las respuestas de las métricas de empresa no tienen campos que identifiquen a un empleado
+  (`EmployeeId`, `UserId`, nombres, emails, ids de movimientos, metas o inversiones), y lo que se
+  le manda a FinGrow-AI sobre una empresa no lleva ningún `Guid` ni texto (`AnonymizedContractRules`).
 
 Si alguien las rompe, el build falla. GitHub Actions los ejecuta en cada push y pull request.
 

@@ -18,4 +18,13 @@ public static class FinancialHealthScale
             >= FragileThreshold => FinancialHealthBand.Fragile,
             _ => FinancialHealthBand.Critical
         };
+
+    public static FinancialHealthBand BandOf(decimal score) =>
+        score switch
+        {
+            >= HealthyThreshold => FinancialHealthBand.Healthy,
+            >= StableThreshold => FinancialHealthBand.Stable,
+            >= FragileThreshold => FinancialHealthBand.Fragile,
+            _ => FinancialHealthBand.Critical
+        };
 }

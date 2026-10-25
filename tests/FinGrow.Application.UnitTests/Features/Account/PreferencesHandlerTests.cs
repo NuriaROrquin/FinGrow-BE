@@ -78,7 +78,7 @@ public class PreferencesHandlerTests
             CancellationToken.None);
 
         employee.FullName.ShouldBe("Ana Gomez");
-        employee.Email.Value.ShouldBe("ana.gomez@acme.com");
+        employee.User.Email.Value.ShouldBe("ana.gomez@acme.com");
     }
 
     [Fact]

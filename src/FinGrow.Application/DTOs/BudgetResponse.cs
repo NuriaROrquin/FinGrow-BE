@@ -9,7 +9,7 @@ public sealed record BudgetResponse(
     BudgetPeriod Period,
     DateOnly PeriodStart,
     DateOnly PeriodEnd,
-    Currency? Currency,
+    Currency Currency,
     IReadOnlyList<BudgetLimitResponse> Limits,
     DateTimeOffset CreatedAt)
 {

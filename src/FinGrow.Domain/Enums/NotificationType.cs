@@ -13,4 +13,7 @@ public enum NotificationType
     ParticipationLow = 9,
     EmployeeAdded = 10,
     EmployeeRemoved = 11,
+    InvestmentValueChanged = 12,
+    InvestmentMaturing = 13,
+    NewEducationContent = 14
 }

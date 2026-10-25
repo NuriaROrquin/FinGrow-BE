@@ -42,12 +42,57 @@ public sealed class GetTransactionHistoryQueryTests
         result.Value.Items.Single(item => item.Id == withoutReceipt.Id).ReceiptId.ShouldBeNull();
     }
 
-    private static Transaction NewHistoryExpense(Guid employeeId) => Transaction.RegisterExpense(
+    [Fact]
+    public async Task Handler_sorts_by_most_recent_date_by_default()
+    {
+        var repository = new FakeTransactionReadRepository();
+        var handler = CreateHandler(repository, Guid.NewGuid());
+
+        await handler.Handle(new GetTransactionHistoryQuery(new TransactionFilters()), CancellationToken.None);
+
+        repository.RequestedSortBy.ShouldBe(TransactionSortField.OccurredOn);
+        repository.RequestedSortDirection.ShouldBe(SortDirection.Descending);
+    }
+
+    [Fact]
+    public async Task Handler_forwards_the_requested_sort_along_with_the_filters()
+    {
+        var repository = new FakeTransactionReadRepository();
+        var handler = CreateHandler(repository, Guid.NewGuid());
+
+        await handler.Handle(
+            new GetTransactionHistoryQuery(new TransactionFilters(
+                PaymentMethod: PaymentMethod.Cash,
+                SortBy: TransactionSortField.Amount,
+                SortDirection: SortDirection.Ascending)),
+            CancellationToken.None);
+
+        repository.RequestedSortBy.ShouldBe(TransactionSortField.Amount);
+        repository.RequestedSortDirection.ShouldBe(SortDirection.Ascending);
+        repository.RequestedPaymentMethod.ShouldBe(PaymentMethod.Cash);
+    }
+
+    [Fact]
+    public async Task Handler_keeps_the_order_the_repository_resolved()
+    {
+        var employeeId = Guid.CreateVersion7();
+        var older = NewHistoryExpense(employeeId, new DateOnly(2026, 1, 1));
+        var newer = NewHistoryExpense(employeeId, new DateOnly(2026, 9, 1));
+        var handler = CreateHandler(new FakeTransactionReadRepository(new[] { older, newer }), employeeId);
+
+        var result = await handler.Handle(
+            new GetTransactionHistoryQuery(new TransactionFilters(SortDirection: SortDirection.Ascending)),
+            CancellationToken.None);
+
+        result.Value.Items.Select(item => item.Id).ShouldBe(new[] { older.Id, newer.Id });
+    }
+
+    private static Transaction NewHistoryExpense(Guid employeeId, DateOnly? occurredOn = null) => Transaction.RegisterExpense(
         employeeId,
         Money.From(1000m, Currency.ARS),
         ExpenseCategory.Alimentos,
         "Supermercado",
-        new DateOnly(2026, 9, 1),
+        occurredOn ?? new DateOnly(2026, 9, 1),
         PaymentMethod.Cash,
         TransactionSource.Manual,
         TransactionStatus.Confirmed,
@@ -129,40 +174,6 @@ public sealed class GetTransactionHistoryQueryTests
     }
 
     [Fact]
-    public async Task Handler_orders_items_from_newest_to_oldest_date()
-    {
-        var older = Transaction.RegisterExpense(
-            Guid.Parse("11111111-1111-1111-1111-111111111111"),
-            Money.From(100m, Currency.ARS),
-            ExpenseCategory.Alimentos,
-            "Viejo",
-            new DateOnly(2025, 1, 10),
-            PaymentMethod.CreditCard,
-            TransactionSource.MercadoPago,
-            TransactionStatus.Confirmed,
-            new DateTimeOffset(2025, 1, 10, 12, 0, 0, TimeSpan.Zero));
-
-        var newer = Transaction.RegisterExpense(
-            Guid.Parse("11111111-1111-1111-1111-111111111111"),
-            Money.From(200m, Currency.ARS),
-            ExpenseCategory.Alimentos,
-            "Nuevo",
-            new DateOnly(2026, 9, 12),
-            PaymentMethod.CreditCard,
-            TransactionSource.MercadoPago,
-            TransactionStatus.Confirmed,
-            new DateTimeOffset(2026, 9, 12, 12, 0, 0, TimeSpan.Zero));
-
-        var repository = new FakeTransactionReadRepository(new[] { older, newer });
-        var handler = CreateHandler(repository, older.EmployeeId);
-
-        var result = await handler.Handle(new GetTransactionHistoryQuery(new TransactionFilters()), CancellationToken.None);
-
-        result.Value.Items.Select(item => item.OccurredOn)
-            .ShouldBe(new[] { newer.OccurredOn, older.OccurredOn });
-    }
-
-    [Fact]
     public async Task Handler_returns_forbidden_without_an_authenticated_user_id()
     {
         var repository = new FakeTransactionReadRepository();
@@ -219,6 +230,10 @@ public sealed class GetTransactionHistoryQueryTests
 
         public PaymentMethod? RequestedPaymentMethod { get; private set; }
 
+        public TransactionSortField? RequestedSortBy { get; private set; }
+
+        public SortDirection? RequestedSortDirection { get; private set; }
+
         public Task<IReadOnlyList<MonthlyExpenseTotal>> GetMonthlyExpensesAsync(
             Guid employeeId,
             Currency currency,
@@ -269,6 +284,8 @@ public sealed class GetTransactionHistoryQueryTests
             PaymentMethod? paymentMethod,
             DateOnly? fromDate,
             DateOnly? toDate,
+            TransactionSortField sortBy,
+            SortDirection sortDirection,
             CancellationToken cancellationToken = default)
         {
             WasCalled = true;
@@ -279,6 +296,8 @@ public sealed class GetTransactionHistoryQueryTests
             RequestedFromDate = fromDate;
             RequestedToDate = toDate;
             RequestedPaymentMethod = paymentMethod;
+            RequestedSortBy = sortBy;
+            RequestedSortDirection = sortDirection;
 
             return Task.FromResult(new TransactionPage(
                 _transactions,
@@ -390,6 +409,8 @@ public sealed class GetTransactionSummaryQueryTests
             PaymentMethod? paymentMethod,
             DateOnly? fromDate,
             DateOnly? toDate,
+            TransactionSortField sortBy,
+            SortDirection sortDirection,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(new TransactionPage(Array.Empty<Transaction>(), pageNumber, pageSize, 0));
 
@@ -449,6 +470,24 @@ public sealed class GetTransactionHistoryQueryValidatorTests
     {
         var result = await _validator.ValidateAsync(
             new GetTransactionHistoryQuery(new TransactionFilters(Status: new[] { (TransactionStatus)999 })));
+
+        result.IsValid.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Validator_rejects_unknown_sort_field()
+    {
+        var result = await _validator.ValidateAsync(
+            new GetTransactionHistoryQuery(new TransactionFilters(SortBy: (TransactionSortField)999)));
+
+        result.IsValid.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Validator_rejects_unknown_sort_direction()
+    {
+        var result = await _validator.ValidateAsync(
+            new GetTransactionHistoryQuery(new TransactionFilters(SortDirection: (SortDirection)999)));
 
         result.IsValid.ShouldBeFalse();
     }

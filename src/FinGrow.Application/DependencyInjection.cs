@@ -21,6 +21,7 @@ using Features.Metrics.SnapshotMetrics;
 using Features.Notifications;
 using Features.Notifications.Alerts.GoalProgress;
 using Features.Notifications.Alerts.Company;
+using Features.Notifications.Alerts.InvestmentAlerts;
 using Features.Notifications.Delivery;
 using Features.OutboundEmails;
 using Features.OutboundEmails.DeliverDueEmails;
@@ -58,6 +59,7 @@ public static class DependencyInjection
         services.AddScoped<IolAccessTokenProvider>();
         services.AddScoped<IolSynchronizer>();
         services.AddScoped<SessionIssuer>();
+        services.AddScoped<SessionAccountResolver>();
         services.AddScoped<TwoFactorAccountFinder>();
         services.AddScoped<DepartmentResponseBuilder>();
         services.AddScoped<DepartmentManagerEligibility>();
@@ -84,6 +86,7 @@ public static class DependencyInjection
         services.AddScoped<IScheduledJob, InvestmentAccrualsJob>();
         services.AddScoped<IScheduledJob, GoalProgressAlertsJob>();
         services.AddScoped<IScheduledJob, CompanyAlertsJob>();
+        services.AddScoped<IScheduledJob, InvestmentAlertsJob>();
         services.AddScoped<IScheduledJob, EmailDeliveryJob>();
         services.AddScoped<IScheduledJob, ReceiptsCleanupJob>();
         services.AddScoped<IScheduledJob, AchievementsEvaluationJob>();

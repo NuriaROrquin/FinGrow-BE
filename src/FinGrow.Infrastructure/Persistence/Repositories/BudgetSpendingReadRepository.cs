@@ -13,12 +13,8 @@ internal sealed class BudgetSpendingReadRepository(FinGrowDbContext dbContext) :
     {
         ArgumentNullException.ThrowIfNull(budget);
 
-        if (budget.Currency is not { } currency)
-        {
-            return new Dictionary<ExpenseCategory, decimal>();
-        }
-
         var employeeId = budget.EmployeeId;
+        var currency = budget.Currency;
         var periodStart = budget.PeriodStart;
         var periodEnd = budget.PeriodEnd;
 

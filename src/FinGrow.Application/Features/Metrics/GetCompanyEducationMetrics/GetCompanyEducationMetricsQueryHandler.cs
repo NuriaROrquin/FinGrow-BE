@@ -34,7 +34,7 @@ internal sealed class GetCompanyEducationMetricsQueryHandler(
         }
 
         var activeEmployees = (await employees.ListByCompanyAsync(companyId, cancellationToken))
-            .Count(employee => employee.IsActive);
+            .Count(employee => employee.User.IsActive);
 
         if (!anonymizationPolicy.CanRevealCompany(activeEmployees))
         {

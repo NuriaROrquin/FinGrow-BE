@@ -20,6 +20,8 @@ public sealed partial class FinGrowDbContext : DbContext, IUnitOfWork
         _currentUser = currentUser;
     }
 
+    public DbSet<User> Users => Set<User>();
+
     public DbSet<Company> Companies => Set<Company>();
 
     public DbSet<Department> Departments => Set<Department>();

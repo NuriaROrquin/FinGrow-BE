@@ -49,7 +49,7 @@ internal sealed class ChangeEmployeeAccessCommandHandler
             return Result.Failure<CompanyEmployeeResponse>(EmployeeErrors.NotFound(request.EmployeeId));
         }
 
-        if (employee.IsActive != request.IsActive)
+        if (employee.User.IsActive != request.IsActive)
         {
             var now = _clock.UtcNow;
 

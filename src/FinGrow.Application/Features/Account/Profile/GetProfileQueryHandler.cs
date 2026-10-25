@@ -47,7 +47,7 @@ internal sealed class GetProfileQueryHandler : IRequestHandler<GetProfileQuery, 
 
         return Result.Success(new EmployeeProfileResponse(
             employee.FullName,
-            employee.Email.Value,
+            employee.User.Email.Value,
             employee.PhoneNumber,
             employee.NationalId,
             employee.BirthDate,

@@ -460,6 +460,16 @@ public class ReceiptsEndpointsTests
             RecommendationsInput input,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+
+        public Task<FinancialRecommendations> RecommendBudgetAsync(
+            BudgetRecommendationsInput input,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<FinancialRecommendations> RecommendCompanyAsync(
+            CompanyRecommendationsInput input,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class NoOpUnitOfWork : IUnitOfWork

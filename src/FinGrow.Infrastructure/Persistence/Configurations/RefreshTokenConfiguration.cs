@@ -23,8 +23,11 @@ internal sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refre
         builder.Property(token => token.CreatedAt).IsRequired();
         builder.Property(token => token.ExpiresAt).IsRequired();
 
-        // Sin relacion a Employee: UserId es polimorfico (Employee o Company segun Role),
-        // asi que no hay una unica tabla principal para una FK real sobre esa columna.
+        builder.HasOne<User>()
+            .WithMany()
+            .HasForeignKey(token => token.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.HasOne<Company>()
             .WithMany()
             .HasForeignKey(token => token.CompanyId)

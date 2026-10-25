@@ -3,6 +3,7 @@ using FinGrow.Api.Authentication;
 using FinGrow.Api.Extensions;
 using FinGrow.Api.Gmail;
 using FinGrow.Api.Jobs;
+using FinGrow.Api.Logging;
 using FinGrow.Api.MercadoPago;
 using FinGrow.Api.Notifications;
 using FinGrow.Application;
@@ -15,7 +16,8 @@ using Serilog;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.UseSerilog((context, configuration) =>
-    configuration.ReadFrom.Configuration(context.Configuration));
+    configuration.ReadFrom.Configuration(context.Configuration)
+        .WriteToAxiom(context.Configuration, context.HostingEnvironment));
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);

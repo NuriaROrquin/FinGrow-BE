@@ -110,7 +110,7 @@ internal sealed class CompanyAlertsEvaluator(
     {
         var snapshot = await LatestEligibleSnapshotAsync(company.Id, setting, cancellationToken);
         if (snapshot is null
-            || snapshot.Metrics.AverageFinancialHealthScore is not { } score
+            || anonymization.CompanyAverageScore(snapshot.Metrics) is not { } score
             || score >= setting.Threshold)
         {
             return null;

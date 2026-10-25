@@ -2,6 +2,7 @@ namespace FinGrow.Infrastructure.Persistence.Repositories;
 
 using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Common;
+using FinGrow.Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 
 internal sealed class CompanyEducationMetricsReadRepository(FinGrowDbContext dbContext)
@@ -14,32 +15,7 @@ internal sealed class CompanyEducationMetricsReadRepository(FinGrowDbContext dbC
     {
         var last30Days = ArgentinaTime.StartOfDay(last30DaysStart);
 
-        var completedCoursesQuery = dbContext.LessonCompletions
-            .Join(
-                dbContext.Employees.Where(employee => employee.CompanyId == companyId),
-                completion => completion.EmployeeId,
-                employee => employee.Id,
-                (completion, _) => completion)
-            .Join(
-                dbContext.Lessons,
-                completion => completion.LessonId,
-                lesson => lesson.Id,
-                (completion, lesson) => new
-                {
-                    completion.EmployeeId,
-                    CourseId = lesson.CourseId,
-                    completion.CompletedAt,
-                })
-            .Join(
-                dbContext.Courses.Where(course => course.PublishedAt != null),
-                completion => completion.CourseId,
-                course => course.Id,
-                (completion, _) => completion)
-            .GroupBy(completion => new { completion.EmployeeId, completion.CourseId })
-            .Where(group =>
-                group.Count() == dbContext.Lessons.Count(
-                    lesson => lesson.CourseId == group.Key.CourseId))
-            .Select(group => group.Max(completion => completion.CompletedAt));
+        var completedCoursesQuery = CompletionDatesOfCompletedCourses(companyId);
 
         var totalCompletedCourses = await completedCoursesQuery.CountAsync(cancellationToken);
         var last30DaysCompletedCourses = await completedCoursesQuery
@@ -66,4 +42,47 @@ internal sealed class CompanyEducationMetricsReadRepository(FinGrowDbContext dbC
             ratingTotals?.Count ?? 0,
             ratingTotals?.Sum ?? 0);
     }
+
+    public Task<int> CountCompletedCoursesAsync(
+        Guid companyId,
+        MetricsPeriod period,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(period);
+
+        var start = period.StartInstant;
+        var end = period.EndInstantExclusive;
+
+        return CompletionDatesOfCompletedCourses(companyId)
+            .Where(completedAt => completedAt >= start && completedAt < end)
+            .CountAsync(cancellationToken);
+    }
+
+    private IQueryable<DateTimeOffset> CompletionDatesOfCompletedCourses(Guid companyId) =>
+        dbContext.LessonCompletions
+            .Join(
+                dbContext.Employees.Where(employee => employee.CompanyId == companyId),
+                completion => completion.EmployeeId,
+                employee => employee.Id,
+                (completion, _) => completion)
+            .Join(
+                dbContext.Lessons,
+                completion => completion.LessonId,
+                lesson => lesson.Id,
+                (completion, lesson) => new
+                {
+                    completion.EmployeeId,
+                    CourseId = lesson.CourseId,
+                    completion.CompletedAt,
+                })
+            .Join(
+                dbContext.Courses.Where(course => course.PublishedAt != null),
+                completion => completion.CourseId,
+                course => course.Id,
+                (completion, _) => completion)
+            .GroupBy(completion => new { completion.EmployeeId, completion.CourseId })
+            .Where(group =>
+                group.Count() == dbContext.Lessons.Count(
+                    lesson => lesson.CourseId == group.Key.CourseId))
+            .Select(group => group.Max(completion => completion.CompletedAt));
 }

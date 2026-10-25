@@ -1,5 +1,6 @@
 namespace FinGrow.Application.Features.Notifications.Alerts.BudgetThreshold;
 
+using System.Globalization;
 using FinGrow.Application.Events;
 using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Entities;
@@ -86,14 +87,23 @@ internal sealed class NotifyBudgetThresholdHandler(
         string body,
         CancellationToken cancellationToken)
     {
+        // La clave usa el tope y no solo la categoria: si la quitan y la vuelven a agregar (HU-79),
+        // el tope nuevo es otro plan y tiene que poder avisar de nuevo. Editar el monto conserva el tope.
+        var limit = budget.Limits.Single(candidate => candidate.Category == category);
+
         await notifier.NotifyAsync(
             new NotificationRequest(
                 NotificationRecipient.Employee(confirmed.EmployeeId),
                 type,
                 $"{title} de {category}",
                 body,
-                $"budget:{budget.Id}:{category}:{type}:{budget.PeriodStart:yyyy-MM-dd}",
+                DeduplicationKey(budget, limit, type),
                 DeduplicationWindow),
             cancellationToken);
     }
+
+    internal static string DeduplicationKey(Budget budget, BudgetCategoryLimit limit, NotificationType type) =>
+        string.Create(
+            CultureInfo.InvariantCulture,
+            $"budget:{budget.Id}:{limit.Category}:{limit.Id}:{type}:{budget.PeriodStart:yyyy-MM-dd}");
 }

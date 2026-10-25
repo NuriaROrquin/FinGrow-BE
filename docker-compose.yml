@@ -64,6 +64,9 @@ services:
       Storage__AccessKey: "${STORAGE_ACCESS_KEY:-fingrow}"
       Storage__SecretKey: "${STORAGE_SECRET_KEY:-fingrow-dev}"
       Storage__Region: "${STORAGE_REGION:-us-east-1}"
+      Axiom__ApiToken: "${AXIOM_API_TOKEN:-}"
+      Axiom__Dataset: "${AXIOM_DATASET:-}"
+      Axiom__Domain: "${AXIOM_DOMAIN:-api.axiom.co}"
       Cors__AllowedOrigins__0: "http://localhost:3000"
       Jwt__SecretKey: "dev-only-secret-key-change-in-production-32chars"
     ports:

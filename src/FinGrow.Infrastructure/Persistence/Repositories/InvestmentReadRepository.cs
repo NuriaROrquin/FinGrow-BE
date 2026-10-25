@@ -35,6 +35,19 @@ internal sealed class InvestmentReadRepository(FinGrowDbContext dbContext) : IIn
         .Select(valuation => valuation.Value.Amount)
         .FirstOrDefault() < investment.InvestedAmount.Amount;
 
+    private static readonly Expression<Func<Investment, int>> TypeByLabel = SortExpressions.RankBy<Investment>(
+        investment => investment.Type == InvestmentType.Stock,
+        investment => investment.Type == InvestmentType.Bond,
+        investment => investment.Type == InvestmentType.Repo,
+        investment => investment.Type == InvestmentType.Cedear,
+        investment => investment.Type == InvestmentType.Crypto,
+        investment => investment.Type == InvestmentType.RemuneratedAccount,
+        investment => investment.Type == InvestmentType.Etf,
+        investment => investment.Type == InvestmentType.MutualFund,
+        investment => investment.Type == InvestmentType.TreasuryBill,
+        investment => investment.Type == InvestmentType.CorporateBond,
+        investment => investment.Type == InvestmentType.FixedTermDeposit);
+
     private static readonly Expression<Func<Investment, bool>> IsQuoted = investment =>
         investment.Valuations.Any(valuation => valuation.Source != ValuationSource.Manual);
 
@@ -122,8 +135,11 @@ internal sealed class InvestmentReadRepository(FinGrowDbContext dbContext) : IIn
         var ordered = filters.SortBy switch
         {
             InvestmentSortField.AssetName => ascending
-                ? query.OrderBy(investment => investment.AssetName)
-                : query.OrderByDescending(investment => investment.AssetName),
+                ? query.OrderBy(investment => EF.Functions.Collate(investment.AssetName, SortExpressions.SpanishCollation))
+                : query.OrderByDescending(investment => EF.Functions.Collate(investment.AssetName, SortExpressions.SpanishCollation)),
+            InvestmentSortField.AssetType => ascending
+                ? query.OrderBy(TypeByLabel)
+                : query.OrderByDescending(TypeByLabel),
             InvestmentSortField.InvestedAmount => ascending
                 ? query.OrderBy(investment => investment.InvestedAmount.Amount)
                 : query.OrderByDescending(investment => investment.InvestedAmount.Amount),

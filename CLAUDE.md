@@ -19,15 +19,12 @@ leer el modelo.
 
 ## Dónde está el modelo de datos
 
-| Documento | Qué contiene |
-|---|---|
-| [docs/database-schema.md](docs/database-schema.md) | **El esquema que existe hoy**: 7 tablas, sus restricciones y su comportamiento al borrar |
-| [docs/database-schema-target.md](docs/database-schema-target.md) | El DER completo de las 65 historias: 31 tablas en 7 módulos, y las divergencias con lo construido |
-| [docs/backlog-huecos.md](docs/backlog-huecos.md) | Huecos del backlog detectados al modelar |
+La fuente de verdad son las configuraciones de EF (`Infrastructure/Persistence/Configurations/`)
+y las migraciones. La sección *Modelo de dominio* del README resume qué guarda cada tabla.
 
-**Regla: toda migración nueva actualiza `docs/database-schema.md` en el mismo commit.** La
-fuente de verdad es la migración; el documento es una foto que se desactualiza sola si nadie la
-mueve, y un DER que miente es peor que no tener ninguno.
+**Regla: toda migración que agregue una tabla o cambie qué guarda una la refleja en el README en
+el mismo commit.** El resumen es una foto que se desactualiza sola si nadie la mueve, y un modelo
+que miente es peor que no tener ninguno.
 
 ## Reglas del dominio que se violan sin querer
 
@@ -206,12 +203,38 @@ Una entidad nueva tiene que aplicar el filtro o figurar en `GlobalEntityTypes`
 - **Sin sesión no hay empresa**: webhooks, trabajos, login y seeders corren sin filtro. Con sesión
   siempre aplica: un token sin `company_id` no ve ninguna fila.
 - **Lo que cruza empresas a propósito** usa `IgnoreQueryFilters(new[] { FinGrowDbContext.TenantFilter })`
-  y lo justifica con un comentario (el email único de `GetByEmailAsync`, el promedio de votos de un curso).
+  y lo justifica con un comentario (el promedio de votos de un curso). `users` no tiene filtro: está
+  en `GlobalEntityTypes` porque el email es único entre todas las empresas.
 - **Un recurso de otra empresa responde `NotFound`**: el filtro hace que ni se vea.
 
 **Entre empleados de la misma empresa el filtro no alcanza**: cada caso de uso compara el dueño con
 `ICurrentUser.UserId`. `Ownership.Require` (`Application/Common/`) resuelve el par: inexistente →
 `NotFound`, de otro empleado → `Forbidden` (403). Usalo en los handlers que cargan un recurso por id.
+
+## Credenciales (T-37)
+
+Email, hash de contraseña, rol, doble factor, último ingreso y si la cuenta está activa viven en
+`users` (`User`), no en `employees` ni en `companies`. Lo que no se deduce leyendo:
+
+- **El usuario tiene el mismo id que su empleado o su empresa.** `employees.id` y `companies.id`
+  son FK a `users.id` con cascada, y `Employee.Create` y `Company.Create` crean el `User` adentro.
+  Por eso el claim `UserId` del JWT y `refresh_tokens.user_id` (ahora FK a `users`) no cambiaron, y
+  las sesiones emitidas antes de la migración siguen valiendo.
+- **El email es único entre empleados y empresas.** Un empleado no puede usar el email de una
+  empresa ni al revés: el alta y la edición del empleado y el perfil de la empresa lo validan
+  contra `IUserRepository` y responden 409.
+- **Un solo login para los dos roles.** `POST /login` y `POST /login/2fa` no reciben el rol: como
+  el email es único, el `User` que lo tiene dice si es empleado o empresa, y la sesión vuelve con
+  ese rol para que el front sepa a qué panel ir. Cambio de contraseña, doble factor y refresh
+  trabajan sobre el `User` del token. La única bifurcación por rol es `SessionAccountResolver`,
+  que arma la sesión con el nombre y la empresa del empleado o de la empresa.
+- **Desactivar es del usuario.** `Employee.Deactivate` y `Activate` cambian su `User`, y las
+  consultas que cuentan activos filtran por `employee.User.IsActive`. `Employee` y `Company` cargan
+  su `User` siempre (`AutoInclude`).
+- **Borrar un empleado borra su usuario** (`DeleteEmployeeCommandHandler`): si no, el email
+  quedaría tomado por una cuenta que ya no existe.
+- **La migración `AddUsers` frena si hay emails repetidos** entre empleados y empresas: los lista y
+  no toca nada. Hay que corregirlos a mano y volver a desplegar.
 
 ## Panel de la empresa
 
@@ -224,7 +247,7 @@ ante un recurso de otra empresa, para no confirmar que existe.
   (`CreatedEmployeeResponse`); en la base queda solo el hash. Además se le manda por correo
   (`WelcomeEmail`), encolado en el mismo `SaveChanges` que el empleado.
 - **El email de un empleado es único en toda la plataforma**, no por empresa: es su credencial
-  de login.
+  de login y vive en `users` (ver *Credenciales*).
 - **Eliminar un empleado es definitivo.** La cascada se lleva sus movimientos, metas,
   presupuestos, inversiones e integraciones; el handler borra además sus notificaciones (no
   tienen FK porque el destinatario es polimórfico) y los archivos de sus comprobantes. Si el
@@ -350,20 +373,60 @@ Application, antes de serializar la respuesta, y no escondiendo columnas en el f
   valor predeterminado 3. Cada handler rechaza la métrica si el período tiene menos empleados
   que su umbral. No devuelvas el dato parcialmente ni completes el resultado con ceros para
   ocultarlo.
+- **El puntaje promedio tiene su propio conteo** (HU-57). No alcanza con tres empleados
+  activos: con diez activos y uno solo con actividad suficiente, el promedio sería el puntaje
+  de esa persona. `CompanyAverageScore` y `DepartmentAverageScore` de
+  `MetricsAnonymizationPolicy` aplican el mismo umbral sobre `EmployeesWithScore` y devuelven
+  `null` si no llega; el resto de la métrica se muestra igual, y la banda de salud y la
+  variación entre períodos también viajan en `null`. Toda respuesta o alerta que lea el promedio
+  lo pide a la política, nunca a `PeriodMetrics.AverageFinancialHealthScore` directo.
 - **Las respuestas usan DTOs exclusivos del panel.** `CompanyMetricsResponse`,
   `DepartmentMetricsResponse` y `CompanyParticipationResponse` solo pueden contener períodos,
   conteos, tasas y promedios agregados. No agregues `EmployeeId`, `UserId`, nombres, emails, `TransactionId`, `GoalId`,
   `InvestmentId` ni colecciones de entidades personales.
+- **El último ingreso es el único dato individual de uso que ve la empresa** (HU-81).
+  Gestión de Empleados (`GET /api/company/employees`, `CompanyEmployeeResponse`) es la nómina,
+  no una métrica: devuelve los datos de alta de cada empleado y `LastLoginAt`, para que la
+  empresa sepa a quién recordarle que active su cuenta. No agregues a esa respuesta, ni a
+  ninguna otra que lea la empresa, otros datos de uso: pantallas visitadas, movimientos, montos,
+  metas, inversiones ni integraciones conectadas.
 - **El mapeo al DTO es explícito.** No serialices snapshots, entidades ni `PeriodMetrics`
   directamente desde un controller o handler. Si se agrega un campo al modelo, debe evaluarse
   expresamente si puede formar parte del contrato anonimizado.
 - **El alcance de empresa se verifica siempre.** El handler usa el `CompanyId` de
   `ICurrentUser`; el acceso a un departamento de otra empresa se trata como inexistente y no
   confirma que el recurso existe.
+- **Las preocupaciones de la plantilla son reglas, las recomendaciones son IA** (HU-61 y HU-64,
+  `GET /api/company/metrics/insights`). `CompanyConcernsCalculator` cuenta, sobre los puntajes del
+  último mes con foto, cuántos empleados tienen cada factor por debajo de 50; la IA solo recomienda
+  a partir de eso. Hay dos umbrales de anonimato: el de empleados medidos (si no llega, no se muestra
+  nada) y el de afectados por preocupación (si no llega, esa preocupación no se muestra ni viaja a
+  la IA, porque con uno o dos afectados la empresa podría adivinar quiénes son). Lo que viaja a
+  FinGrow-AI se arma solo en `CompanyInsightsInputBuilder`. Si cambiás el umbral de 50, cambiá
+  también la definición de cada preocupación en el prompt de `company_insights` de FinGrow-AI:
+  `CompanyConcern` es contrato con su `FinancialConcern`.
+- **Las tendencias comparan el último mes con foto contra el mes anterior, y son reglas** (HU-63,
+  `GET /api/company/metrics/trends`). No es la comparación de HU-59 (`/metrics/comparison`, que
+  va del primer mes del rango al último): acá siempre son dos meses consecutivos, y sin la foto del
+  mes anterior la respuesta viaja con `PreviousPeriod = null`. La comparación vive en
+  `Features/Metrics/Trends` para que la reutilicen HU-65 y HU-82: `CompanyMonthIndicators` lee los
+  indicadores que la empresa puede ver de un mes (participación, puntaje promedio, adopción de
+  presupuesto, metas e integraciones, metas alcanzadas, cursos completados y el porcentaje de cada
+  preocupación de HU-61) y `CompanyTrendsCalculator` los compara. Un indicador que no se puede
+  mostrar en alguno de los dos meses no se compara; si alguno de los dos meses no llega al umbral de
+  empleados activos, viaja `IsAnonymized` sin tendencias. Una preocupación se muestra con 0 % o con
+  al menos el umbral de afectados: con uno o dos se podría adivinar quiénes son. Un cambio menor a
+  `CompanyTrendsCalculator.SignificantChange` (2 puntos porcentuales, 2 puntos de puntaje o 2
+  unidades) es estable y no se informa; lo que mejora es tendencia positiva y lo que empeora es
+  oportunidad de mejora (en las preocupaciones, mejorar es bajar). Los cursos completados del mes se
+  calculan al vuelo (`ICompanyEducationMetricsReadRepository.CountCompletedCoursesAsync`): un curso
+  cuenta en el mes en que se completó su última lección, igual que en `/metrics/education`.
 - **Toda modificación del contrato debe tener una prueba.** Los tests deben comprobar el umbral
   de tres empleados, el aislamiento entre empresas y que la respuesta serializada no expone
-  identificadores, montos, saldos ni movimientos individuales. Un test arquitectónico debe
-  fallar si los DTOs incorporan propiedades identificables.
+  identificadores, montos, saldos ni movimientos individuales. `AnonymizedContractRules`
+  (`tests/FinGrow.ArchitectureTests`) falla si un DTO de `Features/Metrics` o
+  `CompanyParticipationResponse` incorpora una propiedad identificable, o si
+  `CompanyRecommendationsInput` incorpora un `Guid` o un texto.
 
 ## Puntaje de salud financiera
 
@@ -413,6 +476,13 @@ son solo para el rol `Empleado`. Lo que no se deduce leyendo:
   de las metas, nunca movimientos ni el puntaje de salud financiera.
 - **Si la IA falla, el reporte no falla**: el handler atrapa el error y responde los hitos con
   `RecommendationsAvailable = false`.
+- **El análisis de presupuesto (HU-25) no es `insights`.** `GET /api/budgets/analysis`
+  (`Features/Budgets/Analysis`) se habilita con 2 meses con presupuesto en la moneda (el mes en
+  curso cuenta), no con meses con actividad, y le pide a FinGrow-AI `budget-insights`, otro endpoint
+  con su propio prompt. Comparte con HU-44 la forma de las recomendaciones
+  (`FinancialRecommendation`), la caché y la regla de que si la IA cae se responden igual los datos
+  calculados. El mes en curso habilita y viaja a la IA marcado como parcial, pero no entra en el
+  resumen: los datos calculados son de meses cerrados.
 - **El desglose de gastos (HU-42) saca `ahorro_inversion` del ranking**, con el mismo criterio que
   el puntaje de salud: es ahorro, no gasto. Los porcentajes se calculan sobre `Consumption` (el total
   sin ahorro) y el ahorro viaja aparte en `Savings`. `Consumption + Savings = Total`, y `Total` es igual
@@ -543,15 +613,10 @@ necesita `IDomainEventDispatcher`, `AddInfrastructure()` solo arranca junto a `A
   inspección de nombres de Rider, porque el valor se guarda tal cual en la base.
 - **Comentarios solo donde el código no alcanza.** Un comentario justifica una decisión que no
   se deduce leyendo (por qué existe una valuación inicial, por qué el índice incluye `period`);
-  no narra lo que hace la línea de abajo ni repite lo que ya dice este archivo o `docs/`. Si
+  no narra lo que hace la línea de abajo ni repite lo que ya dice este archivo o el README. Si
   al releer un comentario se puede borrar sin perder información, se borra.
 
-## Trabajo pendiente que afecta al modelo
-
-Queda una divergencia entre lo construido y el DER objetivo: la tabla `users` para
-credenciales, 2FA y preferencias (HU-01, HU-04, HU-46, HU-49). Arrastra una migración sobre
-tablas ya construidas: revisá [docs/database-schema-target.md](docs/database-schema-target.md)
-antes de tomar esas historias.
+## Movimientos propuestos
 
 `ai_confidence`, `ai_model` y el estado `Discarded` de `transactions` ya existen (HU-15). HU-12
 reutiliza `ai_confidence` para la confianza del OCR: es un dato del movimiento propuesto, no de

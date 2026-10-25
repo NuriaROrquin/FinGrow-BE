@@ -8,7 +8,7 @@ public class UpdateEmployeeCommandHandlerTests
     private readonly CompanyStaffScenario _scenario = new();
 
     private UpdateEmployeeCommandHandler CreateHandler() =>
-        new(_scenario.CurrentUser, _scenario.Companies, _scenario.Employees, _scenario.UnitOfWork, _scenario.Clock);
+        new(_scenario.CurrentUser, _scenario.Companies, _scenario.Employees, _scenario.Users, _scenario.UnitOfWork, _scenario.Clock);
 
     [Fact]
     public async Task Saves_the_new_name_email_and_phone()
@@ -22,7 +22,7 @@ public class UpdateEmployeeCommandHandlerTests
 
         result.IsSuccess.ShouldBeTrue();
         employee.FullName.ShouldBe("Ana María Gómez");
-        employee.Email.Value.ShouldBe("amgomez@acme.com");
+        employee.User.Email.Value.ShouldBe("amgomez@acme.com");
         employee.PhoneNumber.ShouldBe("+54 11 4000-0000");
         employee.DepartmentId.ShouldBe(sales.Id);
         result.Value.DepartmentName.ShouldBe("Ventas");
@@ -52,7 +52,7 @@ public class UpdateEmployeeCommandHandlerTests
             CancellationToken.None);
 
         result.Error.Type.ShouldBe(ErrorType.Conflict);
-        employee.Email.Value.ShouldBe("ana@acme.com");
+        employee.User.Email.Value.ShouldBe("ana@acme.com");
         _scenario.UnitOfWork.SaveCount.ShouldBe(0);
     }
 

@@ -12,11 +12,15 @@ public class DeleteEmployeeCommandHandlerTests
 {
     private readonly CompanyStaffScenario _scenario = new();
     private readonly FakeRefreshTokenRepository _refreshTokens = new();
+    private FakeUserRepository? _users;
+
+    private FakeUserRepository Users => _users ??= _scenario.Users;
 
     private DeleteEmployeeCommandHandler CreateHandler() =>
         new(
             _scenario.CurrentUser,
             _scenario.Employees,
+            Users,
             _scenario.Receipts,
             _scenario.Notifications,
             _refreshTokens,
@@ -61,6 +65,18 @@ public class DeleteEmployeeCommandHandlerTests
         _scenario.FileStorage.Files.ShouldContainKey(colleagueReceipt.StorageKey);
         _scenario.Notifications.Notifications.ShouldHaveSingleItem()
             .IsAddressedTo(NotificationRecipient.Employee(colleague.Id)).ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task The_login_of_the_employee_is_removed_too()
+    {
+        var employee = _scenario.AddEmployee(department: null);
+        var colleague = _scenario.AddEmployee(department: null);
+
+        await CreateHandler().Handle(new DeleteEmployeeCommand(employee.Id), CancellationToken.None);
+
+        Users.Removed.ShouldHaveSingleItem().ShouldBeSameAs(employee.User);
+        Users.Removed.ShouldNotContain(colleague.User);
     }
 
     [Fact]

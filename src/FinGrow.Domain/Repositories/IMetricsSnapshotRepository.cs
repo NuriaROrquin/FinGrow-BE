@@ -23,6 +23,12 @@ public interface IMetricsSnapshotRepository
         DateOnly? to,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<DepartmentMetricsSnapshot>> ListDepartmentsAsync(
+        Guid companyId,
+        DateOnly? from,
+        DateOnly? to,
+        CancellationToken cancellationToken = default);
+
     void Add(CompanyMetricsSnapshot snapshot);
 
     void Add(DepartmentMetricsSnapshot snapshot);
