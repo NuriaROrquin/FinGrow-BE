@@ -1,5 +1,7 @@
 namespace FinGrow.Application.Interfaces;
 
+using FinGrow.Application.Common;
+using FinGrow.Application.Features.Transactions.GetHistory;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
 
@@ -44,6 +46,8 @@ public interface ITransactionReadRepository
         PaymentMethod? paymentMethod,
         DateOnly? fromDate,
         DateOnly? toDate,
+        TransactionSortField sortBy,
+        SortDirection sortDirection,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<Transaction>> GetFilteredAsync(
@@ -67,7 +71,50 @@ public sealed record TransactionSummary(
     decimal TotalIncomeArs,
     decimal TotalIncomeUsd,
     decimal TotalExpenseArs,
-    decimal TotalExpenseUsd);
+    decimal TotalExpenseUsd)
+{
+    public TransactionSummary(
+        int totalTransactions,
+        int totalExpenseTransactions,
+        int totalIncomeTransactions,
+        decimal totalIncomeArs,
+        decimal totalIncomeUsd,
+        decimal totalExpenseArs,
+        decimal totalExpenseUsd,
+        IReadOnlyDictionary<Currency, CurrencyTransactionSummary> currencies,
+        IReadOnlyCollection<Currency> otherCurrencies)
+        : this(
+            totalTransactions,
+            totalExpenseTransactions,
+            totalIncomeTransactions,
+            totalIncomeArs,
+            totalIncomeUsd,
+            totalExpenseArs,
+            totalExpenseUsd)
+    {
+        Currencies = currencies;
+        OtherCurrencies = otherCurrencies;
+    }
+
+    public IReadOnlyDictionary<Currency, CurrencyTransactionSummary> Currencies { get; } =
+        new Dictionary<Currency, CurrencyTransactionSummary>
+        {
+            [Currency.ARS] = new(TotalIncomeArs, TotalExpenseArs, TotalTransactions, TotalIncomeTransactions, TotalExpenseTransactions),
+            [Currency.USD] = new(TotalIncomeUsd, TotalExpenseUsd, 0, 0, 0),
+        };
+
+    public IReadOnlyCollection<Currency> OtherCurrencies { get; } = Array.Empty<Currency>();
+}
+
+public sealed record CurrencyTransactionSummary(
+    decimal Income,
+    decimal Expenses,
+    int Transactions,
+    int IncomeTransactions,
+    int ExpenseTransactions)
+{
+    public decimal Balance => Income - Expenses;
+}
 
 public sealed record TransactionPage(
     IReadOnlyList<Transaction> Items,

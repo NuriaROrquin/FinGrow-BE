@@ -9,7 +9,5 @@ public interface ICompanyRepository
 
     Task<Company?> GetWithDepartmentsAsync(Guid id, CancellationToken cancellationToken = default);
 
-    Task<Company?> GetByEmailAsync(Email email, CancellationToken cancellationToken);
-
     Task<IReadOnlyList<Company>> ListActiveAsync(CancellationToken cancellationToken = default);
 }

@@ -3,6 +3,7 @@ namespace FinGrow.Application.UnitTests.Features.Transactions.Charting;
 using FinGrow.Application.Common;
 using FinGrow.Application.Features.Transactions;
 using FinGrow.Application.Features.Transactions.GetExpensesByCategory;
+using FinGrow.Application.Features.Transactions.GetHistory;
 using FinGrow.Application.Features.Transactions.GetMonthlyExpenses;
 using FinGrow.Application.Features.Transactions.GetMonthlyIncomeExpenses;
 using FinGrow.Application.Interfaces;
@@ -206,6 +207,8 @@ public sealed class TransactionChartQueryTests
             PaymentMethod? paymentMethod,
             DateOnly? fromDate,
             DateOnly? toDate,
+            TransactionSortField sortBy,
+            SortDirection sortDirection,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(new TransactionPage(Array.Empty<Domain.Entities.Transaction>(), pageNumber, pageSize, 0));
 

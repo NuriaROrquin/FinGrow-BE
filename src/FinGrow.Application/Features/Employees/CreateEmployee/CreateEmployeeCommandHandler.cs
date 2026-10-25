@@ -13,6 +13,7 @@ internal sealed class CreateEmployeeCommandHandler : IRequestHandler<CreateEmplo
     private readonly ICurrentUser _currentUser;
     private readonly ICompanyRepository _companies;
     private readonly IEmployeeRepository _employees;
+    private readonly IUserRepository _users;
     private readonly IOutboundEmailRepository _outboundEmails;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IUnitOfWork _unitOfWork;
@@ -22,6 +23,7 @@ internal sealed class CreateEmployeeCommandHandler : IRequestHandler<CreateEmplo
         ICurrentUser currentUser,
         ICompanyRepository companies,
         IEmployeeRepository employees,
+        IUserRepository users,
         IOutboundEmailRepository outboundEmails,
         IPasswordHasher passwordHasher,
         IUnitOfWork unitOfWork,
@@ -30,6 +32,7 @@ internal sealed class CreateEmployeeCommandHandler : IRequestHandler<CreateEmplo
         _currentUser = currentUser;
         _companies = companies;
         _employees = employees;
+        _users = users;
         _outboundEmails = outboundEmails;
         _passwordHasher = passwordHasher;
         _unitOfWork = unitOfWork;
@@ -46,7 +49,7 @@ internal sealed class CreateEmployeeCommandHandler : IRequestHandler<CreateEmplo
 
         var email = Email.From(request.Email);
 
-        if (await _employees.GetByEmailAsync(email, cancellationToken) is not null)
+        if (await _users.GetByEmailAsync(email, cancellationToken) is not null)
         {
             return Result.Failure<CreatedEmployeeResponse>(EmployeeErrors.EmailTaken(email));
         }

@@ -26,7 +26,7 @@ internal sealed class PeriodActivityReadRepository : IPeriodActivityReadReposito
 
         return await _dbContext.Employees
             .AsNoTracking()
-            .Where(employee => employee.CompanyId == companyId && employee.IsActive && employee.CreatedAt < endExclusive)
+            .Where(employee => employee.CompanyId == companyId && employee.User.IsActive && employee.CreatedAt < endExclusive)
             .OrderBy(employee => employee.Id)
             .Select(employee => new EmployeePeriodActivity(
                 employee.Id,

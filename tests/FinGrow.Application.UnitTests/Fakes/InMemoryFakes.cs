@@ -18,9 +18,6 @@ public sealed class FakeEmployeeRepository : IEmployeeRepository
     public Task<Employee?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Employees.FirstOrDefault(employee => employee.Id == id));
 
-    public Task<Employee?> GetByEmailAsync(Email email, CancellationToken cancellationToken) =>
-        Task.FromResult(Employees.FirstOrDefault(employee => employee.Email == email));
-
     public Task<IReadOnlyDictionary<Guid, int>> CountByDepartmentAsync(
         Guid companyId,
         CancellationToken cancellationToken = default) =>
@@ -56,11 +53,35 @@ public sealed class FakeCompanyRepository : ICompanyRepository
     public Task<Company?> GetWithDepartmentsAsync(Guid id, CancellationToken cancellationToken = default) =>
         GetByIdAsync(id, cancellationToken);
 
-    public Task<Company?> GetByEmailAsync(Email email, CancellationToken cancellationToken) =>
-        Task.FromResult(Companies.FirstOrDefault(company => company.Email == email));
-
     public Task<IReadOnlyList<Company>> ListActiveAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<Company>>(Companies.Where(company => company.IsActive).ToList());
+        Task.FromResult<IReadOnlyList<Company>>(Companies.Where(company => company.User.IsActive).ToList());
+}
+
+public sealed class FakeUserRepository : IUserRepository
+{
+    private readonly FakeEmployeeRepository _employees;
+    private readonly FakeCompanyRepository _companies;
+
+    public FakeUserRepository(FakeEmployeeRepository employees, FakeCompanyRepository? companies = null)
+    {
+        _employees = employees;
+        _companies = companies ?? new FakeCompanyRepository();
+    }
+
+    public List<User> Removed { get; } = new();
+
+    private IEnumerable<User> Users => _employees.Employees
+        .Select(employee => employee.User)
+        .Concat(_companies.Companies.Select(company => company.User))
+        .Where(user => !Removed.Contains(user));
+
+    public Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Users.FirstOrDefault(user => user.Id == id));
+
+    public Task<User?> GetByEmailAsync(Email email, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Users.FirstOrDefault(user => user.Email == email));
+
+    public void Remove(User user) => Removed.Add(user);
 }
 
 public sealed class FakeEmployeeIntegrationRepository : IEmployeeIntegrationRepository
@@ -683,6 +704,38 @@ public sealed class FakeAiService : IAiService
 
         return Task.FromResult(RecommendationsResult);
     }
+
+    public List<BudgetRecommendationsInput> BudgetRecommendationRequests { get; } = new();
+
+    public Task<FinancialRecommendations> RecommendBudgetAsync(
+        BudgetRecommendationsInput input,
+        CancellationToken cancellationToken = default)
+    {
+        if (Unreachable)
+        {
+            throw new HttpRequestException("FinGrow-AI unreachable");
+        }
+
+        BudgetRecommendationRequests.Add(input);
+
+        return Task.FromResult(RecommendationsResult);
+    }
+
+    public List<CompanyRecommendationsInput> CompanyRecommendationRequests { get; } = new();
+
+    public Task<FinancialRecommendations> RecommendCompanyAsync(
+        CompanyRecommendationsInput input,
+        CancellationToken cancellationToken = default)
+    {
+        if (Unreachable)
+        {
+            throw new HttpRequestException("FinGrow-AI unreachable");
+        }
+
+        CompanyRecommendationRequests.Add(input);
+
+        return Task.FromResult(RecommendationsResult);
+    }
 }
 
 public sealed class FakeRefreshTokenRepository : IRefreshTokenRepository
@@ -832,6 +885,19 @@ public sealed class FakeMetricsSnapshotRepository : IMetricsSnapshotRepository
             .OrderBy(snapshot => snapshot.PeriodStart)
             .ToList());
 
+    public Task<IReadOnlyList<DepartmentMetricsSnapshot>> ListDepartmentsAsync(
+        Guid companyId,
+        DateOnly? from,
+        DateOnly? to,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<DepartmentMetricsSnapshot>>(DepartmentSnapshots
+            .Where(snapshot => snapshot.CompanyId == companyId
+                && (from == null || snapshot.PeriodStart >= from)
+                && (to == null || snapshot.PeriodStart <= to))
+            .OrderBy(snapshot => snapshot.PeriodStart)
+            .ThenBy(snapshot => snapshot.DepartmentId)
+            .ToList());
+
     public void Add(CompanyMetricsSnapshot snapshot) => CompanySnapshots.Add(snapshot);
 
     public void Add(DepartmentMetricsSnapshot snapshot) => DepartmentSnapshots.Add(snapshot);
@@ -879,17 +945,40 @@ public sealed class FakeFinancialHealthScoreRepository : IFinancialHealthScoreRe
 {
     public List<FinancialHealthScore> Scores { get; } = new();
 
+    /// <summary>Empresa de cada empleado con puntaje; uno sin entrada cuenta para cualquier empresa.</summary>
+    public Dictionary<Guid, Guid> CompanyByEmployee { get; } = new();
+
     public Task<IReadOnlyList<FinancialHealthScore>> ListByCompanyAsync(
         Guid companyId,
         DateOnly periodStart,
         CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<FinancialHealthScore>>(Scores
-            .Where(score => score.PeriodStart == periodStart)
+            .Where(score => score.PeriodStart == periodStart
+                && (!CompanyByEmployee.TryGetValue(score.EmployeeId, out var owner) || owner == companyId))
             .ToList());
 
     public void Add(FinancialHealthScore score) => Scores.Add(score);
 
     public void Remove(FinancialHealthScore score) => Scores.Remove(score);
+}
+
+public sealed class FakeCompanyEducationMetricsReadRepository : ICompanyEducationMetricsReadRepository
+{
+    public CompanyEducationMetrics Metrics { get; set; } = new(0, 0, 0, 0);
+
+    public Dictionary<(Guid CompanyId, DateOnly PeriodStart), int> CompletedCourses { get; } = new();
+
+    public Task<CompanyEducationMetrics> GetAsync(
+        Guid companyId,
+        DateOnly last30DaysStart,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Metrics);
+
+    public Task<int> CountCompletedCoursesAsync(
+        Guid companyId,
+        MetricsPeriod period,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(CompletedCourses.TryGetValue((companyId, period.Start), out var count) ? count : 0);
 }
 
 public sealed class FakeInvestmentRepository : IInvestmentRepository
@@ -1049,6 +1138,19 @@ public sealed class FakeBudgetRepository : IBudgetRepository
         CancellationToken cancellationToken = default) =>
         Task.FromResult(Budgets.FirstOrDefault(budget =>
             budget.EmployeeId == employeeId && budget.Period == period && budget.PeriodStart == periodStart));
+
+    public Task<IReadOnlyList<Budget>> ListMonthlyAsync(
+        Guid employeeId,
+        DateOnly fromPeriodStart,
+        DateOnly toPeriodStart,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Budget>>(Budgets
+            .Where(budget => budget.EmployeeId == employeeId
+                && budget.Period == BudgetPeriod.Monthly
+                && budget.PeriodStart >= fromPeriodStart
+                && budget.PeriodStart <= toPeriodStart)
+            .OrderBy(budget => budget.PeriodStart)
+            .ToList());
 }
 
 public sealed class FakeBudgetSpendingReadRepository : IBudgetSpendingReadRepository

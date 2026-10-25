@@ -29,6 +29,14 @@ public sealed class GetTransactionHistoryQueryValidator : AbstractValidator<GetT
             .Must(category => !category.HasValue || Enum.IsDefined(category.Value))
             .WithMessage("La categoria de ingreso no es valida.");
 
+        RuleFor(query => query.Filters.SortBy)
+            .IsInEnum()
+            .WithMessage("El orden pedido no existe.");
+
+        RuleFor(query => query.Filters.SortDirection)
+            .IsInEnum()
+            .WithMessage("La direccion del orden tiene que ser ascendente o descendente.");
+
         RuleFor(query => query.Filters)
             .Must(filters => !filters.DateFrom.HasValue
                 || !filters.DateTo.HasValue

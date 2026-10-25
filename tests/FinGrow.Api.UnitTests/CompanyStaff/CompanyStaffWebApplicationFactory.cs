@@ -93,6 +93,7 @@ internal sealed class CompanyStaffWebApplicationFactory : WebApplicationFactory<
         {
             services.AddScoped<ICompanyRepository>(_ => new InMemoryCompanyRepository(Companies));
             services.AddScoped<IEmployeeRepository>(_ => new InMemoryEmployeeRepository(Employees));
+            services.AddScoped<IUserRepository>(_ => new InMemoryUserRepository(Companies, Employees));
             services.AddScoped<IOutboundEmailRepository>(_ => new InMemoryOutboundEmailRepository(QueuedEmails));
             services.AddScoped<ITransactionReceiptRepository, NoReceiptsRepository>();
             services.AddScoped<INotificationRepository>(_ => new RecordingNotificationRepository(ClearedRecipients));
@@ -221,20 +222,32 @@ internal sealed class CompanyStaffWebApplicationFactory : WebApplicationFactory<
         public Task<Company?> GetWithDepartmentsAsync(Guid id, CancellationToken cancellationToken = default) =>
             GetByIdAsync(id, cancellationToken);
 
-        public Task<Company?> GetByEmailAsync(Email email, CancellationToken cancellationToken) =>
-            Task.FromResult(companies.FirstOrDefault(company => company.Email == email));
-
         public Task<IReadOnlyList<Company>> ListActiveAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<Company>>(companies.Where(company => company.IsActive).ToList());
+            Task.FromResult<IReadOnlyList<Company>>(companies.Where(company => company.User.IsActive).ToList());
+    }
+
+    private sealed class InMemoryUserRepository(List<Company> companies, List<Employee> employees) : IUserRepository
+    {
+        private IEnumerable<User> Users =>
+            companies.Select(company => company.User).Concat(employees.Select(employee => employee.User));
+
+        public Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Users.FirstOrDefault(user => user.Id == id));
+
+        public Task<User?> GetByEmailAsync(Email email, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Users.FirstOrDefault(user => user.Email == email));
+
+        public void Remove(User user)
+        {
+            companies.RemoveAll(company => company.Id == user.Id);
+            employees.RemoveAll(employee => employee.Id == user.Id);
+        }
     }
 
     private sealed class InMemoryEmployeeRepository(List<Employee> employees) : IEmployeeRepository
     {
         public Task<Employee?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
             Task.FromResult(employees.FirstOrDefault(employee => employee.Id == id));
-
-        public Task<Employee?> GetByEmailAsync(Email email, CancellationToken cancellationToken) =>
-            Task.FromResult(employees.FirstOrDefault(employee => employee.Email == email));
 
         public Task<IReadOnlyDictionary<Guid, int>> CountByDepartmentAsync(
             Guid companyId,

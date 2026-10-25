@@ -22,7 +22,35 @@ public sealed record DashboardResponse(
     decimal? Expenses,
     decimal? Savings,
     decimal? SavingsRate,
-    decimal? PreviousPeriodSavingsRate);
+    decimal? PreviousPeriodSavingsRate,
+    IReadOnlyCollection<Currency> OtherCurrencies)
+{
+    public DashboardResponse(
+        DateOnly fromDate,
+        DateOnly toDate,
+        Currency currency,
+        bool hasMovements,
+        decimal? balance,
+        decimal? income,
+        decimal? expenses,
+        decimal? savings,
+        decimal? savingsRate,
+        decimal? previousPeriodSavingsRate)
+        : this(
+            fromDate,
+            toDate,
+            currency,
+            hasMovements,
+            balance,
+            income,
+            expenses,
+            savings,
+            savingsRate,
+            previousPeriodSavingsRate,
+            Array.Empty<Currency>())
+    {
+    }
+}
 
 public sealed class GetDashboardQueryValidator : AbstractValidator<GetDashboardQuery>
 {
@@ -95,7 +123,8 @@ internal sealed class GetDashboardQueryHandler(
                 null,
                 null,
                 null,
-                previousPeriodSavingsRate));
+                previousPeriodSavingsRate,
+                summary.OtherCurrencies));
         }
 
         var savings = income - expenses;
@@ -122,7 +151,8 @@ internal sealed class GetDashboardQueryHandler(
             expenses,
             savings,
             savingsRate,
-            previousPeriodSavingsRate));
+            previousPeriodSavingsRate,
+            summary.OtherCurrencies));
     }
 
     private static decimal GetIncome(TransactionSummary summary, Currency currency) =>

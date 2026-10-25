@@ -27,15 +27,21 @@ internal sealed class GetDepartmentMetricsQueryHandler(
         var departmentSnapshots = await snapshots.ListDepartmentAsync(
             companyId, request.DepartmentId, request.FromDate, request.ToDate, cancellationToken);
 
-        if (departmentSnapshots.Any(snapshot => !anonymizationPolicy.CanRevealDepartment(snapshot.Metrics)))
-        {
-            return Result.Failure<IReadOnlyList<DepartmentMetricsResponse>>(
-                MetricsAnonymizationPolicy.NotEnoughEmployees);
-        }
-
         return Result.Success<IReadOnlyList<DepartmentMetricsResponse>>(
             departmentSnapshots
-                .Select(snapshot => DepartmentMetricsResponse.FromSnapshot(snapshot, company.FiscalYearStartMonth))
+                .OrderBy(snapshot => snapshot.PeriodStart)
+                .Select(snapshot =>
+                {
+                    var isHidden = !anonymizationPolicy.CanRevealDepartment(snapshot.Metrics);
+
+                    return DepartmentMetricsResponse.FromSnapshot(
+                        snapshot,
+                        company.FiscalYearStartMonth,
+                        anonymizationPolicy.DepartmentAverageScore(snapshot.Metrics),
+                        isHidden,
+                        anonymizationPolicy.DepartmentMinimumEmployees,
+                        isHidden ? MetricsAnonymizationPolicy.NotEnoughEmployees.Description : null);
+                })
                 .ToList());
     }
 }

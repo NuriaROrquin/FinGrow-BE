@@ -5,7 +5,7 @@ using FinGrow.Domain.Enums;
 using FinGrow.Domain.Errors;
 using FinGrow.Domain.ValueObjects;
 
-public sealed class Employee : AggregateRoot, ITwoFactorAccount
+public sealed class Employee : AggregateRoot
 {
     public const int MinFullNameLength = 2;
     public const int MaxFullNameLength = 200;
@@ -48,15 +48,13 @@ public sealed class Employee : AggregateRoot, ITwoFactorAccount
         CompanyId = companyId;
         DepartmentId = departmentId;
         FullName = fullName;
-        Email = email;
+        User = User.Create(id, email, passwordHash, UserRole.Employee, createdAt);
         PhoneNumber = phoneNumber;
-        PasswordHash = passwordHash;
         PreferredCurrency = preferredCurrency;
         Theme = Theme.System;
         Language = Language.es;
         DateFormat = DateFormat.DayMonthYear;
         HiredOn = hiredOn;
-        IsActive = true;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
 
@@ -77,8 +75,6 @@ public sealed class Employee : AggregateRoot, ITwoFactorAccount
 
     public string FullName { get; private set; } = string.Empty;
 
-    public Email Email { get; private set; } = null!;
-
     public string? PhoneNumber { get; private set; }
 
     public string? NationalId { get; private set; }
@@ -86,8 +82,6 @@ public sealed class Employee : AggregateRoot, ITwoFactorAccount
     public DateOnly? BirthDate { get; private set; }
 
     public string? Address { get; private set; }
-
-    public string PasswordHash { get; private set; } = string.Empty;
 
     public Currency PreferredCurrency { get; private set; }
 
@@ -99,20 +93,11 @@ public sealed class Employee : AggregateRoot, ITwoFactorAccount
 
     public DateOnly HiredOn { get; private set; }
 
-    /// <summary>Baja logica: desactivar corta el acceso sin borrar el historial financiero (HU-55).</summary>
-    public bool IsActive { get; private set; }
-
-    public DateTimeOffset? LastLoginAt { get; private set; }
-
-    public string? TwoFactorSecret { get; private set; }
-
-    public DateTimeOffset? TwoFactorEnabledAt { get; private set; }
-
-    public bool IsTwoFactorEnabled => TwoFactorEnabledAt is not null;
-
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
+
+    public User User { get; private set; } = null!;
 
     public Company Company { get; private set; } = null!;
 
@@ -145,7 +130,7 @@ public sealed class Employee : AggregateRoot, ITwoFactorAccount
             EnsureValidFullName(fullName),
             email,
             EnsureValidPhoneNumber(phoneNumber),
-            EnsureHash(passwordHash),
+            passwordHash,
             preferredCurrency,
             hiredOn,
             createdAt);
@@ -172,7 +157,7 @@ public sealed class Employee : AggregateRoot, ITwoFactorAccount
         ArgumentNullException.ThrowIfNull(email);
 
         FullName = EnsureValidFullName(fullName);
-        Email = email;
+        User.ChangeEmail(email, updatedAt);
         PhoneNumber = EnsureValidPhoneNumber(phoneNumber);
         UpdatedAt = updatedAt;
     }
@@ -225,70 +210,15 @@ public sealed class Employee : AggregateRoot, ITwoFactorAccount
         UpdatedAt = assignedAt;
     }
 
-    public void ChangePassword(string passwordHash, DateTimeOffset updatedAt)
-    {
-        PasswordHash = EnsureHash(passwordHash);
-        UpdatedAt = updatedAt;
-    }
-
-    public void StartTwoFactorEnrollment(string secret, DateTimeOffset updatedAt)
-    {
-        if (IsTwoFactorEnabled)
-        {
-            throw new DomainException("El doble factor ya esta activo.");
-        }
-
-        if (string.IsNullOrWhiteSpace(secret))
-        {
-            throw new DomainException("El secreto del doble factor es obligatorio.");
-        }
-
-        TwoFactorSecret = secret;
-        UpdatedAt = updatedAt;
-    }
-
-    public void EnableTwoFactor(DateTimeOffset enabledAt)
-    {
-        if (IsTwoFactorEnabled)
-        {
-            throw new DomainException("El doble factor ya esta activo.");
-        }
-
-        if (TwoFactorSecret is null)
-        {
-            throw new DomainException("No se puede activar el doble factor sin haber iniciado el alta.");
-        }
-
-        TwoFactorEnabledAt = enabledAt;
-        UpdatedAt = enabledAt;
-    }
-
-    public void RegisterLogin(DateTimeOffset loggedInAt)
-    {
-        if (!IsActive)
-        {
-            throw new DomainException("El empleado esta dado de baja y no puede iniciar sesion.");
-        }
-
-        LastLoginAt = loggedInAt;
-    }
-
     public void Deactivate(DateTimeOffset updatedAt)
     {
-        IsActive = false;
+        User.Deactivate(updatedAt);
         UpdatedAt = updatedAt;
     }
 
     public void Activate(DateTimeOffset updatedAt)
     {
-        IsActive = true;
-        UpdatedAt = updatedAt;
-    }
-
-    public void DisableTwoFactor(DateTimeOffset updatedAt)
-    {
-        TwoFactorSecret = null;
-        TwoFactorEnabledAt = null;
+        User.Activate(updatedAt);
         UpdatedAt = updatedAt;
     }
 
@@ -361,9 +291,4 @@ public sealed class Employee : AggregateRoot, ITwoFactorAccount
         Enum.IsDefined(value)
             ? value
             : throw new DomainException($"{preference} '{value}' no es un valor valido.");
-
-    private static string EnsureHash(string passwordHash) =>
-        string.IsNullOrWhiteSpace(passwordHash)
-            ? throw new DomainException("La contrasena es obligatoria.")
-            : passwordHash;
 }

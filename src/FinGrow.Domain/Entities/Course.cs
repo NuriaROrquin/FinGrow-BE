@@ -3,6 +3,7 @@ namespace FinGrow.Domain.Entities;
 using FinGrow.Domain.Common;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.Errors;
+using FinGrow.Domain.Events;
 using FinGrow.Domain.ValueObjects;
 
 public sealed class Course : AggregateRoot
@@ -105,7 +106,14 @@ public sealed class Course : AggregateRoot
             throw new DomainException("No se puede publicar un curso sin lecciones.");
         }
 
+        var firstPublication = PublishedAt is null;
+
         PublishedAt ??= publishedAt;
         UpdatedAt = publishedAt;
+
+        if (firstPublication)
+        {
+            Raise(new EducationContentPublished(Id, EducationContentKind.Course, Title, publishedAt));
+        }
     }
 }

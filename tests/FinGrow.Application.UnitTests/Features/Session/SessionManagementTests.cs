@@ -268,10 +268,11 @@ public class SessionManagementTests
         _refreshTokens.Add(token);
 
         var device = new FakeClientDevice { UserAgent = ChromeOnWindows };
+        var companies = new FakeCompanyRepository();
         var handler = new RefreshSessionCommandHandler(
             _refreshTokens,
-            employees,
-            new FakeCompanyRepository(),
+            new FakeUserRepository(employees, companies),
+            new SessionAccountResolver(employees, companies),
             new SessionIssuer(new FakeTokenService(), _refreshTokens, _clock, device),
             _unitOfWork,
             _clock);

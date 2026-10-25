@@ -1,10 +1,10 @@
 namespace FinGrow.Api.Contracts;
 
+using FinGrow.Application.Common;
 using FinGrow.Application.Features.Transactions.GetHistory;
 using FinGrow.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
 
-/// <summary>Agrupa los query params de GET /api/transactions para no inflar la firma del controller.</summary>
 public sealed class TransactionQueryParameters
 {
     [FromQuery]
@@ -37,6 +37,24 @@ public sealed class TransactionQueryParameters
     [FromQuery(Name = "dateTo")]
     public DateOnly? DateTo { get; init; }
 
+    [FromQuery]
+    public TransactionSortField SortBy { get; init; } = TransactionSortField.OccurredOn;
+
+    [FromQuery]
+    public SortDirection SortDirection { get; init; } = SortDirection.Descending;
+
     public TransactionFilters ToFilters() =>
-        new(PageNumber, PageSize, Search, Type, ExpenseCategory, IncomeCategory, Status, PaymentMethod, DateFrom, DateTo);
+        new(
+            PageNumber,
+            PageSize,
+            Search,
+            Type,
+            ExpenseCategory,
+            IncomeCategory,
+            Status,
+            PaymentMethod,
+            DateFrom,
+            DateTo,
+            SortBy,
+            SortDirection);
 }

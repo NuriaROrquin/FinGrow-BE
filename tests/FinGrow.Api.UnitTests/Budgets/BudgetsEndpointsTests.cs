@@ -131,70 +131,70 @@ public class BudgetsEndpointsTests
     }
 
     [Fact]
-public async Task Editing_a_limit_saves_it_and_returns_the_recalculated_budget()
-{
-    using var factory = new BudgetsWebApplicationFactory();
-    var client = CreateAuthenticatedClient(factory, Rol.Empleado);
-    await client.PostAsJsonAsync(new Uri(BudgetsPath, UriKind.Relative), SeptemberBudget());
-    factory.Spent[ExpenseCategory.Alimentos] = 90000m;
+    public async Task Editing_a_limit_saves_it_and_returns_the_recalculated_budget()
+    {
+        using var factory = new BudgetsWebApplicationFactory();
+        var client = CreateAuthenticatedClient(factory, Rol.Empleado);
+        await client.PostAsJsonAsync(new Uri(BudgetsPath, UriKind.Relative), SeptemberBudget());
+        factory.Spent[ExpenseCategory.Alimentos] = 90000m;
 
-    var response = await client.PutAsJsonAsync(
-        new Uri(SeptemberLimitsPath, UriKind.Relative),
-        new { category = "Alimentos", amount = 100000m });
+        var response = await client.PutAsJsonAsync(
+            new Uri(SeptemberLimitsPath, UriKind.Relative),
+            new { category = "Alimentos", amount = 100000m });
 
-    response.StatusCode.ShouldBe(HttpStatusCode.OK);
-    factory.Budgets.Single().LimitFor(ExpenseCategory.Alimentos)!.Amount.ShouldBe(100000m);
-    var body = await response.Content.ReadAsStringAsync();
-    body.ShouldContain("\"spent\":90000");
-    body.ShouldContain("\"health\":\"Warning\"");
-}
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        factory.Budgets.Single().LimitFor(ExpenseCategory.Alimentos)!.Amount.ShouldBe(100000m);
+        var body = await response.Content.ReadAsStringAsync();
+        body.ShouldContain("\"spent\":90000");
+        body.ShouldContain("\"health\":\"Warning\"");
+    }
 
-[Fact]
-public async Task A_negative_limit_responds_400_with_a_clear_message()
-{
-    using var factory = new BudgetsWebApplicationFactory();
-    var client = CreateAuthenticatedClient(factory, Rol.Empleado);
-    await client.PostAsJsonAsync(new Uri(BudgetsPath, UriKind.Relative), SeptemberBudget());
+    [Fact]
+    public async Task A_negative_limit_responds_400_with_a_clear_message()
+    {
+        using var factory = new BudgetsWebApplicationFactory();
+        var client = CreateAuthenticatedClient(factory, Rol.Empleado);
+        await client.PostAsJsonAsync(new Uri(BudgetsPath, UriKind.Relative), SeptemberBudget());
 
-    var response = await client.PutAsJsonAsync(
-        new Uri(SeptemberLimitsPath, UriKind.Relative),
-        new { category = "Alimentos", amount = -500m });
+        var response = await client.PutAsJsonAsync(
+            new Uri(SeptemberLimitsPath, UriKind.Relative),
+            new { category = "Alimentos", amount = -500m });
 
-    response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-    (await response.Content.ReadAsStringAsync()).ShouldContain("tiene que ser un numero mayor a cero");
-    factory.Budgets.Single().LimitFor(ExpenseCategory.Alimentos)!.Amount.ShouldBe(150000m);
-}
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync()).ShouldContain("tiene que ser un numero mayor a cero");
+        factory.Budgets.Single().LimitFor(ExpenseCategory.Alimentos)!.Amount.ShouldBe(150000m);
+    }
 
-[Fact]
-public async Task A_non_numeric_limit_responds_400_with_a_clear_message()
-{
-    using var factory = new BudgetsWebApplicationFactory();
-    var client = CreateAuthenticatedClient(factory, Rol.Empleado);
-    await client.PostAsJsonAsync(new Uri(BudgetsPath, UriKind.Relative), SeptemberBudget());
+    [Fact]
+    public async Task A_non_numeric_limit_responds_400_with_a_clear_message()
+    {
+        using var factory = new BudgetsWebApplicationFactory();
+        var client = CreateAuthenticatedClient(factory, Rol.Empleado);
+        await client.PostAsJsonAsync(new Uri(BudgetsPath, UriKind.Relative), SeptemberBudget());
 
-    var response = await client.PutAsJsonAsync(
-        new Uri(SeptemberLimitsPath, UriKind.Relative),
-        new { category = "Alimentos", amount = "mucho" });
+        var response = await client.PutAsJsonAsync(
+            new Uri(SeptemberLimitsPath, UriKind.Relative),
+            new { category = "Alimentos", amount = "mucho" });
 
-    response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-    (await response.Content.ReadAsStringAsync()).ShouldContain("El campo 'amount' tiene que ser un numero.");
-    factory.Budgets.Single().LimitFor(ExpenseCategory.Alimentos)!.Amount.ShouldBe(150000m);
-}
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync()).ShouldContain("El campo 'amount' tiene que ser un numero.");
+        factory.Budgets.Single().LimitFor(ExpenseCategory.Alimentos)!.Amount.ShouldBe(150000m);
+    }
 
-[Fact]
-public async Task Editing_a_limit_of_a_month_without_a_budget_responds_404()
-{
-    using var factory = new BudgetsWebApplicationFactory();
-    var client = CreateAuthenticatedClient(factory, Rol.Empleado);
+    [Fact]
+    public async Task Editing_a_limit_of_a_month_without_a_budget_responds_404()
+    {
+        using var factory = new BudgetsWebApplicationFactory();
+        var client = CreateAuthenticatedClient(factory, Rol.Empleado);
 
-    var response = await client.PutAsJsonAsync(
-        new Uri(SeptemberLimitsPath, UriKind.Relative),
-        new { category = "Alimentos", amount = 100000m });
+        var response = await client.PutAsJsonAsync(
+            new Uri(SeptemberLimitsPath, UriKind.Relative),
+            new { category = "Alimentos", amount = 100000m });
 
-    response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
-}
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
 
-        [Fact]
+    [Fact]
     public async Task Removing_a_category_takes_it_out_of_the_budget()
     {
         using var factory = new BudgetsWebApplicationFactory();
@@ -262,6 +262,28 @@ public async Task Editing_a_limit_of_a_month_without_a_budget_responds_404()
         var response = await client.DeleteAsync(new Uri(BudgetsPath + "/2026/9", UriKind.Relative));
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task The_budget_analysis_is_rejected_for_a_company_token_with_403()
+    {
+        using var factory = new BudgetsWebApplicationFactory();
+        var client = CreateAuthenticatedClient(factory, Rol.Empresa);
+
+        var response = await client.GetAsync(new Uri(BudgetsPath + "/analysis", UriKind.Relative));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task The_budget_analysis_with_an_unknown_currency_responds_400()
+    {
+        using var factory = new BudgetsWebApplicationFactory();
+        var client = CreateAuthenticatedClient(factory, Rol.Empleado);
+
+        var response = await client.GetAsync(new Uri(BudgetsPath + "/analysis?currency=XYZ", UriKind.Relative));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 
     private static object SeptemberBudget() => new
@@ -349,6 +371,18 @@ public async Task Editing_a_limit_of_a_month_without_a_budget_responds_404()
             CancellationToken cancellationToken = default) =>
             Task.FromResult(budgets.FirstOrDefault(budget =>
                 budget.EmployeeId == employeeId && budget.Period == period && budget.PeriodStart == periodStart));
+
+        public Task<IReadOnlyList<Budget>> ListMonthlyAsync(
+            Guid employeeId,
+            DateOnly fromPeriodStart,
+            DateOnly toPeriodStart,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Budget>>(budgets
+                .Where(budget => budget.EmployeeId == employeeId
+                    && budget.PeriodStart >= fromPeriodStart
+                    && budget.PeriodStart <= toPeriodStart)
+                .OrderBy(budget => budget.PeriodStart)
+                .ToList());
     }
 
     private sealed class InMemoryBudgetSpendingReadRepository(Dictionary<ExpenseCategory, decimal> spent)

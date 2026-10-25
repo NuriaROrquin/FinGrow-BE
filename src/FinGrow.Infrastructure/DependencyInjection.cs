@@ -73,6 +73,7 @@ public static class DependencyInjection
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        services.AddScoped<IUserRepository, UserRepository>();
 
         return services;
     }
@@ -106,6 +107,7 @@ public static class DependencyInjection
         services.AddScoped<ITransactionExcelExporter, TransactionExcelExporter>();
         services.AddScoped<IGoalRepository, GoalRepository>();
         services.AddScoped<IInvestmentRepository, InvestmentRepository>();
+        services.AddScoped<INotificationAudienceRepository, NotificationAudienceRepository>();
         services.AddScoped<IInvestmentReadRepository, InvestmentReadRepository>();
         services.AddScoped<ISecurityPriceRepository, SecurityPriceRepository>();
         services.AddScoped<ICourseRepository, CourseRepository>();

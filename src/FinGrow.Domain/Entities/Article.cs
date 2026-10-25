@@ -3,6 +3,7 @@ namespace FinGrow.Domain.Entities;
 using FinGrow.Domain.Common;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.Errors;
+using FinGrow.Domain.Events;
 
 public sealed class Article : AggregateRoot
 {
@@ -91,7 +92,14 @@ public sealed class Article : AggregateRoot
 
     public void Publish(DateTimeOffset publishedAt)
     {
+        var firstPublication = PublishedAt is null;
+
         PublishedAt ??= publishedAt;
         UpdatedAt = publishedAt;
+
+        if (firstPublication)
+        {
+            Raise(new EducationContentPublished(Id, EducationContentKind.Article, Title, publishedAt));
+        }
     }
 }

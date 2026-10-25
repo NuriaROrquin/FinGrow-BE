@@ -92,7 +92,7 @@ internal sealed partial class LinkCodeRedeemer
 
         var employee = await _employees.GetByIdAsync(linkCode.EmployeeId, cancellationToken);
 
-        if (employee is null || !employee.IsActive)
+        if (employee is null || !employee.User.IsActive)
         {
             return LinkAttempt.InvalidCode;
         }

@@ -3,6 +3,7 @@ namespace FinGrow.Domain.UnitTests.Entities;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.Errors;
+using FinGrow.Domain.Events;
 
 public class CourseTests
 {
@@ -63,6 +64,21 @@ public class CourseTests
 
         course.IsPublished.ShouldBeTrue();
         course.PublishedAt.ShouldBe(Now);
+    }
+
+    [Fact]
+    public void Publishing_for_the_first_time_raises_the_event_and_publishing_again_does_not()
+    {
+        var course = CreateCourse();
+        course.AddLesson("Introducción", 10, VideoUrl, Now);
+
+        course.Publish(Now);
+        course.Publish(Now.AddDays(5));
+
+        var published = course.DequeueDomainEvents().ShouldHaveSingleItem().ShouldBeOfType<EducationContentPublished>();
+        published.ContentId.ShouldBe(course.Id);
+        published.Kind.ShouldBe(EducationContentKind.Course);
+        published.Title.ShouldBe(course.Title);
     }
 
     [Theory]

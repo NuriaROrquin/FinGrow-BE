@@ -17,11 +17,11 @@ public sealed record CompanyEmployeeResponse(
         new(
             employee.Id,
             employee.FullName,
-            employee.Email.Value,
+            employee.User.Email.Value,
             employee.PhoneNumber,
             employee.DepartmentId,
             department?.Name,
             employee.HiredOn,
-            employee.IsActive,
-            employee.LastLoginAt);
+            employee.User.IsActive,
+            employee.User.LastLoginAt);
 }

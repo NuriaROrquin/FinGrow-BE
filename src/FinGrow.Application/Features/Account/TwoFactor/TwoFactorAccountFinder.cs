@@ -1,35 +1,22 @@
 ﻿namespace FinGrow.Application.Features.Account.TwoFactor;
 
-using FinGrow.Application.Common;
 using FinGrow.Application.Interfaces;
-using FinGrow.Domain.Common;
+using FinGrow.Domain.Entities;
 using FinGrow.Domain.Repositories;
 
 internal sealed class TwoFactorAccountFinder
 {
     private readonly ICurrentUser _currentUser;
-    private readonly IEmployeeRepository _employees;
-    private readonly ICompanyRepository _companies;
+    private readonly IUserRepository _users;
 
-    public TwoFactorAccountFinder(ICurrentUser currentUser, IEmployeeRepository employees, ICompanyRepository companies)
+    public TwoFactorAccountFinder(ICurrentUser currentUser, IUserRepository users)
     {
         _currentUser = currentUser;
-        _employees = employees;
-        _companies = companies;
+        _users = users;
     }
 
-    public async Task<ITwoFactorAccount?> FindCurrentAsync(CancellationToken cancellationToken)
-    {
-        if (_currentUser.UserId is not { } userId)
-        {
-            return null;
-        }
-
-        if (_currentUser.Role == Rol.Empresa)
-        {
-            return await _companies.GetByIdAsync(userId, cancellationToken);
-        }
-
-        return await _employees.GetByIdAsync(userId, cancellationToken);
-    }
+    public async Task<User?> FindCurrentAsync(CancellationToken cancellationToken) =>
+        _currentUser.UserId is { } userId
+            ? await _users.GetByIdAsync(userId, cancellationToken)
+            : null;
 }

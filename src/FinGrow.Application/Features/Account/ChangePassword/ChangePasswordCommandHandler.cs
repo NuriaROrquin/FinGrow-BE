@@ -20,8 +20,7 @@ internal sealed class ChangePasswordCommandHandler : IRequestHandler<ChangePassw
         Error.Validation("Account.ContrasenaActualIncorrecta", "La contrasena actual no es correcta.");
 
     private readonly ICurrentUser _currentUser;
-    private readonly IEmployeeRepository _employees;
-    private readonly ICompanyRepository _companies;
+    private readonly IUserRepository _users;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IRefreshTokenRepository _refreshTokens;
     private readonly IUnitOfWork _unitOfWork;
@@ -29,16 +28,14 @@ internal sealed class ChangePasswordCommandHandler : IRequestHandler<ChangePassw
 
     public ChangePasswordCommandHandler(
         ICurrentUser currentUser,
-        IEmployeeRepository employees,
-        ICompanyRepository companies,
+        IUserRepository users,
         IPasswordHasher passwordHasher,
         IRefreshTokenRepository refreshTokens,
         IUnitOfWork unitOfWork,
         IDateTimeProvider clock)
     {
         _currentUser = currentUser;
-        _employees = employees;
-        _companies = companies;
+        _users = users;
         _passwordHasher = passwordHasher;
         _refreshTokens = refreshTokens;
         _unitOfWork = unitOfWork;
@@ -47,59 +44,24 @@ internal sealed class ChangePasswordCommandHandler : IRequestHandler<ChangePassw
 
     public async Task<Result> Handle(ChangePasswordCommand request, CancellationToken cancellationToken)
     {
-        if (_currentUser.UserId is not { } userId || _currentUser.Role is not { } role)
+        if (_currentUser.UserId is not { } userId)
         {
             return Result.Failure(NoAutenticado);
         }
 
-        var now = _clock.UtcNow;
+        var user = await _users.GetByIdAsync(userId, cancellationToken);
 
-        var verified = role == Rol.Empresa
-            ? await ChangeCompanyPasswordAsync(userId, request, now, cancellationToken)
-            : await ChangeEmployeePasswordAsync(userId, request, now, cancellationToken);
-
-        if (!verified)
+        if (user is null || !_passwordHasher.Verify(request.CurrentPassword, user.PasswordHash))
         {
             return Result.Failure(ContrasenaActualIncorrecta);
         }
+
+        var now = _clock.UtcNow;
+        user.ChangePassword(_passwordHasher.Hash(request.NewPassword), now);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         await _refreshTokens.RevokeAllForUserAsync(userId, now, cancellationToken);
 
         return Result.Success();
-    }
-
-    private async Task<bool> ChangeEmployeePasswordAsync(
-        Guid employeeId,
-        ChangePasswordCommand request,
-        DateTimeOffset now,
-        CancellationToken cancellationToken)
-    {
-        var employee = await _employees.GetByIdAsync(employeeId, cancellationToken);
-
-        if (employee is null || !_passwordHasher.Verify(request.CurrentPassword, employee.PasswordHash))
-        {
-            return false;
-        }
-
-        employee.ChangePassword(_passwordHasher.Hash(request.NewPassword), now);
-        return true;
-    }
-
-    private async Task<bool> ChangeCompanyPasswordAsync(
-        Guid companyId,
-        ChangePasswordCommand request,
-        DateTimeOffset now,
-        CancellationToken cancellationToken)
-    {
-        var company = await _companies.GetByIdAsync(companyId, cancellationToken);
-
-        if (company is null || !_passwordHasher.Verify(request.CurrentPassword, company.PasswordHash))
-        {
-            return false;
-        }
-
-        company.ChangePassword(_passwordHasher.Hash(request.NewPassword), now);
-        return true;
     }
 }
