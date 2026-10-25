@@ -6,5 +6,6 @@ public enum InvestmentSortField
     AssetName = 2,
     InvestedAmount = 3,
     CurrentValue = 4,
-    ReturnPercentage = 5
+    ReturnPercentage = 5,
+    AssetType = 6
 }

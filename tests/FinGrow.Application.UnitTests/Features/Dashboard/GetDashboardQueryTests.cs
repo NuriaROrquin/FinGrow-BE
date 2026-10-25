@@ -2,6 +2,7 @@ namespace FinGrow.Application.UnitTests.Features.Dashboard;
 
 using FinGrow.Application.Common;
 using FinGrow.Application.Features.Dashboard.GetDashboard;
+using FinGrow.Application.Features.Transactions.GetHistory;
 using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
@@ -165,6 +166,8 @@ public sealed class GetDashboardQueryTests
             PaymentMethod? paymentMethod,
             DateOnly? fromDate,
             DateOnly? toDate,
+            TransactionSortField sortBy,
+            SortDirection sortDirection,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(new TransactionPage(Array.Empty<Transaction>(), pageNumber, pageSize, 0));
 
