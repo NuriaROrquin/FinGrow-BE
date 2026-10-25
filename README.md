@@ -99,7 +99,7 @@ variables de entorno usando `__` como separador de sección.
 | `Gmail:RedirectUri` | `Gmail__RedirectUri` | URL de `GET /api/integrations/gmail/oauth/callback`, idéntica a una de las cargadas en el cliente OAuth. Google acepta `localhost`: en desarrollo ya viene configurada para el puerto 5210 |
 | `Gmail:FrontendReturnUrl` | `Gmail__FrontendReturnUrl` | Página del frontend a la que vuelve el navegador al terminar la vinculación; recibe `?gmail=linked` o `?gmail=error&reason=...` (default `http://localhost:3000/dashboard/settings`) |
 | `Gmail:TimeoutSeconds` | `Gmail__TimeoutSeconds` | Timeout de las llamadas a Google (default 30) |
-| `PasswordReset:ResetUrl` | `PasswordReset__ResetUrl` | Pantalla del frontend a la que lleva el correo de "¿Olvidaste tu contraseña?" (HU-72); recibe `?token=...` y `&tipo=empleado` o `&tipo=empresa`. Sin ella la API no arranca (default `http://localhost:3000/recuperar-password/restablecer`) |
+| `PasswordReset:ResetUrl` | `PasswordReset__ResetUrl` | Pantalla del frontend a la que lleva el correo de "¿Olvidaste tu contraseña?" (HU-72); recibe `?token=...`. Sin ella la API no arranca (default `http://localhost:3000/recuperar-password/restablecer`) |
 | `Iol:ApiBaseUrl` | `Iol__ApiBaseUrl` | URL base de la API de InvertirOnline (default `https://api.invertironline.com/`). Todo lo que se hace por la API impacta en la cuenta real |
 | `Iol:TimeoutSeconds` | `Iol__TimeoutSeconds` | Timeout de las llamadas a la API de IOL (default 30) |
 | `TokenEncryption:Key` | `TokenEncryption__Key` | Clave AES-256 en base64 (`openssl rand -base64 32`) con la que se cifran en la base los tokens OAuth de las integraciones. Cambiarla deja ilegibles los tokens ya guardados |
