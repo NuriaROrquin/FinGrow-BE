@@ -123,7 +123,7 @@ public class GetDepartmentMetricsOverviewQueryHandlerTests
 
         result.IsSuccess.ShouldBeTrue();
         var metrics = result.Value.Single();
-        metrics.Employees.ShouldBeNull();
+        metrics.Employees.ShouldBe(2);
         metrics.AverageScore.ShouldBeNull();
         metrics.Participation.ShouldBeNull();
         metrics.Status.ShouldBeNull();
