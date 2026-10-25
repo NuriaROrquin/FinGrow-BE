@@ -520,7 +520,8 @@ cron esté corriendo: muestra la última corrida de cada trabajo.
 Los logs salen siempre por consola. Si además están configurados `Axiom:ApiToken` y
 `Axiom:Dataset`, la API los manda a [Axiom](https://axiom.co) por OpenTelemetry (OTLP/HTTP a
 `https://<Axiom:Domain>/v1/logs`), en lotes y en segundo plano: si Axiom no responde, los requests
-no esperan ni fallan y el log sigue estando en la consola. Con una sola de las dos variables la API
+no esperan ni fallan y el log sigue estando en la consola. A Axiom va solo lo de nivel
+`Information` para arriba: el `Debug` de Development queda en la consola. Con una sola de las dos variables la API
 no arranca y el log dice cuál falta; sin ninguna, todo funciona como antes (desarrollo local, tests
 y CI).
 
