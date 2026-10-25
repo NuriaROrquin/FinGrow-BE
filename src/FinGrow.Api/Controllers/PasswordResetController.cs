@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
 [Route("password-reset")]
+[IgnoreSession]
 public sealed class PasswordResetController(IMediator mediator) : ControllerBase
 {
     [HttpPost]

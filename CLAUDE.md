@@ -564,6 +564,10 @@ el front vuelve siempre a la portada. Lo que no se deduce leyendo:
   (`password_reset_tokens.user_id`) es FK a `users` con cascada, así que borrar la cuenta se
   lleva sus enlaces. No tiene empresa: está en `GlobalEntityTypes`, como `users`. El nombre del
   saludo sale de `SessionAccountResolver`.
+- **El flujo no mira la sesión** (`[IgnoreSession]`, `Api/Authentication/`): quien abre el enlace puede
+  tener abierta en ese navegador la sesión de otra cuenta, hasta de otra empresa. Con esa sesión el
+  filtro de empresa de T-10 dejaría afuera los refresh tokens de la cuenta, y restablecer la
+  contraseña no le cerraría las sesiones abiertas. No le saques el atributo al controller.
 
 ## Eventos de dominio y alertas
 
