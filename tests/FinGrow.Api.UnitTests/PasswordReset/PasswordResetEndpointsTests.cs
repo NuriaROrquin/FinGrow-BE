@@ -201,6 +201,19 @@ public class PasswordResetEndpointsTests : IClassFixture<PasswordResetEndpointsT
             revokedUsers.Add((userId, currentUser.IsAuthenticated));
             return Task.CompletedTask;
         }
+
+        public Task<IReadOnlyList<RefreshToken>> ListActiveForUserAsync(Guid userId, DateTimeOffset now, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<RefreshToken>>(Array.Empty<RefreshToken>());
+
+        public Task<RefreshToken?> FindActiveBySessionAsync(Guid sessionId, DateTimeOffset now, CancellationToken cancellationToken = default) =>
+            Task.FromResult<RefreshToken?>(null);
+
+        public Task RevokeAllForUserExceptSessionAsync(
+            Guid userId,
+            Guid keptSessionId,
+            DateTimeOffset revokedAt,
+            CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
     }
 
     private sealed class NoOpUnitOfWork : IUnitOfWork
