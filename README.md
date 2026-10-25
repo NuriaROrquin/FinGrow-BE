@@ -99,6 +99,7 @@ variables de entorno usando `__` como separador de sección.
 | `Gmail:RedirectUri` | `Gmail__RedirectUri` | URL de `GET /api/integrations/gmail/oauth/callback`, idéntica a una de las cargadas en el cliente OAuth. Google acepta `localhost`: en desarrollo ya viene configurada para el puerto 5210 |
 | `Gmail:FrontendReturnUrl` | `Gmail__FrontendReturnUrl` | Página del frontend a la que vuelve el navegador al terminar la vinculación; recibe `?gmail=linked` o `?gmail=error&reason=...` (default `http://localhost:3000/dashboard/settings`) |
 | `Gmail:TimeoutSeconds` | `Gmail__TimeoutSeconds` | Timeout de las llamadas a Google (default 30) |
+| `PasswordReset:ResetUrl` | `PasswordReset__ResetUrl` | Pantalla del frontend a la que lleva el correo de "¿Olvidaste tu contraseña?" (HU-72); recibe `?token=...`. Sin ella la API no arranca (default `http://localhost:3000/recuperar-password/restablecer`) |
 | `Iol:ApiBaseUrl` | `Iol__ApiBaseUrl` | URL base de la API de InvertirOnline (default `https://api.invertironline.com/`). Todo lo que se hace por la API impacta en la cuenta real |
 | `Iol:TimeoutSeconds` | `Iol__TimeoutSeconds` | Timeout de las llamadas a la API de IOL (default 30) |
 | `TokenEncryption:Key` | `TokenEncryption__Key` | Clave AES-256 en base64 (`openssl rand -base64 32`) con la que se cifran en la base los tokens OAuth de las integraciones. Cambiarla deja ilegibles los tokens ya guardados |
@@ -940,6 +941,7 @@ Siete entidades y tres value objects. El esquema se crea con la migración `Init
 | Tabla | Raíz de agregado | Qué guarda |
 |---|---|---|
 | `users` | User | Las credenciales de empleados y empresas: email (único entre los dos), hash de contraseña, rol, secreto del doble factor (cifrado), último ingreso y si la cuenta está activa. Tiene el mismo id que su empleado o su empresa |
+| `password_reset_tokens` | PasswordResetToken | Los enlaces de "¿Olvidaste tu contraseña?" (HU-72): el hash del token (nunca el valor), cuándo se emitió, cuándo vence y cuándo se usó. Cuelga de `users` con cascada y no tiene empresa: se busca la cuenta por email sin saber el rol |
 | `companies` | Company | Empresa contratante: razón social, CUIT, datos corporativos, moneda por defecto. Su `id` es FK a `users` |
 | `departments` | (parte de Company) | Departamentos de la empresa; se desactivan, no se borran |
 | `employees` | Employee | La persona que usa la app; pertenece a una empresa y opcionalmente a un departamento. Su `id` es FK a `users` |
