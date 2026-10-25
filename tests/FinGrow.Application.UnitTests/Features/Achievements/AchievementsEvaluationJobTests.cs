@@ -72,6 +72,19 @@ public sealed class AchievementsEvaluationJobTests : IDisposable
     }
 
     [Fact]
+    public async Task An_employee_who_withdrew_gets_no_achievement_back_from_what_was_kept()
+    {
+        PreviousSuccessfulRun();
+        _progress.Reach(_employee.Id, AchievementCode.FirstCourse, Now.AddMonths(-1));
+        _employee.Withdraw(Now.AddDays(-1));
+
+        var result = await Job().ExecuteAsync(CancellationToken.None);
+
+        result.IsSuccess.ShouldBeTrue();
+        _achievements.Achievements.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task A_monthly_achievement_is_announced_to_be_celebrated()
     {
         PreviousSuccessfulRun();

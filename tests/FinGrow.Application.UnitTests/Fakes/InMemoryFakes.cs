@@ -26,6 +26,9 @@ public sealed class FakeEmployeeRepository : IEmployeeRepository
             .GroupBy(employee => employee.DepartmentId!.Value)
             .ToDictionary(group => group.Key, group => group.Count()));
 
+    public Task<DateTimeOffset?> FindLastWithdrawalAsync(Guid companyId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Employees.Where(employee => employee.CompanyId == companyId).Max(employee => employee.WithdrawnAt));
+
     public Task<IReadOnlyList<Employee>> ListByCompanyAsync(Guid companyId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Employee>>(Employees
             .Where(employee => employee.CompanyId == companyId)
@@ -269,6 +272,17 @@ public sealed class FakeUnitOfWork : IUnitOfWork
     }
 }
 
+public sealed class FakeEmployeeDataEraser : IEmployeeDataEraser
+{
+    public List<Guid> ErasedEmployees { get; } = new();
+
+    public Task EraseAndSaveAsync(Guid employeeId, CancellationToken cancellationToken = default)
+    {
+        ErasedEmployees.Add(employeeId);
+        return Task.CompletedTask;
+    }
+}
+
 public sealed class FakeDateTimeProvider : IDateTimeProvider
 {
     public FakeDateTimeProvider(DateTimeOffset utcNow) => UtcNow = utcNow;
@@ -445,9 +459,17 @@ public sealed class FakeGmailOAuthClient : IGmailOAuthClient
     public Task<string> GetEmailAddressAsync(string accessToken, CancellationToken cancellationToken = default) =>
         Task.FromResult(EmailAddress);
 
+    public Exception? RevokeFailure { get; set; }
+
     public Task RevokeAsync(string token, CancellationToken cancellationToken = default)
     {
         ThrowIfUnreachable();
+
+        if (RevokeFailure is not null)
+        {
+            throw RevokeFailure;
+        }
+
         RevokedTokens.Add(token);
 
         return Task.CompletedTask;

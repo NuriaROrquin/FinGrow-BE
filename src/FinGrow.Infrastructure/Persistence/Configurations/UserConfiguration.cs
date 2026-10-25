@@ -10,7 +10,9 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
 {
     public void Configure(EntityTypeBuilder<User> builder)
     {
-        builder.ToTable("users");
+        // Una baja pedida por el empleado (HU-74) es definitiva: la cuenta no puede volver a estar activa.
+        builder.ToTable("users", table =>
+            table.HasCheckConstraint("ck_users_withdrawn_is_inactive", "withdrawn_at IS NULL OR NOT is_active"));
 
         builder.HasKey(user => user.Id);
 

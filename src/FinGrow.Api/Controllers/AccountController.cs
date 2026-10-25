@@ -7,6 +7,7 @@ using FinGrow.Application.Features.Account.ChangePassword;
 using FinGrow.Application.Features.Account.Preferences;
 using FinGrow.Application.Features.Account.Profile;
 using FinGrow.Application.Features.Account.TwoFactor;
+using FinGrow.Application.Features.Account.Withdraw;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -48,6 +49,20 @@ public sealed class AccountController(IMediator mediator) : ControllerBase
     [Authorize(Roles = Rol.Empleado)]
     public async Task<IActionResult> UpdatePreferences(UpdatePreferencesCommand command, CancellationToken cancellationToken) =>
         (await mediator.Send(command, cancellationToken)).ToActionResult();
+
+    [HttpPost("withdrawal")]
+    [Authorize(Roles = Rol.Empleado)]
+    public async Task<IActionResult> Withdraw(WithdrawAccountCommand command, CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(command, cancellationToken);
+
+        if (result.IsSuccess)
+        {
+            SessionCookie.Delete(Response);
+        }
+
+        return result.ToActionResult();
+    }
 
     [HttpGet("2fa")]
     public async Task<IActionResult> GetTwoFactorStatus(CancellationToken cancellationToken) =>

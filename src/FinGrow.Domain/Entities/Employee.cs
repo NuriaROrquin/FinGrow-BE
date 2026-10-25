@@ -93,6 +93,12 @@ public sealed class Employee : AggregateRoot
 
     public DateOnly HiredOn { get; private set; }
 
+    /// <summary>Cuando el propio empleado pidio la baja y el borrado de sus datos (HU-74). Vive en su
+    /// <see cref="User"/>, que es lo que mira el login.</summary>
+    public DateTimeOffset? WithdrawnAt => User.WithdrawnAt;
+
+    public bool IsWithdrawn => User.IsWithdrawn;
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -220,6 +226,25 @@ public sealed class Employee : AggregateRoot
     {
         User.Activate(updatedAt);
         UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Baja pedida por el empleado: su usuario queda sin acceso y sin doble factor, y se borran los
+    /// datos de perfil que cargo el (DNI, direccion, fecha de nacimiento). Nombre, email y telefono
+    /// quedan porque son los que cargo la empresa al darlo de alta y los sigue viendo en su nomina.
+    /// </summary>
+    public void Withdraw(DateTimeOffset withdrawnAt)
+    {
+        if (IsWithdrawn)
+        {
+            return;
+        }
+
+        User.Withdraw(withdrawnAt);
+        NationalId = null;
+        Address = null;
+        BirthDate = null;
+        UpdatedAt = withdrawnAt;
     }
 
     private static string EnsureValidFullName(string fullName)

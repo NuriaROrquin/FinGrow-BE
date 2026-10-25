@@ -292,6 +292,51 @@ public class EmployeeTests
             employee.UpdateDetails("Juan Perez", Email.From("juan.perez@empresa.com"), "hola", Now));
     }
 
+    [Fact]
+    public void Withdrawing_cuts_the_access_and_erases_the_profile_the_employee_entered()
+    {
+        var employee = CreateEmployee();
+        employee.UpdateProfile("Juan Perez", "+54 9 11 1234-5678", "30123456", new DateOnly(1990, 5, 4), "Av. Siempre Viva 742", Now);
+        employee.User.StartTwoFactorEnrollment("SECRETBASE32", Now);
+        employee.User.EnableTwoFactor(Now);
+        var withdrawnAt = Now.AddDays(10);
+
+        employee.Withdraw(withdrawnAt);
+
+        employee.IsWithdrawn.ShouldBeTrue();
+        employee.WithdrawnAt.ShouldBe(withdrawnAt);
+        employee.User.IsActive.ShouldBeFalse();
+        employee.User.WithdrawnAt.ShouldBe(withdrawnAt);
+        employee.NationalId.ShouldBeNull();
+        employee.BirthDate.ShouldBeNull();
+        employee.Address.ShouldBeNull();
+        employee.User.IsTwoFactorEnabled.ShouldBeFalse();
+        employee.User.TwoFactorSecret.ShouldBeNull();
+        employee.FullName.ShouldBe("Juan Perez");
+        employee.User.Email.Value.ShouldBe("juan.perez@empresa.com");
+    }
+
+    [Fact]
+    public void Withdrawing_twice_keeps_the_first_date()
+    {
+        var employee = CreateEmployee();
+        employee.Withdraw(Now);
+
+        employee.Withdraw(Now.AddDays(1));
+
+        employee.WithdrawnAt.ShouldBe(Now);
+    }
+
+    [Fact]
+    public void An_employee_who_withdrew_cannot_be_activated()
+    {
+        var employee = CreateEmployee();
+        employee.Withdraw(Now);
+
+        Should.Throw<DomainException>(() => employee.Activate(Now.AddDays(1)));
+        employee.User.IsActive.ShouldBeFalse();
+    }
+
     private static Employee CreateEmployee() => Employee.Create(
         CompanyId,
         departmentId: null,

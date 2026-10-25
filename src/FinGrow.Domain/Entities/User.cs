@@ -32,6 +32,13 @@ public sealed class User : AggregateRoot
 
     public bool IsActive { get; private set; }
 
+    /// <summary>Baja pedida por el propio empleado (HU-74). Es definitiva: a diferencia de
+    /// <see cref="Deactivate"/>, la empresa no la puede revertir, y el login responde como si la
+    /// cuenta no existiera.</summary>
+    public DateTimeOffset? WithdrawnAt { get; private set; }
+
+    public bool IsWithdrawn => WithdrawnAt is not null;
+
     public DateTimeOffset? LastLoginAt { get; private set; }
 
     public string? TwoFactorSecret { get; private set; }
@@ -132,8 +139,22 @@ public sealed class User : AggregateRoot
 
     internal void Activate(DateTimeOffset updatedAt)
     {
+        if (IsWithdrawn)
+        {
+            throw new DomainException("La cuenta se dio de baja y su acceso no se puede reactivar.");
+        }
+
         IsActive = true;
         UpdatedAt = updatedAt;
+    }
+
+    internal void Withdraw(DateTimeOffset withdrawnAt)
+    {
+        IsActive = false;
+        WithdrawnAt = withdrawnAt;
+        TwoFactorSecret = null;
+        TwoFactorEnabledAt = null;
+        UpdatedAt = withdrawnAt;
     }
 
     private static string EnsureHash(string passwordHash) =>

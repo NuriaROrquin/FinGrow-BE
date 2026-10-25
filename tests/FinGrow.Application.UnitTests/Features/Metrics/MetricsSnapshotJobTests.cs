@@ -17,6 +17,7 @@ public class MetricsSnapshotJobTests
     private static readonly MetricsPeriod August = MetricsPeriod.Of(2026, 8);
 
     private readonly FakeCompanyRepository _companies = new();
+    private readonly FakeEmployeeRepository _employees = new();
     private readonly FakePeriodActivityReadRepository _activity = new();
     private readonly FakeMetricsSnapshotRepository _snapshots = new();
     private readonly FakeFinancialHealthReadRepository _finances = new();
@@ -101,6 +102,59 @@ public class MetricsSnapshotJobTests
         augustCompany.ComputedAt.ShouldBe(Now);
         _snapshots.DepartmentSnapshots.Single(snapshot => snapshot.Period == August).Metrics.ConfirmedTransactions.ShouldBe(2);
         result.Summary.ShouldBe("1 empresa(s) activa(s): 1 foto(s) de empresa y 1 de departamento para 1 periodo(s) (2026-08).");
+    }
+
+    [Fact]
+    public async Task A_withdrawal_after_the_last_closed_month_keeps_its_existing_snapshot()
+    {
+        var company = NewCompany("Acme", CompanyCreatedAt);
+        var tech = company.AddDepartment("Tecnologia", null, null, CompanyCreatedAt);
+        _companies.Companies.Add(company);
+        var earlier = Now.AddDays(-20);
+        var taken = PeriodMetrics.From(2, 2, 7, 0, 0, 0, 0, 0, 0);
+        _snapshots.Add(CompanyMetricsSnapshot.Take(company.Id, July, PeriodMetrics.Empty, earlier));
+        _snapshots.Add(CompanyMetricsSnapshot.Take(company.Id, August, taken, earlier));
+        _snapshots.Add(DepartmentMetricsSnapshot.Take(company.Id, tech.Id, August, taken, earlier));
+        _employees.Employees.Add(WithdrawnEmployee(company.Id, withdrawnAt: August.EndInstantExclusive.AddHours(1)));
+        _activity.Activity[(company.Id, August.Start)] = new List<EmployeePeriodActivity> { Employee(tech.Id, confirmedTransactions: 2) };
+
+        var result = await Job().ExecuteAsync(CancellationToken.None);
+
+        result.IsSuccess.ShouldBeTrue();
+        _activity.Requests.ShouldBeEmpty();
+        var august = _snapshots.CompanySnapshots.Single(snapshot => snapshot.Period == August);
+        august.Metrics.ShouldBe(taken);
+        august.ComputedAt.ShouldBe(earlier);
+        _snapshots.DepartmentSnapshots.Single(snapshot => snapshot.Period == August).Metrics.ShouldBe(taken);
+    }
+
+    [Fact]
+    public async Task A_withdrawal_during_the_last_closed_month_does_not_stop_its_refresh()
+    {
+        var company = NewCompany("Acme", CompanyCreatedAt);
+        _companies.Companies.Add(company);
+        _snapshots.Add(CompanyMetricsSnapshot.Take(company.Id, July, PeriodMetrics.Empty, Now.AddDays(-20)));
+        _snapshots.Add(CompanyMetricsSnapshot.Take(company.Id, August, PeriodMetrics.Empty, Now.AddDays(-20)));
+        _employees.Employees.Add(WithdrawnEmployee(company.Id, withdrawnAt: August.StartInstant.AddDays(3)));
+        _activity.Activity[(company.Id, August.Start)] = new List<EmployeePeriodActivity> { Employee(null, confirmedTransactions: 2) };
+
+        await Job().ExecuteAsync(CancellationToken.None);
+
+        var august = _snapshots.CompanySnapshots.Single(snapshot => snapshot.Period == August);
+        august.ComputedAt.ShouldBe(Now);
+        august.Metrics.ConfirmedTransactions.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task A_withdrawal_does_not_stop_a_missing_snapshot_from_being_taken()
+    {
+        var company = NewCompany("Acme", CompanyCreatedAt);
+        _companies.Companies.Add(company);
+        _employees.Employees.Add(WithdrawnEmployee(company.Id, withdrawnAt: Now.AddDays(-1)));
+
+        await Job().ExecuteAsync(CancellationToken.None);
+
+        _snapshots.CompanySnapshots.Select(snapshot => snapshot.Period).ShouldBe(new[] { July, August });
     }
 
     [Fact]
@@ -237,6 +291,7 @@ public class MetricsSnapshotJobTests
 
     private MetricsSnapshotJob Job() => new(
         _companies,
+        _employees,
         _activity,
         _snapshots,
         new FinancialHealthScorer(_finances, _goals, _scores, _exchangeRates, NullLogger<FinancialHealthScorer>.Instance),
@@ -246,6 +301,22 @@ public class MetricsSnapshotJobTests
 
     private static EmployeeCurrencyTotals Pesos(Guid employeeId, decimal monthIncome, decimal monthSpending) =>
         new(employeeId, Currency.ARS, new DateOnly(2026, 5, 10), monthIncome, monthSpending, 1000000m, 700000m, 300000m);
+
+    private static FinGrow.Domain.Entities.Employee WithdrawnEmployee(Guid companyId, DateTimeOffset withdrawnAt)
+    {
+        var employee = FinGrow.Domain.Entities.Employee.Create(
+            companyId,
+            departmentId: null,
+            "Ana Gómez",
+            Email.From("ana.gomez@acme.com"),
+            phoneNumber: null,
+            "hash",
+            Currency.ARS,
+            new DateOnly(2026, 7, 15),
+            CompanyCreatedAt);
+        employee.Withdraw(withdrawnAt);
+        return employee;
+    }
 
     private static Company NewCompany(string name, DateTimeOffset createdAt) => Company.Create(
         name,

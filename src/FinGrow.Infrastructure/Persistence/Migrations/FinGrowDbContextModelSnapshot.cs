@@ -1959,6 +1959,10 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<DateTimeOffset?>("WithdrawnAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("withdrawn_at");
+
                     b.HasKey("Id")
                         .HasName("pk_users");
 
@@ -1966,7 +1970,10 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_users_email");
 
-                    b.ToTable("users", (string)null);
+                    b.ToTable("users", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_users_withdrawn_is_inactive", "withdrawn_at IS NULL OR NOT is_active");
+                        });
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.Budget", b =>

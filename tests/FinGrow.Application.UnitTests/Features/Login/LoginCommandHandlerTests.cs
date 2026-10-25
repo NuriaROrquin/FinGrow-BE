@@ -114,6 +114,20 @@ public class LoginCommandHandlerTests
     }
 
     [Fact]
+    public async Task An_employee_who_withdrew_gets_the_same_error_as_wrong_credentials()
+    {
+        var employee = AddEmployee(plainPassword: "1234");
+        employee.Withdraw(Now.AddDays(-1));
+
+        var withdrawn = await LoginAsync("empleado@empresa.com", "1234");
+        var wrongPassword = await LoginAsync("empleado@empresa.com", "otra");
+
+        withdrawn.Error.ShouldBe(wrongPassword.Error);
+        withdrawn.Error.Code.ShouldBe("Auth.CredencialesInvalidas");
+        employee.User.LastLoginAt.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task With_two_factor_enabled_the_password_only_returns_a_challenge()
     {
         var employee = AddEmployee(plainPassword: "1234");

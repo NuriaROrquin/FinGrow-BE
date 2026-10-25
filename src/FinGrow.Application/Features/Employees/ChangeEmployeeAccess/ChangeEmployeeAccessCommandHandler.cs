@@ -49,6 +49,11 @@ internal sealed class ChangeEmployeeAccessCommandHandler
             return Result.Failure<CompanyEmployeeResponse>(EmployeeErrors.NotFound(request.EmployeeId));
         }
 
+        if (employee.IsWithdrawn && request.IsActive)
+        {
+            return Result.Failure<CompanyEmployeeResponse>(EmployeeErrors.Withdrawn);
+        }
+
         if (employee.User.IsActive != request.IsActive)
         {
             var now = _clock.UtcNow;

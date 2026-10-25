@@ -131,6 +131,7 @@ public static class DependencyInjection
         services.AddScoped<IOutboundEmailRepository, OutboundEmailRepository>();
         services.AddScoped<IAchievementRepository, AchievementRepository>();
         services.AddScoped<IAchievementProgressReadRepository, AchievementProgressReadRepository>();
+        services.AddScoped<IEmployeeDataEraser, EmployeeDataEraser>();
 
         services.AddScoped<DatabaseSeeder>();
         services.AddScoped<EducationCatalogSeeder>();
