@@ -154,6 +154,25 @@ internal sealed class TransactionReadRepository : ITransactionReadRepository
         var totalIncomeUsd = GetTotal(totals, TransactionType.Income, Currency.USD);
         var totalExpenseArs = GetTotal(totals, TransactionType.Expense, Currency.ARS);
         var totalExpenseUsd = GetTotal(totals, TransactionType.Expense, Currency.USD);
+        var currencies = Enum.GetValues<Currency>()
+            .ToDictionary(
+                currency => currency,
+                currency => new CurrencyTransactionSummary(
+                    GetTotal(totals, TransactionType.Income, currency),
+                    GetTotal(totals, TransactionType.Expense, currency),
+                    totals
+                        .Where(total => total.Currency == currency)
+                        .Sum(total => total.Count),
+                    totals
+                        .Where(total => total.Currency == currency && total.Type == TransactionType.Income)
+                        .Sum(total => total.Count),
+                    totals
+                        .Where(total => total.Currency == currency && total.Type == TransactionType.Expense)
+                        .Sum(total => total.Count)));
+        var otherCurrencies = currencies
+            .Where(pair => pair.Key is not (Currency.ARS or Currency.USD) && pair.Value.Transactions > 0)
+            .Select(pair => pair.Key)
+            .ToArray();
 
         return new TransactionSummary(
             totalTransactions,
@@ -162,7 +181,9 @@ internal sealed class TransactionReadRepository : ITransactionReadRepository
             totalIncomeArs,
             totalIncomeUsd,
             totalExpenseArs,
-            totalExpenseUsd);
+            totalExpenseUsd,
+            currencies,
+            otherCurrencies);
     }
     
 

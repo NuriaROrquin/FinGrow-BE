@@ -31,9 +31,10 @@ internal sealed class SetBudgetCategoryLimitHandler(
             return Result.Failure<BudgetResponse>(BudgetErrors.NotFound(periodStart));
         }
 
-        var currency = budget.Currency ?? Currency.ARS;
-
-        budget.SetLimit(request.Category, Money.From(request.Amount, currency), dateTimeProvider.UtcNow);
+        budget.SetLimit(
+            request.Category,
+            Money.From(request.Amount, budget.Currency),
+            dateTimeProvider.UtcNow);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 

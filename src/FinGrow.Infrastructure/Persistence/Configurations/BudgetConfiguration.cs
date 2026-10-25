@@ -18,12 +18,14 @@ internal sealed class BudgetConfiguration : IEntityTypeConfiguration<Budget>
             .IsRequired();
 
         builder.Property(budget => budget.PeriodStart).IsRequired();
+        builder.Property(budget => budget.Currency)
+            .HasConversion<string>()
+            .HasMaxLength(3)
+            .IsRequired();
         builder.Property(budget => budget.CreatedAt).IsRequired();
         builder.Property(budget => budget.UpdatedAt).IsRequired();
 
-        // Calculadas a partir de otros campos: viven en el dominio, no en una columna.
         builder.Ignore(budget => budget.PeriodEnd);
-        builder.Ignore(budget => budget.Currency);
 
         builder.HasOne(budget => budget.Employee)
             .WithMany()

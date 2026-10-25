@@ -41,7 +41,7 @@ public class GetBudgetAnalysisHandlerTests
 
     private void BudgetIn(Currency currency, int year, int month, params (ExpenseCategory Category, decimal Limit)[] limits)
     {
-        var budget = Budget.Create(_employeeId, BudgetPeriod.Monthly, new DateOnly(year, month, 1), Now);
+        var budget = Budget.Create(_employeeId, BudgetPeriod.Monthly, new DateOnly(year, month, 1), currency, Now);
 
         foreach (var (category, limit) in limits)
         {
