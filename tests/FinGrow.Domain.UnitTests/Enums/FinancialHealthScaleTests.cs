@@ -19,6 +19,16 @@ public class FinancialHealthScaleTests
     }
 
     [Theory]
+    [InlineData(FinancialHealthBand.Critical, true)]
+    [InlineData(FinancialHealthBand.Fragile, true)]
+    [InlineData(FinancialHealthBand.Stable, false)]
+    [InlineData(FinancialHealthBand.Healthy, false)]
+    public void Only_critical_and_fragile_bands_need_attention(FinancialHealthBand band, bool expected)
+    {
+        FinancialHealthScale.NeedsAttention(band).ShouldBe(expected);
+    }
+
+    [Theory]
     [InlineData(-1, false)]
     [InlineData(0, true)]
     [InlineData(100, true)]

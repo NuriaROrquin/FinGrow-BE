@@ -106,6 +106,91 @@ public class GetDepartmentMetricsOverviewQueryHandlerTests
         metrics.IsMetricsHidden.ShouldBeFalse();
     }
 
+    [Theory]
+    [InlineData(90, FinancialHealthBand.Critical, true)]
+    [InlineData(150, FinancialHealthBand.Fragile, true)]
+    [InlineData(180, FinancialHealthBand.Stable, false)]
+    [InlineData(240, FinancialHealthBand.Healthy, false)]
+    public async Task A_department_needs_attention_when_its_band_is_critical_or_fragile(
+        int scoreSum,
+        FinancialHealthBand expectedBand,
+        bool expectedAttention)
+    {
+        var department = _scenario.AddDepartment("Ventas");
+        _snapshots.Add(DepartmentMetricsSnapshot.Take(
+            _scenario.Company.Id,
+            department.Id,
+            October,
+            PeriodMetrics.From(3, 3, 15, 2, 2, 1, 2, 3, scoreSum),
+            CompanyStaffScenario.Now));
+
+        var result = await CreateHandler().Handle(
+            new GetDepartmentMetricsOverviewQuery(),
+            CancellationToken.None);
+
+        result.IsSuccess.ShouldBeTrue();
+        var metrics = result.Value.Single();
+        metrics.Status.ShouldBe(expectedBand);
+        metrics.NeedsAttention.ShouldBe(expectedAttention);
+    }
+
+    [Fact]
+    public async Task A_department_below_the_minimum_never_needs_attention_even_with_a_low_score()
+    {
+        var department = _scenario.AddDepartment("Marketing");
+        _snapshots.Add(DepartmentMetricsSnapshot.Take(
+            _scenario.Company.Id,
+            department.Id,
+            October,
+            PeriodMetrics.From(2, 2, 10, 1, 1, 0, 1, 2, 20),
+            CompanyStaffScenario.Now));
+
+        var result = await CreateHandler().Handle(
+            new GetDepartmentMetricsOverviewQuery(),
+            CancellationToken.None);
+
+        result.IsSuccess.ShouldBeTrue();
+        var metrics = result.Value.Single();
+        metrics.IsMetricsHidden.ShouldBeTrue();
+        metrics.NeedsAttention.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task A_department_with_its_score_hidden_does_not_need_attention()
+    {
+        var department = _scenario.AddDepartment("Ventas");
+        _snapshots.Add(DepartmentMetricsSnapshot.Take(
+            _scenario.Company.Id,
+            department.Id,
+            October,
+            PeriodMetrics.From(4, 2, 15, 2, 2, 1, 2, 2, 20),
+            CompanyStaffScenario.Now));
+
+        var result = await CreateHandler().Handle(
+            new GetDepartmentMetricsOverviewQuery(),
+            CancellationToken.None);
+
+        result.IsSuccess.ShouldBeTrue();
+        var metrics = result.Value.Single();
+        metrics.AverageScore.ShouldBeNull();
+        metrics.NeedsAttention.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task A_department_without_snapshots_does_not_need_attention()
+    {
+        _scenario.AddDepartment("Soporte");
+
+        var result = await CreateHandler().Handle(
+            new GetDepartmentMetricsOverviewQuery(),
+            CancellationToken.None);
+
+        result.IsSuccess.ShouldBeTrue();
+        var metrics = result.Value.Single();
+        metrics.Period.ShouldBeNull();
+        metrics.NeedsAttention.ShouldBeFalse();
+    }
+
     [Fact]
     public async Task A_department_below_the_minimum_hides_its_metrics()
     {

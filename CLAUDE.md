@@ -421,6 +421,11 @@ Application, antes de serializar la respuesta, y no escondiendo columnas en el f
   FinGrow-AI se arma solo en `CompanyInsightsInputBuilder`. Si cambiás el umbral de 50, cambiá
   también la definición de cada preocupación en el prompt de `company_insights` de FinGrow-AI:
   `CompanyConcern` es contrato con su `FinancialConcern`.
+- **Un departamento necesita atención si su banda es crítica o frágil** (HU-62, `needsAttention`
+  en `GET /api/company/metrics/departments`). La regla es `FinancialHealthScale.NeedsAttention` y
+  se aplica solo a la banda que la empresa puede ver: un departamento con las métricas ocultas o
+  sin puntaje por los umbrales de anonimato nunca se marca, porque marcarlo ya diría algo de un
+  grupo chico. El front destaca lo que llega marcado; no decide con umbrales propios.
 - **Las tendencias comparan el último mes con foto contra el mes anterior, y son reglas** (HU-63,
   `GET /api/company/metrics/trends`). No es la comparación de HU-59 (`/metrics/comparison`, que
   va del primer mes del rango al último): acá siempre son dos meses consecutivos, y sin la foto del
