@@ -7,6 +7,7 @@ using FinGrow.Application.Features.Metrics.GetCompanyMetrics;
 using FinGrow.Application.Features.Metrics.GetCompanyMetricsComparison;
 using FinGrow.Application.Features.Metrics.GetCompanyEducationMetrics;
 using FinGrow.Application.Features.Metrics.GetCompanyInsights;
+using FinGrow.Application.Features.Metrics.GetCompanyTrends;
 using FinGrow.Application.Features.Metrics.GetDepartmentMetricsOverview;
 using FinGrow.Application.Features.Metrics.GetDepartmentMetrics;
 using FinGrow.Application.Features.Metrics.GetParticipation;
@@ -59,6 +60,13 @@ public sealed class CompanyMetricsController(ISender sender) : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Insights(CancellationToken cancellationToken) =>
         (await sender.Send(new GetCompanyInsightsQuery(), cancellationToken)).ToActionResult();
+
+    [HttpGet("metrics/trends")]
+    [ProducesResponseType<CompanyTrendsResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Trends(CancellationToken cancellationToken) =>
+        (await sender.Send(new GetCompanyTrendsQuery(), cancellationToken)).ToActionResult();
 
     [HttpGet("metrics/participation")]
     [ProducesResponseType<CompanyParticipationResponse>(StatusCodes.Status200OK)]
