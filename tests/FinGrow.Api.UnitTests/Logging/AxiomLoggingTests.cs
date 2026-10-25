@@ -25,9 +25,11 @@ public class AxiomLoggingTests
         });
 
         await using (var logger = new LoggerConfiguration()
+            .MinimumLevel.Debug()
             .WriteToAxiom(configuration, new FakeHostEnvironment("Testing"))
             .CreateLogger())
         {
+            logger.Debug("Consulta de {Entity} armada", "BudgetCategoryLimit");
             logger.Information("Corrida de {Job} terminada", "metrics-snapshot");
         }
 
@@ -38,6 +40,7 @@ public class AxiomLoggingTests
         request.Body.ShouldContain(AxiomOptions.ServiceName);
         request.Body.ShouldContain("Testing");
         request.Body.ShouldContain("metrics-snapshot");
+        request.Body.ShouldNotContain("BudgetCategoryLimit");
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 namespace FinGrow.Api.Logging;
 
 using Serilog;
+using Serilog.Events;
 using Serilog.Sinks.OpenTelemetry;
 
 public static class AxiomLoggingExtensions
@@ -21,6 +22,7 @@ public static class AxiomLoggingExtensions
 
         return logger.WriteTo.OpenTelemetry(sink =>
         {
+            sink.RestrictedToMinimumLevel = LogEventLevel.Information;
             sink.Endpoint = options.LogsEndpoint;
             sink.Protocol = OtlpProtocol.HttpProtobuf;
             sink.Headers = new Dictionary<string, string>
