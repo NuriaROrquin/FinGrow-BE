@@ -24,7 +24,6 @@ internal static class BudgetAnalysisBuilder
         var monthsByStart = months.ToDictionary(month => new DateOnly(month.Year, month.Month, 1));
 
         return budgets
-            .Where(budget => budget.Currency is not null)
             .Select(budget => ToUsage(budget, monthsByStart.GetValueOrDefault(budget.PeriodStart)))
             .ToList();
     }
@@ -71,7 +70,7 @@ internal static class BudgetAnalysisBuilder
 
         return new BudgetMonthUsage(
             budget.PeriodStart,
-            budget.Currency!.Value,
+            budget.Currency,
             budget.Limits
                 .OrderBy(limit => limit.Category)
                 .Select(limit => new RecommendationBudgetLimit(

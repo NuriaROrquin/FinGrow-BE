@@ -21,6 +21,7 @@ internal sealed class CreateBudgetHandler(
             request.EmployeeId,
             BudgetPeriod.Monthly,
             new DateOnly(request.Year, request.Month, 1),
+            request.Currency,
             now);
 
         if (await budgetRepository.ExistsForPeriodAsync(

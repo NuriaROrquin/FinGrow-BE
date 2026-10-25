@@ -32,13 +32,13 @@ internal sealed partial class GetBudgetAnalysisHandler(
         var currentMonth = new DateOnly(today.Year, today.Month, 1);
         var firstMonth = currentMonth.AddMonths(-AnalyzedMonths);
 
-        // Un presupuesto sin topes no tiene moneda: no cuenta para ninguna.
+        // Un presupuesto sin topes no aporta cumplimiento: no cuenta para el análisis.
         var budgets = (await budgetRepository.ListMonthlyAsync(
                 request.EmployeeId,
                 firstMonth,
                 currentMonth,
                 cancellationToken))
-            .Where(budget => budget.Currency == request.Currency)
+            .Where(budget => budget.Limits.Count > 0 && budget.Currency == request.Currency)
             .ToList();
         // El mes en curso cuenta para habilitar y la IA lo ve, pero el resumen sale de los meses cerrados:
         // su gasto todavía es parcial. Como hay un solo mes en curso, llegar al mínimo implica al menos uno cerrado.

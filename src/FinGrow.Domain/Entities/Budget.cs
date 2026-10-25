@@ -21,12 +21,14 @@ public sealed class Budget : AggregateRoot
         Guid employeeId,
         BudgetPeriod period,
         DateOnly periodStart,
+        Currency currency,
         DateTimeOffset createdAt)
         : base(id)
     {
         EmployeeId = employeeId;
         Period = period;
         PeriodStart = periodStart;
+        Currency = currency;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
     }
@@ -36,6 +38,8 @@ public sealed class Budget : AggregateRoot
     public BudgetPeriod Period { get; private set; }
 
     public DateOnly PeriodStart { get; private set; }
+
+    public Currency Currency { get; private set; }
 
     public DateTimeOffset CreatedAt { get; private set; }
 
@@ -49,6 +53,7 @@ public sealed class Budget : AggregateRoot
         Guid employeeId,
         BudgetPeriod period,
         DateOnly anyDayOfPeriod,
+        Currency currency,
         DateTimeOffset createdAt)
     {
         if (employeeId == Guid.Empty)
@@ -61,10 +66,16 @@ public sealed class Budget : AggregateRoot
             employeeId,
             period,
             StartOfPeriod(period, anyDayOfPeriod),
+            currency,
             createdAt);
     }
 
-    public Currency? Currency => _limits.Count == 0 ? null : _limits[0].Limit.Currency;
+    public static Budget Create(
+        Guid employeeId,
+        BudgetPeriod period,
+        DateOnly anyDayOfPeriod,
+        DateTimeOffset createdAt) =>
+        Create(employeeId, period, anyDayOfPeriod, Currency.ARS, createdAt);
 
     public DateOnly PeriodEnd => Period == BudgetPeriod.Monthly
         ? PeriodStart.AddMonths(1).AddDays(-1)
@@ -78,10 +89,10 @@ public sealed class Budget : AggregateRoot
     {
         ArgumentNullException.ThrowIfNull(limit);
 
-        if (Currency is { } currency && limit.Currency != currency)
+        if (limit.Currency != Currency)
         {
             throw new DomainException(
-                $"Todos los topes de un presupuesto van en la misma moneda: este esta en {currency}.");
+                $"Todos los topes de un presupuesto van en la misma moneda: este esta en {Currency}.");
         }
 
         var existing = FindLimit(category);
@@ -138,7 +149,7 @@ public sealed class Budget : AggregateRoot
 
     public Budget Duplicate(DateOnly anyDayOfNewPeriod, DateTimeOffset createdAt)
     {
-        var copy = Create(EmployeeId, Period, anyDayOfNewPeriod, createdAt);
+        var copy = Create(EmployeeId, Period, anyDayOfNewPeriod, Currency, createdAt);
 
         if (copy.PeriodStart == PeriodStart)
         {
