@@ -1,6 +1,7 @@
 namespace FinGrow.Application.UnitTests.Features.Metrics;
 
 using FinGrow.Application.Features.Metrics.GetCompanyInsights;
+using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Enums;
 using FinGrow.Domain.ValueObjects;
 
@@ -89,6 +90,22 @@ public class CompanyConcernsCalculatorTests
     public void Without_scores_there_are_no_concerns()
     {
         CompanyConcernsCalculator.Count(Array.Empty<FinancialHealthFactors>()).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Measuring_a_concern_nobody_has_returns_zero_percent()
+    {
+        var measure = CompanyConcernsCalculator.Measure(
+            CompanyConcern.ThinCushion,
+            new[] { Factors(), Factors(savings: 10m) });
+
+        measure.ShouldBe(new CompanyConcernSummary(CompanyConcern.ThinCushion, 0, 2, 0m));
+    }
+
+    [Fact]
+    public void Measuring_a_factor_nobody_has_returns_nothing()
+    {
+        CompanyConcernsCalculator.Measure(CompanyConcern.BudgetOverruns, new[] { Factors(), Factors() }).ShouldBeNull();
     }
 
     private static FinancialHealthFactors Factors(
