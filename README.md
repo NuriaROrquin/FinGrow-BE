@@ -132,6 +132,9 @@ variables de entorno usando `__` como separador de sección.
 | `Storage:ForcePathStyle` | `Storage__ForcePathStyle` | Arma las URLs como `<host>/<bucket>` en lugar de `<bucket>.<host>` (default `true`, que es lo que necesitan R2 y S3Mock) |
 | `Storage:TimeoutSeconds` | `Storage__TimeoutSeconds` | Timeout de cada operación contra el almacenamiento (default 30) |
 | `ReceiptsCleanup:GraceDays` | `ReceiptsCleanup__GraceDays` | Días que espera `receipts-cleanup` antes de borrar un comprobante suelto, contados desde que se subió (default 7, entre 1 y 365) |
+| `Axiom:ApiToken` | `Axiom__ApiToken` | Token de API de Axiom (`xaat-...`) con permiso de ingesta sobre el dataset del entorno. Junto con `Axiom:Dataset`, hace que los logs también vayan a Axiom; ver [Logs (Axiom)](#logs-axiom) |
+| `Axiom:Dataset` | `Axiom__Dataset` | Dataset de Axiom del entorno (`fingrow-dev`, `fingrow-prod`) |
+| `Axiom:Domain` | `Axiom__Domain` | Dominio de ingesta de Axiom (default `api.axiom.co`). Un dataset creado en un edge va con el dominio de ese edge, como `us-east-1.aws.edge.axiom.co` o `eu-central-1.aws.edge.axiom.co` |
 
 Los secretos no se commitean. En desarrollo local:
 
@@ -511,6 +514,32 @@ curl -fsS -X POST "https://dev-be.fingrow.com.ar/api/jobs/metrics-snapshot/run" 
 La respuesta es la corrida registrada; si `status` es `Failed`, `error` dice por qué y el log de
 la API tiene el detalle completo. `GET /api/jobs` sirve para verificar de un vistazo que cada
 cron esté corriendo: muestra la última corrida de cada trabajo.
+
+### Logs (Axiom)
+
+Los logs salen siempre por consola. Si además están configurados `Axiom:ApiToken` y
+`Axiom:Dataset`, la API los manda a [Axiom](https://axiom.co) por OpenTelemetry (OTLP/HTTP a
+`https://<Axiom:Domain>/v1/logs`), en lotes y en segundo plano: si Axiom no responde, los requests
+no esperan ni fallan y el log sigue estando en la consola. Con una sola de las dos variables la API
+no arranca y el log dice cuál falta; sin ninguna, todo funciona como antes (desarrollo local, tests
+y CI).
+
+Cada evento lleva `service.name = fingrow-api` y `deployment.environment` (el valor de
+`ASPNETCORE_ENVIRONMENT`) como atributos del recurso, el mensaje ya armado como cuerpo y las
+propiedades de Serilog como atributos. FinGrow-AI manda al mismo dataset con
+`service.name = fingrow-ai`, así que los dos servicios se consultan juntos.
+
+Para habilitarlo en un entorno:
+
+1. En Axiom, **Datasets → New dataset**, de tipo *Events*: uno por entorno (`fingrow-dev`,
+   `fingrow-prod`).
+2. **Settings → API tokens → New API token**, con permiso de ingesta solo sobre ese dataset. El
+   mismo token sirve para la API y para FinGrow-AI.
+3. En Dokploy, en las variables de entorno del servicio de la API: `Axiom__ApiToken`,
+   `Axiom__Dataset` y, si el dataset vive en un edge, `Axiom__Domain`. Redeploy.
+
+Los logs de `System.Net.Http.HttpClient` quedan en `Warning`: en `Information` imprimen la URL de
+cada pedido, y la de la Bot API de Telegram lleva el token del bot.
 
 ### Puntaje de salud financiera
 
