@@ -1,5 +1,7 @@
 namespace FinGrow.Application.Interfaces;
 
+using FinGrow.Application.Common;
+using FinGrow.Application.Features.Transactions.GetHistory;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
 
@@ -44,6 +46,8 @@ public interface ITransactionReadRepository
         PaymentMethod? paymentMethod,
         DateOnly? fromDate,
         DateOnly? toDate,
+        TransactionSortField sortBy,
+        SortDirection sortDirection,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<Transaction>> GetFilteredAsync(
