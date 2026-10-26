@@ -96,7 +96,7 @@ public class PasswordResetEndpointsTests : IClassFixture<PasswordResetEndpointsT
 
             using var scope = Services.CreateScope();
             var token = scope.ServiceProvider.GetRequiredService<ITokenService>()
-                .GenerateToken(Guid.NewGuid(), Guid.NewGuid(), Rol.Empresa, "Otra S.A.");
+                .GenerateToken(Guid.NewGuid(), Guid.NewGuid(), Rol.Empresa, "Otra S.A.", Guid.NewGuid());
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Value);
 
             return client;
@@ -127,6 +127,7 @@ public class PasswordResetEndpointsTests : IClassFixture<PasswordResetEndpointsT
 
             builder.ConfigureTestServices(services =>
             {
+                services.TreatEverySessionAsOpen();
                 services.AddScoped<IPasswordResetTokenRepository>(provider =>
                     new SessionRecordingTokenRepository(provider.GetRequiredService<ICurrentUser>(), SessionsSeen, Account));
                 services.AddScoped<IUserRepository>(provider =>

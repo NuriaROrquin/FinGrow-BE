@@ -216,7 +216,7 @@ public class PendingTransactionsEndpointsTests
 
         using var scope = factory.Services.CreateScope();
         var token = scope.ServiceProvider.GetRequiredService<ITokenService>()
-            .GenerateToken(factory.EmployeeId, Guid.CreateVersion7(), Rol.Empleado, "Juan Perez");
+            .GenerateToken(factory.EmployeeId, Guid.CreateVersion7(), Rol.Empleado, "Juan Perez", Guid.NewGuid());
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Value);
 
         return client;
@@ -271,6 +271,7 @@ public class PendingTransactionsEndpointsTests
 
             builder.ConfigureTestServices(services =>
             {
+                services.TreatEverySessionAsOpen();
                 services.AddScoped<ITransactionRepository>(_ => new InMemoryTransactionRepository(Transactions));
                 services.AddScoped<ITransactionReceiptRepository, EmptyReceiptRepository>();
                 services.AddScoped<IUnitOfWork, NoOpUnitOfWork>();

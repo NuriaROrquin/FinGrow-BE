@@ -58,7 +58,7 @@ internal sealed class CompanyStaffWebApplicationFactory : WebApplicationFactory<
 
         using var scope = Services.CreateScope();
         var token = scope.ServiceProvider.GetRequiredService<ITokenService>()
-            .GenerateToken(Company.Id, Company.Id, role, Company.Name);
+            .GenerateToken(Company.Id, Company.Id, role, Company.Name, Guid.NewGuid());
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Value);
 
         return client;
@@ -91,6 +91,7 @@ internal sealed class CompanyStaffWebApplicationFactory : WebApplicationFactory<
 
         builder.ConfigureTestServices(services =>
         {
+            services.TreatEverySessionAsOpen();
             services.AddScoped<ICompanyRepository>(_ => new InMemoryCompanyRepository(Companies));
             services.AddScoped<IEmployeeRepository>(_ => new InMemoryEmployeeRepository(Employees));
             services.AddScoped<IUserRepository>(_ => new InMemoryUserRepository(Companies, Employees));

@@ -26,7 +26,6 @@ internal sealed class ListSessionsQueryHandler : IRequestHandler<ListSessionsQue
         }
 
         var now = _clock.UtcNow;
-        var current = await CurrentSession.FindAsync(_refreshTokens, request.CurrentRefreshToken, userId, now, cancellationToken);
         var tokens = await _refreshTokens.ListActiveForUserAsync(userId, now, cancellationToken);
 
         IReadOnlyList<ActiveSessionResponse> sessions = tokens
@@ -36,7 +35,7 @@ internal sealed class ListSessionsQueryHandler : IRequestHandler<ListSessionsQue
                 UserAgentDescription.OperatingSystemOf(token.UserAgent),
                 token.StartedAt,
                 token.CreatedAt,
-                token.SessionId == current?.SessionId))
+                token.SessionId == _currentUser.SessionId))
             .OrderByDescending(session => session.IsCurrent)
             .ThenByDescending(session => session.LastActiveAt)
             .ToList();

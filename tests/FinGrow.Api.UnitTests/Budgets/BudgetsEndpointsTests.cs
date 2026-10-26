@@ -304,7 +304,7 @@ public class BudgetsEndpointsTests
 
         using var scope = factory.Services.CreateScope();
         var token = scope.ServiceProvider.GetRequiredService<ITokenService>()
-            .GenerateToken(factory.EmployeeId, Guid.CreateVersion7(), role, "Juan Perez");
+            .GenerateToken(factory.EmployeeId, Guid.CreateVersion7(), role, "Juan Perez", Guid.NewGuid());
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Value);
 
         return client;
@@ -343,6 +343,7 @@ public class BudgetsEndpointsTests
 
             builder.ConfigureTestServices(services =>
             {
+                services.TreatEverySessionAsOpen();
                 services.AddScoped<IBudgetRepository>(_ => new InMemoryBudgetRepository(Budgets));
                 services.AddScoped<IBudgetSpendingReadRepository>(_ => new InMemoryBudgetSpendingReadRepository(Spent));
                 services.AddScoped<IUnitOfWork, NoOpUnitOfWork>();

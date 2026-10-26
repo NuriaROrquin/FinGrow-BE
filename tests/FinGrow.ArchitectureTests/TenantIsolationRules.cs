@@ -96,6 +96,8 @@ public class TenantIsolationRules
 
         public string? Role => "Empleado";
 
+        public Guid? SessionId => null;
+
         public DateTimeOffset? ExpiresAt => null;
 
         public bool IsAuthenticated => true;

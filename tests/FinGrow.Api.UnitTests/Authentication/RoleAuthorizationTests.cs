@@ -67,7 +67,7 @@ public class RoleAuthorizationTests : IClassFixture<RoleAuthorizationTests.RoleE
         using var scope = _factory.Services.CreateScope();
         var tokenService = scope.ServiceProvider.GetRequiredService<ITokenService>();
 
-        var token = tokenService.GenerateToken(Guid.CreateVersion7(), Guid.CreateVersion7(), role, "Test");
+        var token = tokenService.GenerateToken(Guid.CreateVersion7(), Guid.CreateVersion7(), role, "Test", Guid.NewGuid());
 
         return await Task.FromResult(token.Value);
     }
@@ -98,7 +98,10 @@ public class RoleAuthorizationTests : IClassFixture<RoleAuthorizationTests.RoleE
                 }));
 
             builder.ConfigureTestServices(services =>
-                services.AddSingleton<IStartupFilter, RoleTestEndpointsStartupFilter>());
+            {
+                services.TreatEverySessionAsOpen();
+                services.AddSingleton<IStartupFilter, RoleTestEndpointsStartupFilter>();
+            });
         }
     }
 

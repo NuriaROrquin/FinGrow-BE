@@ -300,6 +300,8 @@ public sealed class FakeCurrentUser : ICurrentUser
 
     public string? Role { get; set; }
 
+    public Guid? SessionId { get; set; }
+
     public DateTimeOffset? ExpiresAt { get; set; }
 
     public bool IsAuthenticated => UserId is not null;
@@ -320,7 +322,7 @@ public sealed class FakeTokenService : ITokenService
 
     private const string ChallengePrefix = "challenge-for-";
 
-    public AuthToken GenerateToken(Guid userId, Guid companyId, string role, string fullName) =>
+    public AuthToken GenerateToken(Guid userId, Guid companyId, string role, string fullName, Guid sessionId) =>
         new($"token-for-{userId}", ExpiresAt);
 
     public AuthToken GenerateTwoFactorChallenge(Guid employeeId) =>
