@@ -7,6 +7,7 @@ using FinGrow.Application.Features.Metrics.GetCompanyMetrics;
 using FinGrow.Application.Features.Metrics.GetCompanyEducationMetrics;
 using FinGrow.Application.Features.Metrics.GetCompanyInsights;
 using FinGrow.Application.Features.Metrics.GetCompanyMonthlyReport;
+using FinGrow.Application.Features.Metrics.GetCompanyMonthlyReportPdf;
 using FinGrow.Application.Features.Metrics.GetCompanyTrends;
 using FinGrow.Application.Features.Metrics.GetDepartmentMetricsOverview;
 using FinGrow.Application.Features.Metrics.GetDepartmentMetrics;
@@ -61,6 +62,20 @@ public sealed class CompanyMetricsController(ISender sender) : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Report(CancellationToken cancellationToken) =>
         (await sender.Send(new GetCompanyMonthlyReportQuery(), cancellationToken)).ToActionResult();
+
+    /// <summary>El PDF del último mes con foto (HU-65): el mismo que adjunta el mail mensual (HU-82).</summary>
+    [HttpGet("metrics/report/pdf")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ReportPdf(CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetCompanyMonthlyReportPdfQuery(), cancellationToken);
+
+        return result.IsSuccess
+            ? File(result.Value.Content.ToArray(), "application/pdf", result.Value.FileName)
+            : result.ToActionResult();
+    }
 
     [HttpGet("metrics/participation")]
     [ProducesResponseType<CompanyParticipationResponse>(StatusCodes.Status200OK)]
