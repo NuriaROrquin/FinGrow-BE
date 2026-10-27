@@ -170,7 +170,7 @@ public class NotificationsEndpointsTests
             new { isEnabled = false });
 
         var items = types.EnumerateArray().ToList();
-        var companyOnlyTypes = 4;
+        var companyOnlyTypes = 5;
         items.Count.ShouldBe(Enum.GetValues<NotificationType>().Length - companyOnlyTypes);
         items.ShouldAllBe(item => item.GetProperty("isEnabled").GetBoolean());
         change.StatusCode.ShouldBe(HttpStatusCode.OK);
@@ -205,6 +205,28 @@ public class NotificationsEndpointsTests
         var response = await client.GetAsync(new Uri(NotificationsPath + "/types", UriKind.Relative));
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task A_company_sees_the_monthly_report_turned_off_and_can_turn_it_on()
+    {
+        using var factory = new NotificationsWebApplicationFactory();
+        var client = CreateClient(factory, Rol.Empresa);
+
+        var types = await client.GetFromJsonAsync<JsonElement>(new Uri(NotificationsPath + "/types", UriKind.Relative));
+        var change = await client.PutAsJsonAsync(
+            new Uri(NotificationsPath + "/types/MonthlyReport", UriKind.Relative),
+            new { isEnabled = true, cadence = "Monthly" });
+
+        var monthlyReport = types.EnumerateArray()
+            .Single(item => item.GetProperty("type").GetString() == "MonthlyReport");
+        monthlyReport.GetProperty("isEnabled").GetBoolean().ShouldBeFalse();
+        monthlyReport.GetProperty("threshold").ValueKind.ShouldBe(JsonValueKind.Null);
+        change.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var stored = factory.CompanyTypeSettings.ShouldHaveSingleItem();
+        stored.Type.ShouldBe(NotificationType.MonthlyReport);
+        stored.IsEnabled.ShouldBeTrue();
+        stored.EnabledAt.ShouldNotBeNull();
     }
 
     private static HttpClient CreateClient(NotificationsWebApplicationFactory factory, string role)

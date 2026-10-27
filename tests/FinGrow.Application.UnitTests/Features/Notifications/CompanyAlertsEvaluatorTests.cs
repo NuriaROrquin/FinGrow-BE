@@ -151,6 +151,22 @@ public class CompanyAlertsEvaluatorTests
         _notifications.Notifications.ShouldHaveSingleItem().Type.ShouldBe(NotificationType.FinancialWellbeingLow);
     }
 
+    [Fact]
+    public async Task The_monthly_report_preference_is_not_an_alert_and_is_left_alone()
+    {
+        var setting = CompanyNotificationSetting.Create(
+            _company.Id, NotificationType.MonthlyReport, isEnabled: true, NotificationCadence.Monthly, Now.AddMonths(-2));
+        _settings.Add(setting);
+        _snapshots.Add(Snapshot(new DateOnly(2026, 8, 1), activeEmployees: 10, scoreSum: 650));
+        _snapshots.Add(Snapshot(new DateOnly(2026, 9, 1), activeEmployees: 13, scoreSum: 845));
+
+        var notifications = await CreateEvaluator().EvaluateAsync(_company, Now, CancellationToken.None);
+
+        notifications.ShouldBe(0);
+        _notifications.Notifications.ShouldBeEmpty();
+        setting.LastEvaluatedAt.ShouldBeNull();
+    }
+
     private CompanyAlertsEvaluator CreateEvaluator() =>
         new(
             _settings,

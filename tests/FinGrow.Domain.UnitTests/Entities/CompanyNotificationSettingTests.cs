@@ -53,4 +53,55 @@ public class CompanyNotificationSettingTests
         Should.Throw<DomainException>(() => CompanyNotificationSetting.Create(
             CompanyId, NotificationType.GoalStalled, isEnabled: true, NotificationCadence.Monthly, Now));
     }
+
+    [Fact]
+    public void The_monthly_report_is_a_company_preference_but_not_an_alert()
+    {
+        var setting = CompanyNotificationSetting.Create(
+            CompanyId, NotificationType.MonthlyReport, isEnabled: true, NotificationCadence.Monthly, Now);
+
+        setting.Threshold.ShouldBeNull();
+        CompanyNotificationSetting.IsCompanyType(NotificationType.MonthlyReport).ShouldBeTrue();
+        CompanyNotificationSetting.IsAlertType(NotificationType.MonthlyReport).ShouldBeFalse();
+        CompanyNotificationSetting.IsAlertType(NotificationType.ParticipationLow).ShouldBeTrue();
+        Should.Throw<DomainException>(() => CompanyNotificationSetting.Create(
+            CompanyId, NotificationType.MonthlyReport, isEnabled: true, NotificationCadence.Monthly, Now, threshold: 50m));
+    }
+
+    [Fact]
+    public void A_setting_created_enabled_remembers_since_when()
+    {
+        var enabled = CompanyNotificationSetting.Create(
+            CompanyId, NotificationType.MonthlyReport, isEnabled: true, NotificationCadence.Monthly, Now);
+        var disabled = CompanyNotificationSetting.Create(
+            CompanyId, NotificationType.MonthlyReport, isEnabled: false, NotificationCadence.Monthly, Now);
+
+        enabled.EnabledAt.ShouldBe(Now);
+        disabled.EnabledAt.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Saving_an_enabled_setting_again_keeps_the_moment_it_was_turned_on()
+    {
+        var setting = CompanyNotificationSetting.Create(
+            CompanyId, NotificationType.MonthlyReport, isEnabled: true, NotificationCadence.Monthly, Now);
+
+        setting.Change(isEnabled: true, NotificationCadence.Monthly, Now.AddDays(10));
+
+        setting.EnabledAt.ShouldBe(Now);
+        setting.UpdatedAt.ShouldBe(Now.AddDays(10));
+    }
+
+    [Fact]
+    public void Turning_a_setting_off_forgets_when_it_was_on_and_turning_it_on_again_starts_over()
+    {
+        var setting = CompanyNotificationSetting.Create(
+            CompanyId, NotificationType.MonthlyReport, isEnabled: true, NotificationCadence.Monthly, Now);
+
+        setting.Change(isEnabled: false, NotificationCadence.Monthly, Now.AddDays(1));
+        setting.EnabledAt.ShouldBeNull();
+
+        setting.Change(isEnabled: true, NotificationCadence.Monthly, Now.AddDays(2));
+        setting.EnabledAt.ShouldBe(Now.AddDays(2));
+    }
 }
