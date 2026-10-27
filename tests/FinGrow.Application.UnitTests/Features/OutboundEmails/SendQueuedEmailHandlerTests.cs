@@ -42,6 +42,19 @@ public class SendQueuedEmailHandlerTests
     }
 
     [Fact]
+    public async Task The_attachment_is_sent_with_the_email()
+    {
+        var attachment = EmailAttachment.From("reporte-empresa_202609.pdf", new byte[] { 37, 80, 68, 70 });
+        var email = OutboundEmail.Queue(Email.From("rrhh@acme.com"), "Reporte", "<p>Hola</p>", "Hola", QueuedAt, attachment);
+        _emails.Add(email);
+
+        await Handle(email.Id);
+
+        _sender.Sent.ShouldHaveSingleItem().Attachment.ShouldBe(attachment);
+        email.Status.ShouldBe(OutboundEmailStatus.Sent);
+    }
+
+    [Fact]
     public async Task A_delivery_failure_is_recorded_for_retry_instead_of_escaping()
     {
         var email = Queue();

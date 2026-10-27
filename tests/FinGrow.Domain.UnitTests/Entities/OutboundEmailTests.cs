@@ -153,6 +153,47 @@ public class OutboundEmailTests
             OutboundEmail.Queue(Email.From("ana@acme.com"), "Asunto", "<p>Hola</p>", "", QueuedAt));
     }
 
+    [Fact]
+    public void An_attachment_travels_with_the_email_and_its_content_is_dropped_once_sent()
+    {
+        var attachment = EmailAttachment.From("reporte-empresa_202609.pdf", new byte[] { 37, 80, 68, 70 });
+        var email = OutboundEmail.Queue(Email.From("rrhh@acme.com"), "Reporte", "<p>Hola</p>", "Hola", QueuedAt, attachment);
+
+        email.Attachment.ShouldBe(attachment);
+
+        email.MarkSent("re-1", QueuedAt.AddMinutes(1));
+
+        email.Attachment.ShouldBeNull();
+        email.AttachmentContent.ShouldBeNull();
+        email.AttachmentFileName.ShouldBe("reporte-empresa_202609.pdf");
+    }
+
+    [Fact]
+    public void An_abandoned_email_also_drops_its_attachment()
+    {
+        var email = OutboundEmail.Queue(
+            Email.From("rrhh@acme.com"),
+            "Reporte",
+            "<p>Hola</p>",
+            "Hola",
+            QueuedAt,
+            EmailAttachment.From("reporte.pdf", new byte[] { 1 }));
+
+        for (var attempt = 0; attempt < OutboundEmail.MaxAttempts; attempt++)
+        {
+            email.MarkFailed("Resend caido", QueuedAt.AddMinutes(attempt));
+        }
+
+        email.Status.ShouldBe(OutboundEmailStatus.Abandoned);
+        email.AttachmentContent.ShouldBeNull();
+    }
+
+    [Fact]
+    public void An_email_without_attachment_has_none()
+    {
+        Queue().Attachment.ShouldBeNull();
+    }
+
     private static OutboundEmail Queue() =>
         OutboundEmail.Queue(Email.From("ana@acme.com"), " Tu acceso a FinGrow ", "<p>Hola Ana</p>", "Hola Ana", QueuedAt);
 }

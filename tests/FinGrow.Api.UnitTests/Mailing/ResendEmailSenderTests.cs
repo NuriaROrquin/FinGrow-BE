@@ -38,6 +38,31 @@ public class ResendEmailSenderTests
     }
 
     [Fact]
+    public async Task A_message_without_attachment_does_not_send_the_attachments_field()
+    {
+        using var handler = new RecordingHandler("""{"id": "re-123"}""");
+
+        await Send(handler, Welcome);
+
+        using var body = JsonDocument.Parse(handler.Body!);
+        body.RootElement.TryGetProperty("attachments", out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task An_attachment_is_posted_with_its_name_and_its_base64_content()
+    {
+        using var handler = new RecordingHandler("""{"id": "re-123"}""");
+        var report = Welcome with { Attachment = EmailAttachment.From("reporte-empresa_202609.pdf", new byte[] { 37, 80, 68, 70 }) };
+
+        await Send(handler, report);
+
+        using var body = JsonDocument.Parse(handler.Body!);
+        var attachment = body.RootElement.GetProperty("attachments").EnumerateArray().ShouldHaveSingleItem();
+        attachment.GetProperty("filename").GetString().ShouldBe("reporte-empresa_202609.pdf");
+        attachment.GetProperty("content").GetString().ShouldBe("JVBERg==");
+    }
+
+    [Fact]
     public async Task With_a_redirect_the_message_goes_to_the_redirect_and_names_the_original_recipient()
     {
         using var handler = new RecordingHandler("""{"id": "re-123"}""");
