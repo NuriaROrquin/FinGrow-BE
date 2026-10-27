@@ -45,9 +45,7 @@ internal sealed class CloseSessionCommandHandler : IRequestHandler<CloseSessionC
             return owned;
         }
 
-        var current = await CurrentSession.FindAsync(_refreshTokens, request.CurrentRefreshToken, userId, now, cancellationToken);
-
-        if (current?.SessionId == request.SessionId)
+        if (request.SessionId == _currentUser.SessionId)
         {
             return Result.Failure(SessionErrors.IsCurrent);
         }

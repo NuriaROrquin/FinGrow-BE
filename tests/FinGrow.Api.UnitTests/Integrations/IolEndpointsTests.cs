@@ -184,7 +184,7 @@ public class IolEndpointsTests
 
         using var scope = factory.Services.CreateScope();
         var token = scope.ServiceProvider.GetRequiredService<ITokenService>()
-            .GenerateToken(factory.EmployeeId, Guid.CreateVersion7(), Rol.Empleado, "Juan Perez");
+            .GenerateToken(factory.EmployeeId, Guid.CreateVersion7(), Rol.Empleado, "Juan Perez", Guid.NewGuid());
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Value);
 
         return client;
@@ -227,6 +227,7 @@ public class IolEndpointsTests
 
             builder.ConfigureTestServices(services =>
             {
+                services.TreatEverySessionAsOpen();
                 services.AddScoped<IEmployeeIntegrationRepository>(_ => new InMemoryEmployeeIntegrationRepository(Integrations));
                 services.AddScoped<IUnitOfWork, NoOpUnitOfWork>();
                 services.AddSingleton<IIolAuthClient>(Iol);

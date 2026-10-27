@@ -239,15 +239,26 @@ Email, hash de contraseña, rol, doble factor, último ingreso y si la cuenta es
 ## Sesiones abiertas (HU-73)
 
 `GET /session/all`, `DELETE /session/{sessionId}` y `DELETE /session/others` listan y cierran
-las sesiones del usuario del token, empleado o empresa. Dos cosas que no se deducen leyendo:
+las sesiones del usuario del token, empleado o empresa. Lo que no se deduce leyendo:
 
 - **Una sesión es una cadena de refresh tokens**, no una fila: cada refresh revoca el token y
   emite otro con el mismo `SessionId` y `StartedAt` (`RefreshToken.Rotate`). La "última
   actividad" es el `CreatedAt` del token vigente, o sea la última renovación. Si emitís un token
   con `Issue` en vez de `Rotate` al renovar, la sesión aparece como nueva.
-- **La sesión actual sale de la cookie `fingrow-refresh`**, que el navegador solo manda a
-  `/session`: por eso estas rutas no cuelgan de `/api`. Sin esa cookie no se marca ninguna como
-  actual y "cerrar las demás" responde `Conflict` en vez de cerrar todas.
+- **El access token lleva el id de su sesión** (claim `session_id`, `SessionClaims`) y
+  `SessionCookie` lo verifica en cada pedido (`OnTokenValidated` → `IOpenSessionChecker`): si la
+  sesión ya no tiene un refresh token vigente, el pedido responde 401 (HU-73). Así cerrar una
+  sesión, cambiar o restablecer la contraseña, desactivar a un empleado o darse de baja cortan el
+  acceso en el próximo pedido, no cuando vence el access token. Es una consulta por pedido sobre
+  el índice de `session_id`; no la cachees, porque eso es justamente lo que demora el corte. Un
+  token sin `session_id` es de antes de que el access token llevara su sesión y se acepta hasta
+  que vence (a lo sumo `Jwt:ExpirationMinutes`): rechazarlo dejaría a todos afuera al desplegar.
+- **La sesión actual es la del access token** (`ICurrentUser.SessionId`), no la de la cookie de
+  refresh. Con un token sin `session_id` no se marca ninguna como actual y "cerrar las demás"
+  responde `Conflict` en vez de cerrar todas.
+- **Los tests de la API no tienen base**: cada fábrica que emite tokens llama a
+  `TreatEverySessionAsOpen()` (`tests/FinGrow.Api.UnitTests/TestSessions.cs`). Una fábrica nueva
+  que autentique tiene que hacerlo, o todos sus pedidos van a responder 401.
 
 Se guarda solo el User-Agent (`IClientDevice`), del que salen navegador y sistema. No hay IP ni
 ubicación a propósito: la pantalla no inventa una ciudad.
@@ -271,8 +282,8 @@ ante un recurso de otra empresa, para no confirmar que existe.
   conservando los datos está la desactivación (HU-55).
 - **Desactivar corta el acceso sin borrar nada** (`PUT .../{id}/access`): revoca los refresh
   tokens y el login responde `Auth.AccesoDesactivado` (403), recién después de verificar la
-  contraseña para no revelar qué cuentas existen. El access token emitido sigue valiendo hasta
-  que expira, igual que al cambiar la contraseña.
+  contraseña para no revelar qué cuentas existen. Revocar los refresh tokens cierra sus sesiones, así
+  que el access token ya emitido deja de valer en el próximo pedido (ver *Sesiones abiertas*).
 - **El empleado se puede dar de baja solo** (`POST /account/withdrawal`, HU-74), confirmando
   con su contraseña. `IEmployeeDataEraser` borra en una transacción sus datos financieros
   (movimientos, presupuestos, metas, inversiones, integraciones, puntajes, logros y

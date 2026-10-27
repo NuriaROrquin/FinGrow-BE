@@ -46,25 +46,35 @@ public class SessionManagementTests
         return (token, value);
     }
 
-    private Task<Result<IReadOnlyList<ActiveSessionResponse>>> ListAsync(string? currentRefreshToken) =>
-        new ListSessionsQueryHandler(_currentUser, _refreshTokens, _clock)
-            .Handle(new ListSessionsQuery(currentRefreshToken), CancellationToken.None);
+    // La sesion actual es la del access token del pedido (HU-73).
+    private Task<Result<IReadOnlyList<ActiveSessionResponse>>> ListAsync(Guid? currentSessionId)
+    {
+        _currentUser.SessionId = currentSessionId;
+        return new ListSessionsQueryHandler(_currentUser, _refreshTokens, _clock)
+            .Handle(new ListSessionsQuery(), CancellationToken.None);
+    }
 
-    private Task<Result> CloseAsync(Guid sessionId, string? currentRefreshToken) =>
-        new CloseSessionCommandHandler(_currentUser, _refreshTokens, _unitOfWork, _clock)
-            .Handle(new CloseSessionCommand(sessionId, currentRefreshToken), CancellationToken.None);
+    private Task<Result> CloseAsync(Guid sessionId, Guid? currentSessionId)
+    {
+        _currentUser.SessionId = currentSessionId;
+        return new CloseSessionCommandHandler(_currentUser, _refreshTokens, _unitOfWork, _clock)
+            .Handle(new CloseSessionCommand(sessionId), CancellationToken.None);
+    }
 
-    private Task<Result> CloseOthersAsync(string? currentRefreshToken) =>
-        new CloseOtherSessionsCommandHandler(_currentUser, _refreshTokens, _clock)
-            .Handle(new CloseOtherSessionsCommand(currentRefreshToken), CancellationToken.None);
+    private Task<Result> CloseOthersAsync(Guid? currentSessionId)
+    {
+        _currentUser.SessionId = currentSessionId;
+        return new CloseOtherSessionsCommandHandler(_currentUser, _refreshTokens, _clock)
+            .Handle(new CloseOtherSessionsCommand(), CancellationToken.None);
+    }
 
     [Fact]
     public async Task Listing_shows_one_row_per_open_session_with_device_and_dates_and_marks_the_current_one()
     {
-        var (laptop, laptopValue) = OpenSession(ChromeOnWindows, Now.AddDays(-3));
+        var (laptop, _) = OpenSession(ChromeOnWindows, Now.AddDays(-3));
         var (phone, _) = OpenSession(SafariOnIphone, Now.AddDays(-1));
 
-        var result = await ListAsync(laptopValue);
+        var result = await ListAsync(laptop.SessionId);
 
         result.IsSuccess.ShouldBeTrue();
         result.Value.Count.ShouldBe(2);
@@ -90,7 +100,7 @@ public class SessionManagementTests
         var renewed = token.Rotate(RefreshToken.GenerateValue(), Now.AddHours(-1));
         _refreshTokens.Add(renewed);
 
-        var result = await ListAsync(currentRefreshToken: null);
+        var result = await ListAsync(currentSessionId: null);
 
         var session = result.Value.ShouldHaveSingleItem();
         session.Id.ShouldBe(token.SessionId);
@@ -106,7 +116,7 @@ public class SessionManagementTests
         revoked.Revoke(Now);
         var (open, _) = OpenSession(SafariOnIphone);
 
-        var result = await ListAsync(currentRefreshToken: null);
+        var result = await ListAsync(currentSessionId: null);
 
         result.Value.ShouldHaveSingleItem().Id.ShouldBe(open.SessionId);
     }
@@ -116,7 +126,7 @@ public class SessionManagementTests
     {
         OpenSession(ChromeOnWindows, userId: Guid.NewGuid());
 
-        var result = await ListAsync(currentRefreshToken: null);
+        var result = await ListAsync(currentSessionId: null);
 
         result.Value.ShouldBeEmpty();
     }
@@ -126,7 +136,7 @@ public class SessionManagementTests
     {
         OpenSession(userAgent: null);
 
-        var session = (await ListAsync(currentRefreshToken: null)).Value.ShouldHaveSingleItem();
+        var session = (await ListAsync(currentSessionId: null)).Value.ShouldHaveSingleItem();
 
         session.Browser.ShouldBeNull();
         session.OperatingSystem.ShouldBeNull();
@@ -136,9 +146,9 @@ public class SessionManagementTests
     public async Task A_company_lists_its_own_sessions_the_same_way()
     {
         _currentUser.Role = Rol.Empresa;
-        var (token, value) = OpenSession(ChromeOnWindows, role: Rol.Empresa);
+        var (token, _) = OpenSession(ChromeOnWindows, role: Rol.Empresa);
 
-        var session = (await ListAsync(value)).Value.ShouldHaveSingleItem();
+        var session = (await ListAsync(token.SessionId)).Value.ShouldHaveSingleItem();
 
         session.Id.ShouldBe(token.SessionId);
         session.IsCurrent.ShouldBeTrue();
@@ -147,10 +157,10 @@ public class SessionManagementTests
     [Fact]
     public async Task Closing_another_session_revokes_its_token()
     {
-        var (_, currentValue) = OpenSession(ChromeOnWindows);
+        var (current, _) = OpenSession(ChromeOnWindows);
         var (phone, _) = OpenSession(SafariOnIphone);
 
-        var result = await CloseAsync(phone.SessionId, currentValue);
+        var result = await CloseAsync(phone.SessionId, current.SessionId);
 
         result.IsSuccess.ShouldBeTrue();
         phone.RevokedAt.ShouldBe(Now);
@@ -160,12 +170,12 @@ public class SessionManagementTests
     [Fact]
     public async Task Closing_a_renewed_session_revokes_the_token_it_is_using_now()
     {
-        var (_, currentValue) = OpenSession(ChromeOnWindows);
+        var (current, _) = OpenSession(ChromeOnWindows);
         var (phone, _) = OpenSession(SafariOnIphone, Now.AddDays(-1));
         var renewed = phone.Rotate(RefreshToken.GenerateValue(), Now.AddHours(-1));
         _refreshTokens.Add(renewed);
 
-        var result = await CloseAsync(phone.SessionId, currentValue);
+        var result = await CloseAsync(phone.SessionId, current.SessionId);
 
         result.IsSuccess.ShouldBeTrue();
         renewed.RevokedAt.ShouldBe(Now);
@@ -174,9 +184,9 @@ public class SessionManagementTests
     [Fact]
     public async Task The_current_session_is_not_closed_from_the_list()
     {
-        var (current, currentValue) = OpenSession(ChromeOnWindows);
+        var (current, _) = OpenSession(ChromeOnWindows);
 
-        var result = await CloseAsync(current.SessionId, currentValue);
+        var result = await CloseAsync(current.SessionId, current.SessionId);
 
         result.Error.Type.ShouldBe(ErrorType.Validation);
         current.RevokedAt.ShouldBeNull();
@@ -185,10 +195,10 @@ public class SessionManagementTests
     [Fact]
     public async Task Closing_a_session_of_another_user_is_forbidden()
     {
-        var (_, currentValue) = OpenSession(ChromeOnWindows);
+        var (current, _) = OpenSession(ChromeOnWindows);
         var (foreign, _) = OpenSession(SafariOnIphone, userId: Guid.NewGuid());
 
-        var result = await CloseAsync(foreign.SessionId, currentValue);
+        var result = await CloseAsync(foreign.SessionId, current.SessionId);
 
         result.Error.Type.ShouldBe(ErrorType.Forbidden);
         foreign.RevokedAt.ShouldBeNull();
@@ -197,11 +207,11 @@ public class SessionManagementTests
     [Fact]
     public async Task Closing_an_already_closed_session_is_not_found()
     {
-        var (_, currentValue) = OpenSession(ChromeOnWindows);
+        var (current, _) = OpenSession(ChromeOnWindows);
         var (phone, _) = OpenSession(SafariOnIphone);
         phone.Revoke(Now.AddMinutes(-5));
 
-        var result = await CloseAsync(phone.SessionId, currentValue);
+        var result = await CloseAsync(phone.SessionId, current.SessionId);
 
         result.Error.Type.ShouldBe(ErrorType.NotFound);
         phone.RevokedAt.ShouldBe(Now.AddMinutes(-5));
@@ -210,12 +220,12 @@ public class SessionManagementTests
     [Fact]
     public async Task Closing_the_other_sessions_keeps_only_the_current_one()
     {
-        var (current, currentValue) = OpenSession(ChromeOnWindows);
+        var (current, _) = OpenSession(ChromeOnWindows);
         var (phone, _) = OpenSession(SafariOnIphone);
         var (tablet, _) = OpenSession(userAgent: null);
         var (foreign, _) = OpenSession(ChromeOnWindows, userId: Guid.NewGuid());
 
-        var result = await CloseOthersAsync(currentValue);
+        var result = await CloseOthersAsync(current.SessionId);
 
         result.IsSuccess.ShouldBeTrue();
         current.RevokedAt.ShouldBeNull();
@@ -229,22 +239,10 @@ public class SessionManagementTests
     {
         var (phone, _) = OpenSession(SafariOnIphone);
 
-        var result = await CloseOthersAsync(currentRefreshToken: null);
+        var result = await CloseOthersAsync(currentSessionId: null);
 
         result.Error.Type.ShouldBe(ErrorType.Conflict);
         phone.RevokedAt.ShouldBeNull();
-    }
-
-    [Fact]
-    public async Task A_refresh_cookie_of_another_user_does_not_count_as_the_current_session()
-    {
-        var (_, foreignValue) = OpenSession(ChromeOnWindows, userId: Guid.NewGuid());
-        var (mine, _) = OpenSession(SafariOnIphone);
-
-        var result = await CloseOthersAsync(foreignValue);
-
-        result.Error.Type.ShouldBe(ErrorType.Conflict);
-        mine.RevokedAt.ShouldBeNull();
     }
 
     [Fact]

@@ -18,28 +18,30 @@ public class SessionManagementEndpointsTests : IClassFixture<SessionManagementEn
 
     public SessionManagementEndpointsTests(SessionsWebApplicationFactory factory) => _factory = factory;
 
-    private (RefreshToken Token, string Value) OpenSession(Guid userId, Guid companyId, string? userAgent)
+    private RefreshToken OpenSession(Guid userId, Guid companyId, string? userAgent)
     {
-        var value = RefreshToken.GenerateValue();
-        var token = RefreshToken.Issue(userId, companyId, "Empleado", value, DateTimeOffset.UtcNow.AddMinutes(-5), userAgent);
+        var token = RefreshToken.Issue(
+            userId,
+            companyId,
+            "Empleado",
+            RefreshToken.GenerateValue(),
+            DateTimeOffset.UtcNow.AddMinutes(-5),
+            userAgent);
         _factory.Tokens.Add(token);
-        return (token, value);
+        return token;
     }
 
-    private HttpClient CreateClient(Guid userId, Guid companyId, string? refreshToken)
+    // El access token de un dispositivo: lleva el id de su sesion, como los que emite SessionIssuer.
+    private HttpClient CreateClientFor(RefreshToken session) => CreateClient(session.UserId, session.CompanyId, session.SessionId);
+
+    private HttpClient CreateClient(Guid userId, Guid companyId, Guid sessionId)
     {
         using var scope = _factory.Services.CreateScope();
         var accessToken = scope.ServiceProvider.GetRequiredService<ITokenService>()
-            .GenerateToken(userId, companyId, "Empleado", "Ana Pérez");
+            .GenerateToken(userId, companyId, "Empleado", "Ana Pérez", sessionId);
 
         var client = _factory.CreateClient();
-        var cookie = $"{SessionCookie.Name}={accessToken.Value}";
-        if (refreshToken is not null)
-        {
-            cookie += $"; {SessionCookie.RefreshName}={refreshToken}";
-        }
-
-        client.DefaultRequestHeaders.Add("Cookie", cookie);
+        client.DefaultRequestHeaders.Add("Cookie", $"{SessionCookie.Name}={accessToken.Value}");
         return client;
     }
 
@@ -52,14 +54,14 @@ public class SessionManagementEndpointsTests : IClassFixture<SessionManagementEn
     }
 
     [Fact]
-    public async Task The_list_marks_the_session_of_the_refresh_cookie_as_current()
+    public async Task The_list_marks_the_session_of_the_access_token_as_current()
     {
         var userId = Guid.CreateVersion7();
         var companyId = Guid.CreateVersion7();
-        var (current, currentValue) = OpenSession(userId, companyId, "Mozilla/5.0 (Windows NT 10.0) Chrome/141.0 Safari/537.36");
-        var (other, _) = OpenSession(userId, companyId, userAgent: null);
+        var current = OpenSession(userId, companyId, "Mozilla/5.0 (Windows NT 10.0) Chrome/141.0 Safari/537.36");
+        var other = OpenSession(userId, companyId, userAgent: null);
 
-        var sessions = await CreateClient(userId, companyId, currentValue)
+        var sessions = await CreateClientFor(current)
             .GetFromJsonAsync<List<SessionRow>>(new Uri("/session/all", UriKind.Relative));
 
         sessions.ShouldNotBeNull();
@@ -73,10 +75,10 @@ public class SessionManagementEndpointsTests : IClassFixture<SessionManagementEn
     {
         var userId = Guid.CreateVersion7();
         var companyId = Guid.CreateVersion7();
-        var (current, currentValue) = OpenSession(userId, companyId, userAgent: null);
-        var (phone, _) = OpenSession(userId, companyId, userAgent: null);
-        var (tablet, _) = OpenSession(userId, companyId, userAgent: null);
-        var client = CreateClient(userId, companyId, currentValue);
+        var current = OpenSession(userId, companyId, userAgent: null);
+        var phone = OpenSession(userId, companyId, userAgent: null);
+        var tablet = OpenSession(userId, companyId, userAgent: null);
+        var client = CreateClientFor(current);
 
         var closeOne = await client.DeleteAsync(new Uri($"/session/{phone.SessionId}", UriKind.Relative));
         closeOne.StatusCode.ShouldBe(HttpStatusCode.NoContent);
@@ -94,17 +96,47 @@ public class SessionManagementEndpointsTests : IClassFixture<SessionManagementEn
     }
 
     [Fact]
-    public async Task Closing_the_others_without_a_refresh_cookie_closes_nothing()
+    public async Task A_closed_session_loses_access_on_its_next_request()
     {
         var userId = Guid.CreateVersion7();
         var companyId = Guid.CreateVersion7();
-        var (phone, _) = OpenSession(userId, companyId, userAgent: null);
+        var laptop = OpenSession(userId, companyId, userAgent: null);
+        var phone = OpenSession(userId, companyId, userAgent: null);
+        var phoneClient = CreateClientFor(phone);
 
-        var response = await CreateClient(userId, companyId, refreshToken: null)
-            .DeleteAsync(new Uri("/session/others", UriKind.Relative));
+        (await phoneClient.GetAsync(new Uri("/session", UriKind.Relative))).StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
-        phone.RevokedAt.ShouldBeNull();
+        var close = await CreateClientFor(laptop).DeleteAsync(new Uri($"/session/{phone.SessionId}", UriKind.Relative));
+        close.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        (await phoneClient.GetAsync(new Uri("/session", UriKind.Relative))).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        (await phoneClient.GetAsync(new Uri("/session/all", UriKind.Relative))).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Closing_the_others_cuts_their_access_and_keeps_the_one_that_asked()
+    {
+        var userId = Guid.CreateVersion7();
+        var companyId = Guid.CreateVersion7();
+        var chrome = OpenSession(userId, companyId, userAgent: null);
+        var edge = OpenSession(userId, companyId, userAgent: null);
+        var chromeClient = CreateClientFor(chrome);
+        var edgeClient = CreateClientFor(edge);
+
+        var closeOthers = await chromeClient.DeleteAsync(new Uri("/session/others", UriKind.Relative));
+
+        closeOthers.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        (await edgeClient.GetAsync(new Uri("/session", UriKind.Relative))).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        (await chromeClient.GetAsync(new Uri("/session", UriKind.Relative))).StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task An_access_token_of_a_session_that_does_not_exist_is_rejected()
+    {
+        var response = await CreateClient(Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7())
+            .GetAsync(new Uri("/session", UriKind.Relative));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
     private sealed record SessionRow(Guid Id, string? Browser, string? OperatingSystem, bool IsCurrent);
@@ -139,9 +171,17 @@ public class SessionManagementEndpointsTests : IClassFixture<SessionManagementEn
             builder.ConfigureTestServices(services =>
             {
                 services.AddSingleton<IRefreshTokenRepository>(new InMemoryRefreshTokenRepository(Tokens));
+                services.AddSingleton<IOpenSessionChecker>(new InMemoryOpenSessionChecker(Tokens));
                 services.AddSingleton<IUnitOfWork, NoOpUnitOfWork>();
             });
         }
+    }
+
+    private sealed class InMemoryOpenSessionChecker(List<RefreshToken> tokens) : IOpenSessionChecker
+    {
+        public Task<bool> IsOpenAsync(Guid userId, Guid sessionId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(tokens.Any(token =>
+                token.UserId == userId && token.SessionId == sessionId && token.IsActive(DateTimeOffset.UtcNow)));
     }
 
     private sealed class NoOpUnitOfWork : IUnitOfWork

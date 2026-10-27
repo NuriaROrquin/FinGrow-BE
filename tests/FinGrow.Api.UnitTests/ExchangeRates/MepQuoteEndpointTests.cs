@@ -100,7 +100,7 @@ public class MepQuoteEndpointTests
     {
         using var scope = factory.Services.CreateScope();
         var token = scope.ServiceProvider.GetRequiredService<ITokenService>()
-            .GenerateToken(Guid.CreateVersion7(), Guid.CreateVersion7(), Rol.Empleado, "Ana Gomez");
+            .GenerateToken(Guid.CreateVersion7(), Guid.CreateVersion7(), Rol.Empleado, "Ana Gomez", Guid.NewGuid());
 
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Value);
@@ -151,8 +151,11 @@ public class MepQuoteEndpointTests
                 }));
 
             builder.ConfigureTestServices(services =>
+            {
+                services.TreatEverySessionAsOpen();
                 services.AddHttpClient(nameof(IExchangeRateProvider))
-                    .ConfigurePrimaryHttpMessageHandler(() => DolarApi));
+                    .ConfigurePrimaryHttpMessageHandler(() => DolarApi);
+            });
         }
     }
 }

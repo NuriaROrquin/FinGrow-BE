@@ -317,7 +317,7 @@ public class CoursesEndpointsTests
     {
         using var scope = factory.Services.CreateScope();
         var token = scope.ServiceProvider.GetRequiredService<ITokenService>()
-            .GenerateToken(EmployeeId, Guid.CreateVersion7(), role, "Ana Gomez");
+            .GenerateToken(EmployeeId, Guid.CreateVersion7(), role, "Ana Gomez", Guid.NewGuid());
 
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Value);
@@ -426,6 +426,7 @@ public class CoursesEndpointsTests
 
             builder.ConfigureTestServices(services =>
             {
+                services.TreatEverySessionAsOpen();
                 services.RemoveAll<ICourseRepository>();
                 services.AddSingleton<ICourseRepository>(Courses);
                 services.RemoveAll<ICourseRatingRepository>();

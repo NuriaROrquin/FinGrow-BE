@@ -13,6 +13,7 @@ using FinGrow.Domain.ValueObjects;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -132,7 +133,7 @@ public class NotificationsHubTests
         {
             using var scope = factory.Services.CreateScope();
             var token = scope.ServiceProvider.GetRequiredService<ITokenService>()
-                .GenerateToken(userId, userId, role, "Juan Perez");
+                .GenerateToken(userId, userId, role, "Juan Perez", Guid.NewGuid());
 
             var listener = new Listener(BuildConnection(factory, token.Value), userId);
             await listener._connection.StartAsync();
@@ -152,7 +153,9 @@ public class NotificationsHubTests
 
     private sealed class HubWebApplicationFactory : WebApplicationFactory<Program>
     {
-        protected override void ConfigureWebHost(IWebHostBuilder builder) =>
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            builder.ConfigureTestServices(services => services.TreatEverySessionAsOpen());
             builder.ConfigureAppConfiguration((_, configuration) =>
                 configuration.AddInMemoryCollection(new Dictionary<string, string?>
                 {
@@ -173,5 +176,6 @@ public class NotificationsHubTests
                     ["TokenEncryption:Key"] = "dW5pdC10ZXN0LXRva2VuLWVuY3J5cHRpb24ta2V5ISE=",
                     ["Jobs:ApiKey"] = "unit-test-jobs-api-key",
                 }));
+        }
     }
 }

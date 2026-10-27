@@ -159,7 +159,7 @@ public class ArticlesEndpointsTests
     {
         using var scope = factory.Services.CreateScope();
         var token = scope.ServiceProvider.GetRequiredService<ITokenService>()
-            .GenerateToken(Guid.CreateVersion7(), Guid.CreateVersion7(), role, "Ana Gomez");
+            .GenerateToken(Guid.CreateVersion7(), Guid.CreateVersion7(), role, "Ana Gomez", Guid.NewGuid());
 
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Value);
@@ -226,6 +226,7 @@ public class ArticlesEndpointsTests
 
             builder.ConfigureTestServices(services =>
             {
+                services.TreatEverySessionAsOpen();
                 services.RemoveAll<IArticleRepository>();
                 services.AddSingleton<IArticleRepository>(Articles);
             });

@@ -235,7 +235,7 @@ public class NotificationsEndpointsTests
 
         using var scope = factory.Services.CreateScope();
         var token = scope.ServiceProvider.GetRequiredService<ITokenService>()
-            .GenerateToken(factory.UserId, factory.UserId, role, "Juan Perez");
+            .GenerateToken(factory.UserId, factory.UserId, role, "Juan Perez", Guid.NewGuid());
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Value);
 
         return client;
@@ -292,6 +292,7 @@ public class NotificationsEndpointsTests
 
             builder.ConfigureTestServices(services =>
             {
+                services.TreatEverySessionAsOpen();
                 services.AddScoped<INotificationRepository>(_ => new InMemoryNotificationRepository(Notifications));
                 services.AddScoped<INotificationChannelSettingRepository>(_ => new InMemoryChannelSettingRepository(ChannelSettings));
                 services.AddScoped<INotificationTypeSettingRepository>(_ => new InMemoryTypeSettingRepository(TypeSettings));

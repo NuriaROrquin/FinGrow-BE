@@ -59,22 +59,20 @@ public sealed class SessionController : ControllerBase
         return Ok(new SessionResponse(session.EmployeeId, session.CompanyId, session.FullName, session.Role, session.ExpiresAt));
     }
 
-    // La sesion actual se reconoce por la cookie de refresh, que el navegador solo manda a /session:
-    // por eso estas rutas cuelgan de aca y no de /api.
     [HttpGet("all")]
     [Authorize]
     public async Task<IActionResult> List(CancellationToken cancellationToken) =>
-        (await _mediator.Send(new ListSessionsQuery(CurrentRefreshToken()), cancellationToken)).ToActionResult();
+        (await _mediator.Send(new ListSessionsQuery(), cancellationToken)).ToActionResult();
 
     [HttpDelete("{sessionId:guid}")]
     [Authorize]
     public async Task<IActionResult> Close(Guid sessionId, CancellationToken cancellationToken) =>
-        (await _mediator.Send(new CloseSessionCommand(sessionId, CurrentRefreshToken()), cancellationToken)).ToActionResult();
+        (await _mediator.Send(new CloseSessionCommand(sessionId), cancellationToken)).ToActionResult();
 
     [HttpDelete("others")]
     [Authorize]
     public async Task<IActionResult> CloseOthers(CancellationToken cancellationToken) =>
-        (await _mediator.Send(new CloseOtherSessionsCommand(CurrentRefreshToken()), cancellationToken)).ToActionResult();
+        (await _mediator.Send(new CloseOtherSessionsCommand(), cancellationToken)).ToActionResult();
 
     [HttpDelete]
     public async Task<IActionResult> Delete(CancellationToken cancellationToken)
@@ -87,7 +85,4 @@ public sealed class SessionController : ControllerBase
         SessionCookie.Delete(Response);
         return NoContent();
     }
-
-    private string? CurrentRefreshToken() =>
-        Request.Cookies.TryGetValue(SessionCookie.RefreshName, out var value) && !string.IsNullOrEmpty(value) ? value : null;
 }

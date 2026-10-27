@@ -146,7 +146,7 @@ public class InvestmentsListEndpointTests
     {
         using var scope = factory.Services.CreateScope();
         var token = scope.ServiceProvider.GetRequiredService<ITokenService>()
-            .GenerateToken(EmployeeId, Guid.CreateVersion7(), Rol.Empleado, "Ana Gomez");
+            .GenerateToken(EmployeeId, Guid.CreateVersion7(), Rol.Empleado, "Ana Gomez", Guid.NewGuid());
 
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Value);
@@ -202,6 +202,7 @@ public class InvestmentsListEndpointTests
 
             builder.ConfigureTestServices(services =>
             {
+                services.TreatEverySessionAsOpen();
                 services.RemoveAll<IInvestmentReadRepository>();
                 services.AddSingleton<IInvestmentReadRepository>(Investments);
             });

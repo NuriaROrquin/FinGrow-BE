@@ -48,7 +48,7 @@ internal sealed class SessionIssuer
         var userId = refreshToken.UserId;
         var companyId = refreshToken.CompanyId;
         var role = refreshToken.Role;
-        var accessToken = _tokenService.GenerateToken(userId, companyId, role, fullName);
+        var accessToken = _tokenService.GenerateToken(userId, companyId, role, fullName, refreshToken.SessionId);
         _refreshTokens.Add(refreshToken);
 
         return new LoginResponse(

@@ -125,7 +125,7 @@ public class ReportsEndpointsTests
     {
         using var scope = factory.Services.CreateScope();
         var token = scope.ServiceProvider.GetRequiredService<ITokenService>()
-            .GenerateToken(EmployeeId, Guid.CreateVersion7(), role, "Ana Gomez");
+            .GenerateToken(EmployeeId, Guid.CreateVersion7(), role, "Ana Gomez", Guid.NewGuid());
 
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Value);
@@ -199,6 +199,7 @@ public class ReportsEndpointsTests
 
             builder.ConfigureTestServices(services =>
             {
+                services.TreatEverySessionAsOpen();
                 services.RemoveAll<IMonthlySummaryReadRepository>();
                 services.AddSingleton<IMonthlySummaryReadRepository>(Summary);
                 services.RemoveAll<IAchievementRepository>();

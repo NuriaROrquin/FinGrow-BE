@@ -240,7 +240,7 @@ public class ReceiptsEndpointsTests
 
         using var scope = factory.Services.CreateScope();
         var token = scope.ServiceProvider.GetRequiredService<ITokenService>()
-            .GenerateToken(factory.EmployeeId, Guid.CreateVersion7(), Rol.Empleado, "Juan Perez");
+            .GenerateToken(factory.EmployeeId, Guid.CreateVersion7(), Rol.Empleado, "Juan Perez", Guid.NewGuid());
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Value);
 
         return client;
@@ -309,6 +309,7 @@ public class ReceiptsEndpointsTests
 
             builder.ConfigureTestServices(services =>
             {
+                services.TreatEverySessionAsOpen();
                 services.AddScoped<ITransactionReceiptRepository>(_ => new InMemoryReceiptRepository(Receipts));
                 services.AddScoped<ITransactionRepository>(_ => new InMemoryTransactionRepository(Transactions));
                 services.AddSingleton<IFileStorage>(Storage);

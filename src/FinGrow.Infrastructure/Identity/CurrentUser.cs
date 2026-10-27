@@ -1,6 +1,7 @@
 namespace FinGrow.Infrastructure.Identity;
 
 using System.Security.Claims;
+using FinGrow.Application.Common;
 using FinGrow.Application.Interfaces;
 using Microsoft.AspNetCore.Http;
 
@@ -21,6 +22,8 @@ internal sealed class CurrentUser : ICurrentUser
     public string? FullName => Principal?.FindFirstValue(ClaimTypes.Name);
 
     public string? Role => Principal?.FindFirstValue(ClaimTypes.Role);
+
+    public Guid? SessionId => ReadGuidClaim(SessionClaims.SessionId);
 
     public DateTimeOffset? ExpiresAt =>
         long.TryParse(Principal?.FindFirstValue("exp"), out var exp) ? DateTimeOffset.FromUnixTimeSeconds(exp) : null;

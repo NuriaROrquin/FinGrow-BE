@@ -202,6 +202,8 @@ public sealed class GetTransactionHistoryQueryTests
 
         public string? Role => "Employee";
 
+        public Guid? SessionId => null;
+
         public DateTimeOffset? ExpiresAt => DateTimeOffset.UtcNow.AddHours(1);
 
         public bool IsAuthenticated => UserId.HasValue;
@@ -351,6 +353,8 @@ public sealed class GetTransactionSummaryQueryTests
         public string? FullName => "Fake User";
 
         public string? Role => "Employee";
+
+        public Guid? SessionId => null;
 
         public DateTimeOffset? ExpiresAt => DateTimeOffset.UtcNow.AddHours(1);
 

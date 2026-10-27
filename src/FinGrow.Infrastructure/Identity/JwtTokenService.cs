@@ -3,6 +3,7 @@ namespace FinGrow.Infrastructure.Identity;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using FinGrow.Application.Common;
 using FinGrow.Application.DTOs;
 using FinGrow.Application.Interfaces;
 using Microsoft.Extensions.Options;
@@ -22,12 +23,13 @@ internal sealed class JwtTokenService : ITokenService
 
     private SymmetricSecurityKey SigningKey => new(Encoding.UTF8.GetBytes(_options.SecretKey));
 
-    public AuthToken GenerateToken(Guid userId, Guid companyId, string role, string fullName)
+    public AuthToken GenerateToken(Guid userId, Guid companyId, string role, string fullName, Guid sessionId)
     {
         Claim[] claims =
         [
             new(ClaimTypes.NameIdentifier, userId.ToString()),
             new(CurrentUser.CompanyIdClaim, companyId.ToString()),
+            new(SessionClaims.SessionId, sessionId.ToString()),
             new(ClaimTypes.Role, role),
             new(ClaimTypes.Name, fullName),
         ];

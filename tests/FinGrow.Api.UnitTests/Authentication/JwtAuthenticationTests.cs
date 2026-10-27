@@ -49,7 +49,7 @@ public class JwtAuthenticationTests : IClassFixture<JwtAuthenticationTests.Secur
         var companyId = Guid.CreateVersion7();
         using var scope = _factory.Services.CreateScope();
         var tokenService = scope.ServiceProvider.GetRequiredService<ITokenService>();
-        var token = tokenService.GenerateToken(userId, companyId, "Employee", "Ana Pérez");
+        var token = tokenService.GenerateToken(userId, companyId, "Employee", "Ana Pérez", Guid.NewGuid());
 
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Value);
@@ -70,7 +70,7 @@ public class JwtAuthenticationTests : IClassFixture<JwtAuthenticationTests.Secur
         var companyId = Guid.CreateVersion7();
         using var scope = _factory.Services.CreateScope();
         var tokenService = scope.ServiceProvider.GetRequiredService<ITokenService>();
-        var token = tokenService.GenerateToken(userId, companyId, "Employee", "Ana Pérez");
+        var token = tokenService.GenerateToken(userId, companyId, "Employee", "Ana Pérez", Guid.NewGuid());
 
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add("Cookie", $"{SessionCookie.Name}={token.Value}");
@@ -107,7 +107,7 @@ public class JwtAuthenticationTests : IClassFixture<JwtAuthenticationTests.Secur
         var tokenService = scope.ServiceProvider.GetRequiredService<ITokenService>();
 
         var challenge = tokenService.GenerateTwoFactorChallenge(employeeId);
-        var session = tokenService.GenerateToken(employeeId, Guid.CreateVersion7(), "Empleado", "Ana Pérez");
+        var session = tokenService.GenerateToken(employeeId, Guid.CreateVersion7(), "Empleado", "Ana Pérez", Guid.NewGuid());
 
         tokenService.ReadTwoFactorChallenge(challenge.Value).ShouldBe(employeeId);
         tokenService.ReadTwoFactorChallenge(session.Value).ShouldBeNull();
@@ -121,7 +121,7 @@ public class JwtAuthenticationTests : IClassFixture<JwtAuthenticationTests.Secur
         var companyId = Guid.CreateVersion7();
         using var scope = _factory.Services.CreateScope();
         var tokenService = scope.ServiceProvider.GetRequiredService<ITokenService>();
-        var token = tokenService.GenerateToken(userId, companyId, "Empleado", "Ana Pérez");
+        var token = tokenService.GenerateToken(userId, companyId, "Empleado", "Ana Pérez", Guid.NewGuid());
 
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add("Cookie", $"{SessionCookie.Name}={token.Value}");
@@ -177,7 +177,10 @@ public class JwtAuthenticationTests : IClassFixture<JwtAuthenticationTests.Secur
                 }));
 
             builder.ConfigureTestServices(services =>
-                services.AddSingleton<IStartupFilter, SecureTestEndpointStartupFilter>());
+            {
+                services.TreatEverySessionAsOpen();
+                services.AddSingleton<IStartupFilter, SecureTestEndpointStartupFilter>();
+            });
         }
     }
 

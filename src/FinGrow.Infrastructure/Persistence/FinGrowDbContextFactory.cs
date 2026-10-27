@@ -34,6 +34,8 @@ public sealed class FinGrowDbContextFactory : IDesignTimeDbContextFactory<FinGro
 
         public string? Role => null;
 
+        public Guid? SessionId => null;
+
         public DateTimeOffset? ExpiresAt => null;
 
         public bool IsAuthenticated => false;
