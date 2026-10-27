@@ -458,11 +458,25 @@ Application, antes de serializar la respuesta, y no escondiendo columnas en el f
   `CompanyMonthlyReportBuilder` (`Features/Metrics/MonthlyReport`) arma, para un mes con foto, la
   participación, el puntaje promedio con su banda, los cursos completados y las tendencias contra el
   mes anterior, todo leído con `CompanyMonthIndicators` como la tarjeta de tendencias. El panel lo
-  exporta a PDF (siempre el último mes con foto) y HU-82 lo va a mandar por mail: si el mail necesita
-  otro dato, se agrega al builder y no se arma aparte. Un dato que no se puede mostrar no viaja en
-  cero: cada indicador dice por qué falta (`CompanyReportValueStatus`: sin foto de ese mes, menos
+  exporta a PDF (siempre el último mes con foto) y HU-82 lo manda por mail: si el mail necesita
+  otro dato, se agrega al builder y no se arma aparte. **El PDF lo arma el backend, uno solo para los
+  dos** (`MonthlyReport/Pdf`): `CompanyReportPdfBuilder` junta los datos, `CompanyReportPdfComposer`
+  decide qué se muestra y cómo se dice (sus textos copian los que tenía el PDF del front) y el renderer
+  de `Infrastructure/Reports` solo lo dibuja: no le agregues lógica de anonimato ni textos al renderer.
+  Un dato que no se puede mostrar no viaja en cero: cada indicador dice por qué falta (`CompanyReportValueStatus`: sin foto de ese mes, menos
   empleados activos que el umbral o menos empleados con puntaje que el umbral). El nombre de la
   empresa viaja en el reporte; los datos de una persona, nunca.
+- **El mail mensual (HU-82) adjunta ese PDF y no calcula nada** (`MonthlyReport/Mailing`).
+  `company-monthly-report` corre todos los días y manda el último mes cerrado una sola vez:
+  `monthly_report_deliveries` (una fila por empresa y mes, guardada en el mismo `SaveChanges` que el
+  correo) es lo que lo impide, no el cron. Tres cosas a propósito:
+  - **El primer mes es el que cierra después de prender el switch**, por eso existe
+    `CompanyNotificationSetting.EnabledAt`: no lo reemplaces por `UpdatedAt`, que se pisa con cualquier
+    guardado y correría el primer reporte un mes.
+  - **Un correo `Abandoned` se vuelve a encolar; uno pendiente, fallido o enviado, no.** Los reintentos
+    de un mismo correo son de `email-delivery`, no de este trabajo.
+  - **`MonthlyReport` es una preferencia de empresa pero no una alerta** (`IsCompanyType` sí,
+    `IsAlertType` no): `company-alerts` no lo evalúa y no pasa por `Notifier`.
 - **Toda modificación del contrato debe tener una prueba.** Los tests deben comprobar el umbral
   de tres empleados, el aislamiento entre empresas y que la respuesta serializada no expone
   identificadores, montos, saldos ni movimientos individuales. `AnonymizedContractRules`
@@ -570,7 +584,9 @@ Los reintentos los hace el trabajo `email-delivery`. Un correo recién encolado 
 primer intento durante `OutboundEmail.FirstAttemptGrace`: así el trabajo no lo manda a la vez.
 
 - **El cuerpo va cifrado y se borra cuando el correo deja de esperar envío**: puede llevar
-  credenciales. Un `CHECK` impide que un correo enviado o abandonado conserve el cuerpo.
+  credenciales. Un `CHECK` impide que un correo enviado o abandonado conserve el cuerpo. Lo mismo
+  vale para el adjunto (`EmailAttachment`, en base64), que tiene el formato que pide Resend; el nombre
+  del archivo queda.
 - **Si `Email:RedirectAllTo` tiene valor, todo correo va ahí** y no a su destinatario: lo resuelve
   `ResendEmailSender`, no quien encola. Solo lo define el `docker-compose.yml` local; `dev-be`
   manda a los destinatarios reales.

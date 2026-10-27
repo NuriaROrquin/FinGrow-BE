@@ -100,6 +100,7 @@ variables de entorno usando `__` como separador de sección.
 | `Gmail:FrontendReturnUrl` | `Gmail__FrontendReturnUrl` | Página del frontend a la que vuelve el navegador al terminar la vinculación; recibe `?gmail=linked` o `?gmail=error&reason=...` (default `http://localhost:3000/dashboard/settings`) |
 | `Gmail:TimeoutSeconds` | `Gmail__TimeoutSeconds` | Timeout de las llamadas a Google (default 30) |
 | `PasswordReset:ResetUrl` | `PasswordReset__ResetUrl` | Pantalla del frontend a la que lleva el correo de "¿Olvidaste tu contraseña?" (HU-72); recibe `?token=...`. Sin ella la API no arranca (default `http://localhost:3000/recuperar-password/restablecer`) |
+| `CompanyMonthlyReport:PanelUrl` | `CompanyMonthlyReport__PanelUrl` | Panel de la empresa en el frontend, al que lleva el enlace del reporte mensual por mail (HU-82). Sin ella la API no arranca (default `http://localhost:3000/dashboard/company`) |
 | `Iol:ApiBaseUrl` | `Iol__ApiBaseUrl` | URL base de la API de InvertirOnline (default `https://api.invertironline.com/`). Todo lo que se hace por la API impacta en la cuenta real |
 | `Iol:TimeoutSeconds` | `Iol__TimeoutSeconds` | Timeout de las llamadas a la API de IOL (default 30) |
 | `TokenEncryption:Key` | `TokenEncryption__Key` | Clave AES-256 en base64 (`openssl rand -base64 32`) con la que se cifran en la base los tokens OAuth de las integraciones. Cambiarla deja ilegibles los tokens ya guardados |
@@ -469,6 +470,7 @@ siguiente.
 |---|---|---|
 | `metrics-snapshot` | `0 4 1 * *` (el 1 de cada mes, 01:00 de Argentina) | Genera las fotos mensuales de métricas por empresa y por departamento (`company_metrics_snapshots` y `department_metrics_snapshots`) del último mes cerrado, y completa las de los meses anteriores que falten desde el alta de cada empresa. En la misma pasada calcula el puntaje de salud financiera de cada empleado (ver más abajo). Es idempotente: correrlo de nuevo actualiza la foto del último mes cerrado en lugar de duplicarla. Si un mes necesita el dólar MEP y DolarApi no responde, esa foto queda pendiente y la corrida, fallida |
 | `company-alerts` | `0 5 1 * *` (el 1 de cada mes, después de `metrics-snapshot`) | Evalúa la configuración de alertas de cada empresa sobre `company_metrics_snapshots`. Avisa si el bienestar financiero promedio o la participación quedaron por debajo del umbral configurado, y si la plantilla activa aumentó o disminuyó respecto de la foto mensual anterior. Solo expone períodos, porcentajes y cantidades agregadas |
+| `company-monthly-report` | `0 8 * * *` (todos los días, 05:00 de Argentina, después de `metrics-snapshot`) | Manda por mail el reporte del último mes cerrado a cada empresa que activó Reportes Mensuales (HU-82, ver *Reporte mensual por mail*). Corre todos los días porque la foto del mes puede llegar tarde: si todavía no está, espera a la corrida siguiente. Manda cada mes una sola vez (`monthly_report_deliveries`); si el correo termina `Abandoned`, lo vuelve a encolar. Si falla con una empresa, sigue con el resto y la corrida queda fallida con el motivo |
 | `mercadopago-sync` | `0 * * * *` (cada hora) | Recorre las cuentas de Mercado Pago vinculadas y trae los movimientos nuevos como pendientes de revisión. Mercado Pago no avisa por webhook lo que un usuario paga, por eso se consulta |
 | `iol-token-refresh` | `*/5 * * * *` (cada 5 minutos, todo el día) | Renueva la autorización de cada cuenta de IOL vinculada a la que le quedan menos de 10 minutos, para que el refresh token (que dura 20) no venza. Si IOL la rechaza (el empleado cambió la contraseña o revocó el acceso), la integración queda en error; si IOL no responde, la corrida queda fallida y la siguiente reintenta sin perder la vinculación. **Tiene que estar programado**: sin él, las cuentas de IOL se desvinculan solas |
 | `iol-sync` | `*/30 14-21 * * 1-5` (cada media hora de 11 a 18:30 de Argentina, días hábiles) | Importa el portafolio de cada cuenta de IOL vinculada como inversiones (ver *InvertirOnline (IOL)*). Si IOL no responde para una cuenta, esa no se toca, la corrida queda fallida con el motivo y la siguiente la reintenta. Una integración en error no se visita |
@@ -503,6 +505,12 @@ Para las alertas empresariales, el schedule mensual ejecuta el mismo comando con
 
 ```bash
 curl -fsS -X POST "http://localhost:8080/api/jobs/company-alerts/run" -H "X-Jobs-Key: $Jobs__ApiKey"
+```
+
+Y el reporte mensual por mail, todos los días:
+
+```bash
+curl -fsS -X POST "http://localhost:8080/api/jobs/company-monthly-report/run" -H "X-Jobs-Key: $Jobs__ApiKey"
 ```
 
 Si el schedule corre en el servidor en lugar de dentro del contenedor, es la misma llamada contra
@@ -681,7 +689,7 @@ No hay tabla nueva: todo se calcula en la consulta sobre `company_metrics_snapsh
 `GET /api/company/metrics/report` arma el reporte que la empresa exporta a PDF desde el encabezado del
 panel, solo para el rol `Empresa`. Mira el último mes con foto de `metrics-snapshot` y lo compara con el
 mes inmediatamente anterior. Son reglas fijas: no se llama a la IA. Lo arma `CompanyMonthlyReportBuilder`,
-que también va a usar el mail mensual de HU-82.
+que también usa el mail mensual de HU-82.
 
 | Parte | De dónde sale |
 |---|---|
@@ -690,9 +698,41 @@ que también va a usar el mail mensual de HU-82.
 | Indicadores | Participación, puntaje promedio y cursos completados del mes, con su valor del mes anterior y la diferencia. Cada valor trae su estado (`Visible`, `NoData`, `TooFewActiveEmployees`, `TooFewScoredEmployees`): un valor oculto viaja en `null` con el motivo, nunca en cero. `averageScoreBand` es la banda del puntaje (40, 60 y 80), solo si el puntaje es visible |
 | Tendencias | Las mismas reglas y la misma forma que `GET /api/company/metrics/trends` (HU-63), para el mes del reporte |
 
-Preocupaciones y recomendaciones no vienen en este endpoint: el PDF usa las que el panel ya pidió a
-`/metrics/insights`, para no volver a llamar a la IA y que el PDF muestre lo mismo que la pantalla. No hay
-tabla nueva.
+Preocupaciones y recomendaciones no vienen en este endpoint: las trae `/metrics/insights`.
+
+**El PDF lo arma el backend** (`GET /api/company/metrics/report/pdf`, siempre el último mes con foto, `404`
+si todavía no hay ninguno). Es el mismo que adjunta el mail mensual de HU-82, así la exportación del panel y
+el mail no pueden decir dos cosas distintas del mismo mes. Lo arma `CompanyReportPdfBuilder`
+(`Features/Metrics/MonthlyReport/Pdf`): junta el reporte de arriba, los meses con foto hasta ese mes para los
+dos gráficos de evolución (con la misma serie que `GET /api/company/metrics`, `CompanyMetricsSeries`) y las
+preocupaciones y recomendaciones de ese mes (`CompanyInsightsBuilder`, el mismo que usa `/metrics/insights`).
+`CompanyReportPdfComposer` arma el contenido ya traducido, en el idioma de la empresa, con los mismos textos
+que tenía el PDF del front, y `MigraDocCompanyReportPdfRenderer` (`Infrastructure/Reports`) lo dibuja en A4
+con MigraDoc y los gráficos con ScottPlot, las dos con licencia MIT. La tipografía (Liberation Sans, SIL OFL)
+y el logo viajan con la API en `Infrastructure/Resources`: PDFsharp no busca fuentes del sistema fuera de
+Windows y la imagen de Docker no trae ninguna. Las recomendaciones se le piden a FinGrow-AI al armar el PDF,
+así que pueden no ser idénticas a las de la pestaña; si la IA no responde, el PDF sale igual y lo dice.
+
+### Reporte mensual por mail (HU-82)
+
+La empresa lo activa con el switch "Reportes Mensuales" de Configuración → Notificaciones, que es la
+preferencia `MonthlyReport` de `PUT /api/notifications/types/{tipo}` (empieza apagada, como las alertas de
+HU-50, pero no es una alerta: no queda en la bandeja). El trabajo `company-monthly-report` arma el PDF del
+último mes cerrado con el mismo `CompanyReportPdfBuilder` que la exportación del panel y lo encola adjunto en
+`outbound_emails`, con un texto corto, dirigido al email de la cuenta de la empresa (`users.email`). El
+adjunto se guarda cifrado en `outbound_emails.attachment_content`, como el cuerpo, y se borra cuando el
+correo se envía o se abandona; el nombre del archivo queda.
+
+| Regla | Cómo se cumple |
+|---|---|
+| Qué mes | Siempre el último mes cerrado según la hora de Argentina. Un mes que ya había cerrado cuando la empresa prendió el switch no se manda: el primero es el que cierra después (`company_notification_settings.enabled_at`) |
+| Sin foto | Si `metrics-snapshot` todavía no generó la foto del mes (por ejemplo, porque faltó el MEP), no se manda nada y la corrida del día siguiente lo vuelve a intentar |
+| Una sola vez | `monthly_report_deliveries` guarda una fila por empresa y mes, encolada en el mismo `SaveChanges` que el correo. Si el correo está pendiente, fallido con reintentos o enviado, no se encola otro; si quedó `Abandoned`, se encola uno nuevo y la fila pasa a apuntar a él |
+| Anonimato | El mail muestra solo lo que el builder deja ver: si el mes no llega a `Metrics:CompanyMinimumEmployees` empleados activos, explica por qué no trae indicadores, y cada dato oculto dice su motivo, igual que el panel. Nunca lleva datos de un empleado |
+| Idioma | El de las preferencias de la empresa (`companies.language`: `es`, `en` o `pt`), en el mail y en el PDF. Los meses y los decimales salen de `ReportLocale`, no de la cultura del servidor |
+| Contenido | El PDF de HU-65 adjunto (indicadores, gráficos de evolución, tendencias, preocupaciones y recomendaciones) y, en el cuerpo, una introducción, la nota de privacidad y un enlace a `CompanyMonthlyReport:PanelUrl` |
+
+Apagar el switch corta los meses siguientes; volver a prenderlo arranca de nuevo desde el próximo cierre.
 
 ### Logros
 
@@ -954,6 +994,8 @@ Siete entidades y tres value objects. El esquema se crea con la migración `Init
 | `company_metrics_snapshots` | CompanyMetricsSnapshot | Foto mensual de métricas agregadas de una empresa: empleados activos, cuántos participaron, movimientos confirmados, presupuestos, metas, integraciones, y cuántos tienen puntaje de salud financiera con la suma de esos puntajes |
 | `financial_health_scores` | FinancialHealthScore | El puntaje de salud financiera de cada empleado por mes, con sus cuatro factores y la fecha de cómputo. Solo existe para los meses con actividad suficiente |
 | `department_metrics_snapshots` | DepartmentMetricsSnapshot | La misma foto, por departamento |
+| `company_notification_settings` | CompanyNotificationSetting | Las preferencias de notificación de cada empresa (HU-50 y HU-82): tipo, si está prendida, frecuencia, umbral, última evaluación y desde cuándo está prendida (`enabled_at`, `null` si está apagada; un `CHECK` lo obliga) |
+| `monthly_report_deliveries` | MonthlyReportDelivery | El reporte mensual que ya se le encoló a cada empresa (HU-82): una fila por empresa y mes, con el correo de `outbound_emails` que lo lleva y cuándo se encoló por última vez. Es lo que impide mandar dos veces el mismo mes |
 | `courses` | Course | Cursos del catálogo de educación financiera: nivel, categoría y tipo de activo relacionado; la duración se deriva de las lecciones |
 | `lessons` | (parte de Course) | Lecciones de un curso, ordenadas por `position`, con su duración y el video |
 | `articles` | Article | Artículos del catálogo: resumen, cuerpo en Markdown, categoría y tiempo de lectura |
