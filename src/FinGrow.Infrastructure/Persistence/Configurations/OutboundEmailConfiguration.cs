@@ -15,7 +15,10 @@ internal sealed class OutboundEmailConfiguration : IEntityTypeConfiguration<Outb
             table.HasCheckConstraint("ck_outbound_emails_attempts_not_negative", "attempts >= 0");
             table.HasCheckConstraint(
                 "ck_outbound_emails_body_only_while_awaiting",
-                "status IN ('Pending', 'Failed') OR (html_body IS NULL AND text_body IS NULL)");
+                "status IN ('Pending', 'Failed') OR (html_body IS NULL AND text_body IS NULL AND attachment_content IS NULL)");
+            table.HasCheckConstraint(
+                "ck_outbound_emails_attachment_has_file_name",
+                "attachment_content IS NULL OR attachment_file_name IS NOT NULL");
             table.HasCheckConstraint(
                 "ck_outbound_emails_sent_has_provider_id",
                 "status <> 'Sent' OR (sent_at IS NOT NULL AND provider_message_id IS NOT NULL)");
@@ -37,6 +40,14 @@ internal sealed class OutboundEmailConfiguration : IEntityTypeConfiguration<Outb
 
         builder.Property(email => email.TextBody)
             .HasAnnotation(EncryptedStringConverter.Annotation, true);
+
+        builder.Property(email => email.AttachmentFileName)
+            .HasMaxLength(EmailAttachment.MaxFileNameLength);
+
+        builder.Property(email => email.AttachmentContent)
+            .HasAnnotation(EncryptedStringConverter.Annotation, true);
+
+        builder.Ignore(email => email.Attachment);
 
         builder.Property(email => email.Status)
             .HasConversion<string>()

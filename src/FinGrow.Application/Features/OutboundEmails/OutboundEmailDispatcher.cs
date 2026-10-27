@@ -30,7 +30,7 @@ internal sealed partial class OutboundEmailDispatcher
 
         try
         {
-            var message = new EmailMessage(email.Recipient, email.Subject, email.HtmlBody!, email.TextBody!);
+            var message = new EmailMessage(email.Recipient, email.Subject, email.HtmlBody!, email.TextBody!, email.Attachment);
             var providerMessageId = await _sender.SendAsync(message, cancellationToken);
 
             email.MarkSent(providerMessageId, _clock.UtcNow);

@@ -458,6 +458,10 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("company_id");
 
+                    b.Property<DateTimeOffset?>("EnabledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("enabled_at");
+
                     b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -490,7 +494,10 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_company_notification_settings_company_id_type");
 
-                    b.ToTable("company_notification_settings", (string)null);
+                    b.ToTable("company_notification_settings", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_company_notification_settings_enabled_at_matches_is_enabled", "(is_enabled AND enabled_at IS NOT NULL) OR (NOT is_enabled AND enabled_at IS NULL)");
+                        });
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.Course", b =>
@@ -1364,6 +1371,49 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                     b.ToTable("lesson_completions", (string)null);
                 });
 
+            modelBuilder.Entity("FinGrow.Domain.Entities.MonthlyReportDelivery", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("OutboundEmailId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("outbound_email_id");
+
+                    b.Property<DateOnly>("PeriodStart")
+                        .HasColumnType("date")
+                        .HasColumnName("period_start");
+
+                    b.Property<DateTimeOffset>("QueuedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("queued_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_monthly_report_deliveries");
+
+                    b.HasIndex("OutboundEmailId")
+                        .HasDatabaseName("ix_monthly_report_deliveries_outbound_email_id");
+
+                    b.HasIndex("CompanyId", "PeriodStart")
+                        .IsUnique()
+                        .HasDatabaseName("ix_monthly_report_deliveries_company_id_period_start");
+
+                    b.ToTable("monthly_report_deliveries", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_monthly_report_deliveries_period_starts_on_day_one", "extract(day from period_start) = 1");
+                        });
+                });
+
             modelBuilder.Entity("FinGrow.Domain.Entities.Notification", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1508,6 +1558,16 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("AttachmentContent")
+                        .HasColumnType("text")
+                        .HasColumnName("attachment_content")
+                        .HasAnnotation("FinGrow:Encrypted", true);
+
+                    b.Property<string>("AttachmentFileName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("attachment_file_name");
+
                     b.Property<int>("Attempts")
                         .HasColumnType("integer")
                         .HasColumnName("attempts");
@@ -1570,9 +1630,11 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
 
                     b.ToTable("outbound_emails", null, t =>
                         {
+                            t.HasCheckConstraint("ck_outbound_emails_attachment_has_file_name", "attachment_content IS NULL OR attachment_file_name IS NOT NULL");
+
                             t.HasCheckConstraint("ck_outbound_emails_attempts_not_negative", "attempts >= 0");
 
-                            t.HasCheckConstraint("ck_outbound_emails_body_only_while_awaiting", "status IN ('Pending', 'Failed') OR (html_body IS NULL AND text_body IS NULL)");
+                            t.HasCheckConstraint("ck_outbound_emails_body_only_while_awaiting", "status IN ('Pending', 'Failed') OR (html_body IS NULL AND text_body IS NULL AND attachment_content IS NULL)");
 
                             t.HasCheckConstraint("ck_outbound_emails_sent_has_provider_id", "status <> 'Sent' OR (sent_at IS NOT NULL AND provider_message_id IS NOT NULL)");
                         });
@@ -2574,6 +2636,23 @@ namespace FinGrow.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_lesson_completions_lessons_lesson_id");
+                });
+
+            modelBuilder.Entity("FinGrow.Domain.Entities.MonthlyReportDelivery", b =>
+                {
+                    b.HasOne("FinGrow.Domain.Entities.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_monthly_report_deliveries_companies_company_id");
+
+                    b.HasOne("FinGrow.Domain.Entities.OutboundEmail", null)
+                        .WithMany()
+                        .HasForeignKey("OutboundEmailId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_monthly_report_deliveries_outbound_emails_outbound_email_id");
                 });
 
             modelBuilder.Entity("FinGrow.Domain.Entities.NotificationChannelSetting", b =>

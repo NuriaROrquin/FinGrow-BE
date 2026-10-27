@@ -2,7 +2,12 @@ namespace FinGrow.Application.Interfaces;
 
 using FinGrow.Domain.ValueObjects;
 
-public sealed record EmailMessage(Email To, string Subject, string HtmlBody, string TextBody);
+public sealed record EmailMessage(
+    Email To,
+    string Subject,
+    string HtmlBody,
+    string TextBody,
+    EmailAttachment? Attachment = null);
 
 public interface IEmailSender
 {

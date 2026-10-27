@@ -21,7 +21,15 @@ internal sealed class ResendEmailSender : IEmailSender
         ArgumentNullException.ThrowIfNull(message);
 
         var (to, subject) = Route(message);
-        var request = new SendEmailRequest(_options.From, new[] { to }, subject, message.HtmlBody, message.TextBody);
+        var request = new SendEmailRequest(
+            _options.From,
+            new[] { to },
+            subject,
+            message.HtmlBody,
+            message.TextBody,
+            message.Attachment is { } attachment
+                ? new[] { new SendEmailAttachment(attachment.FileName, attachment.Base64Content) }
+                : null);
 
         HttpResponseMessage response;
 
@@ -68,7 +76,13 @@ internal sealed class ResendEmailSender : IEmailSender
         [property: JsonPropertyName("to")] IReadOnlyList<string> To,
         [property: JsonPropertyName("subject")] string Subject,
         [property: JsonPropertyName("html")] string Html,
-        [property: JsonPropertyName("text")] string Text);
+        [property: JsonPropertyName("text")] string Text,
+        [property: JsonPropertyName("attachments"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        IReadOnlyList<SendEmailAttachment>? Attachments);
+
+    private sealed record SendEmailAttachment(
+        [property: JsonPropertyName("filename")] string FileName,
+        [property: JsonPropertyName("content")] string Content);
 
     private sealed record SendEmailResponse([property: JsonPropertyName("id")] string? Id);
 }

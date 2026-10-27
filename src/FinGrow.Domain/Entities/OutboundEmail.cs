@@ -26,13 +26,22 @@ public sealed class OutboundEmail : AggregateRoot
     {
     }
 
-    private OutboundEmail(Guid id, Email recipient, string subject, string htmlBody, string textBody, DateTimeOffset createdAt)
+    private OutboundEmail(
+        Guid id,
+        Email recipient,
+        string subject,
+        string htmlBody,
+        string textBody,
+        EmailAttachment? attachment,
+        DateTimeOffset createdAt)
         : base(id)
     {
         Recipient = recipient;
         Subject = subject;
         HtmlBody = htmlBody;
         TextBody = textBody;
+        AttachmentFileName = attachment?.FileName;
+        AttachmentContent = attachment?.Base64Content;
         Status = OutboundEmailStatus.Pending;
         NextAttemptAt = createdAt + FirstAttemptGrace;
         CreatedAt = createdAt;
@@ -47,6 +56,16 @@ public sealed class OutboundEmail : AggregateRoot
     public string? HtmlBody { get; private set; }
 
     public string? TextBody { get; private set; }
+
+    public string? AttachmentFileName { get; private set; }
+
+    /// <summary>En base64 y, como el cuerpo, se borra cuando el correo deja de esperar envío.</summary>
+    public string? AttachmentContent { get; private set; }
+
+    public EmailAttachment? Attachment =>
+        AttachmentFileName is { } fileName && AttachmentContent is { } content
+            ? EmailAttachment.FromStored(fileName, content)
+            : null;
 
     public OutboundEmailStatus Status { get; private set; }
 
@@ -64,7 +83,13 @@ public sealed class OutboundEmail : AggregateRoot
 
     public bool IsAwaitingDelivery => Status is OutboundEmailStatus.Pending or OutboundEmailStatus.Failed;
 
-    public static OutboundEmail Queue(Email recipient, string subject, string htmlBody, string textBody, DateTimeOffset queuedAt)
+    public static OutboundEmail Queue(
+        Email recipient,
+        string subject,
+        string htmlBody,
+        string textBody,
+        DateTimeOffset queuedAt,
+        EmailAttachment? attachment = null)
     {
         ArgumentNullException.ThrowIfNull(recipient);
 
@@ -74,6 +99,7 @@ public sealed class OutboundEmail : AggregateRoot
             EnsureValidSubject(subject),
             EnsureBody(htmlBody, "HTML"),
             EnsureBody(textBody, "de texto"),
+            attachment,
             queuedAt);
 
         email.Raise(new OutboundEmailQueued(email.Id, queuedAt));
@@ -130,6 +156,7 @@ public sealed class OutboundEmail : AggregateRoot
         NextAttemptAt = null;
         HtmlBody = null;
         TextBody = null;
+        AttachmentContent = null;
     }
 
     private void EnsureAwaitingDelivery()
