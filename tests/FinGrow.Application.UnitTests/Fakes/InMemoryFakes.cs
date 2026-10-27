@@ -5,6 +5,7 @@ using System.Net;
 using FinGrow.Application.Common;
 using FinGrow.Application.DTOs;
 using FinGrow.Application.Features.Investments.ListInvestments;
+using FinGrow.Application.Features.Metrics.MonthlyReport.Pdf;
 using FinGrow.Application.Interfaces;
 using FinGrow.Domain.Entities;
 using FinGrow.Domain.Enums;
@@ -1481,6 +1482,29 @@ public sealed class FakeOutboundEmailRepository : IOutboundEmailRepository
             .Select(email => email.Id)
             .Take(take)
             .ToList());
+}
+
+public sealed class FakeMonthlyReportDeliveryRepository : IMonthlyReportDeliveryRepository
+{
+    public List<MonthlyReportDelivery> Deliveries { get; } = new();
+
+    public void Add(MonthlyReportDelivery delivery) => Deliveries.Add(delivery);
+
+    public Task<MonthlyReportDelivery?> FindAsync(Guid companyId, DateOnly periodStart, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Deliveries.FirstOrDefault(delivery => delivery.CompanyId == companyId && delivery.PeriodStart == periodStart));
+}
+
+public sealed class FakeCompanyReportPdfRenderer : ICompanyReportPdfRenderer
+{
+    public static readonly byte[] Pdf = "%PDF-1.7 fake"u8.ToArray();
+
+    public List<CompanyReportPdfContent> Rendered { get; } = new();
+
+    public byte[] Render(CompanyReportPdfContent content)
+    {
+        Rendered.Add(content);
+        return Pdf;
+    }
 }
 
 public sealed class FakeEmailSender : IEmailSender
