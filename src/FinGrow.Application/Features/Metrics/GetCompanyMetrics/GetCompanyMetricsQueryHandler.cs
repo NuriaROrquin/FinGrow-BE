@@ -32,21 +32,7 @@ internal sealed class GetCompanyMetricsQueryHandler(
         var companySnapshots = await snapshots.ListCompanyAsync(
             companyId, request.FromDate, request.ToDate, cancellationToken);
 
-        return Result.Success<IReadOnlyList<CompanyMetricsResponse>>(
-            companySnapshots
-                .OrderBy(snapshot => snapshot.PeriodStart)
-                .Select(snapshot =>
-                {
-                    var isHidden = !anonymizationPolicy.CanRevealCompany(snapshot.Metrics);
-
-                    return CompanyMetricsResponse.FromSnapshot(
-                        snapshot,
-                        company.FiscalYearStartMonth,
-                        anonymizationPolicy.CompanyAverageScore(snapshot.Metrics),
-                        isHidden,
-                        anonymizationPolicy.CompanyMinimumEmployees,
-                        isHidden ? MetricsAnonymizationPolicy.NotEnoughEmployees.Description : null);
-                })
-                .ToList());
+        return Result.Success(
+            CompanyMetricsSeries.Build(companySnapshots, company.FiscalYearStartMonth, anonymizationPolicy));
     }
 }

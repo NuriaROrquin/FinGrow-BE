@@ -21,15 +21,16 @@ public class GetCompanyInsightsQueryHandlerTests
     private readonly FakeFinancialHealthScoreRepository _scores = new();
     private readonly FakeAiService _ai = new();
 
+    private static MetricsAnonymizationPolicy Policy =>
+        new(Options.Create(new MetricsAnonymizationOptions()));
+
     private GetCompanyInsightsQueryHandler CreateHandler() =>
         new(
             _scenario.CurrentUser,
             _scenario.Companies,
             _snapshots,
-            _scores,
-            new MetricsAnonymizationPolicy(Options.Create(new MetricsAnonymizationOptions())),
-            _ai,
-            NullLogger<GetCompanyInsightsQueryHandler>.Instance);
+            Policy,
+            new CompanyInsightsBuilder(_snapshots, _scores, Policy, _ai, NullLogger<CompanyInsightsBuilder>.Instance));
 
     [Fact]
     public async Task Returns_the_concerns_of_the_last_photographed_month_ordered_by_weight()
