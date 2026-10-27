@@ -94,6 +94,9 @@ public sealed partial class FinGrowDbContext
         modelBuilder.Entity<CompanyNotificationSetting>().HasQueryFilter(
             TenantFilter, setting => IsUnscoped || setting.CompanyId == CurrentCompanyId);
 
+        modelBuilder.Entity<MonthlyReportDelivery>().HasQueryFilter(
+            TenantFilter, delivery => IsUnscoped || delivery.CompanyId == CurrentCompanyId);
+
         modelBuilder.Entity<FinancialHealthScore>().HasQueryFilter(
             TenantFilter, score => IsUnscoped || Employees.Any(employee => employee.Id == score.EmployeeId));
 
