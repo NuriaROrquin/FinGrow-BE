@@ -15,5 +15,6 @@ public enum NotificationType
     EmployeeRemoved = 11,
     InvestmentValueChanged = 12,
     InvestmentMaturing = 13,
-    NewEducationContent = 14
+    NewEducationContent = 14,
+    MonthlyReport = 15
 }

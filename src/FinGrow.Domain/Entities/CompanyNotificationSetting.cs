@@ -26,6 +26,7 @@ public sealed class CompanyNotificationSetting : AggregateRoot
         Cadence = cadence;
         Threshold = threshold;
         UpdatedAt = updatedAt;
+        EnabledAt = isEnabled ? updatedAt : null;
     }
 
     public Guid CompanyId { get; private set; }
@@ -41,6 +42,13 @@ public sealed class CompanyNotificationSetting : AggregateRoot
     public DateTimeOffset? LastEvaluatedAt { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
+
+    /// <summary>
+    /// Cuándo pasó de apagada a prendida; <c>null</c> mientras está apagada. No es <see cref="UpdatedAt"/>:
+    /// guardar otra vez la misma preferencia lo pisaría, y el reporte mensual (HU-82) solo manda los
+    /// meses que cerraron después de que la empresa lo pidió.
+    /// </summary>
+    public DateTimeOffset? EnabledAt { get; private set; }
 
     public static CompanyNotificationSetting Create(
         Guid companyId,
@@ -65,6 +73,16 @@ public sealed class CompanyNotificationSetting : AggregateRoot
     public void Change(bool isEnabled, NotificationCadence cadence, DateTimeOffset updatedAt, decimal? threshold = null)
     {
         EnsureCadence(Type, cadence);
+
+        if (!isEnabled)
+        {
+            EnabledAt = null;
+        }
+        else if (!IsEnabled)
+        {
+            EnabledAt = updatedAt;
+        }
+
         IsEnabled = isEnabled;
         Cadence = cadence;
         Threshold = ResolveThreshold(Type, threshold ?? Threshold);
@@ -77,6 +95,13 @@ public sealed class CompanyNotificationSetting : AggregateRoot
     public void MarkEvaluated(DateTimeOffset evaluatedAt) => LastEvaluatedAt = evaluatedAt;
 
     public static bool IsCompanyType(NotificationType type) =>
+        IsAlertType(type) || type == NotificationType.MonthlyReport;
+
+    /// <summary>
+    /// Lo que evalúa <c>company-alerts</c> y termina en la bandeja. <see cref="NotificationType.MonthlyReport"/>
+    /// es una preferencia de la empresa pero no una alerta: es un mail que manda <c>company-monthly-report</c>.
+    /// </summary>
+    public static bool IsAlertType(NotificationType type) =>
         type is NotificationType.FinancialWellbeingLow
             or NotificationType.ParticipationLow
             or NotificationType.EmployeeAdded

@@ -10,5 +10,6 @@ internal static class CompanyNotificationTypes
         NotificationType.ParticipationLow,
         NotificationType.EmployeeAdded,
         NotificationType.EmployeeRemoved,
+        NotificationType.MonthlyReport,
     };
 }

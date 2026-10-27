@@ -21,7 +21,8 @@ internal sealed class CompanyAlertsEvaluator(
         var companySettings = await settings.ListByCompanyAsync(company.Id, cancellationToken);
         var notifications = 0;
 
-        foreach (var setting in companySettings.Where(setting => setting.IsEnabled && setting.IsDue(now)))
+        foreach (var setting in companySettings.Where(setting =>
+                     setting.IsEnabled && CompanyNotificationSetting.IsAlertType(setting.Type) && setting.IsDue(now)))
         {
             if (await EvaluateSettingAsync(company, setting, now, cancellationToken) is not null)
             {
