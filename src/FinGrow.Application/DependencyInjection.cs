@@ -18,6 +18,9 @@ using Features.Investments.QuoteInvestments;
 using Features.Metrics.FinancialHealth;
 using Features.Metrics;
 using Features.Metrics.MonthlyReport;
+using Features.Metrics.MonthlyReport.Mailing;
+using Features.Metrics.MonthlyReport.Pdf;
+using Features.Metrics.GetCompanyInsights;
 using Features.Metrics.SnapshotMetrics;
 using Features.Notifications;
 using Features.Notifications.Alerts.GoalProgress;
@@ -67,6 +70,9 @@ public static class DependencyInjection
         services.AddScoped<FinancialHealthScorer>();
         services.AddSingleton<MetricsAnonymizationPolicy>();
         services.AddScoped<CompanyMonthlyReportBuilder>();
+        services.AddScoped<CompanyInsightsBuilder>();
+        services.AddScoped<CompanyReportPdfBuilder>();
+        services.AddScoped<CompanyMonthlyReportMailer>();
         services.AddScoped<AchievementGranter>();
         services.AddScoped<MonthlyAchievementsEvaluator>();
 
@@ -88,6 +94,7 @@ public static class DependencyInjection
         services.AddScoped<IScheduledJob, InvestmentAccrualsJob>();
         services.AddScoped<IScheduledJob, GoalProgressAlertsJob>();
         services.AddScoped<IScheduledJob, CompanyAlertsJob>();
+        services.AddScoped<IScheduledJob, CompanyMonthlyReportJob>();
         services.AddScoped<IScheduledJob, InvestmentAlertsJob>();
         services.AddScoped<IScheduledJob, EmailDeliveryJob>();
         services.AddScoped<IScheduledJob, ReceiptsCleanupJob>();
