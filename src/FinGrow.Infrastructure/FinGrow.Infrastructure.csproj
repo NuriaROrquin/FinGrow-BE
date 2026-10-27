@@ -17,10 +17,17 @@
     <PackageReference Include="Microsoft.Extensions.Http.Polly" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="BCrypt.Net-Next" />
+    <PackageReference Include="PDFsharp-MigraDoc" />
+    <PackageReference Include="ScottPlot" />
   </ItemGroup>
 
   <ItemGroup>
     <None Update="Resources\Templates\TransactionsTemplate.xlsx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+    <!-- La tipografía y el logo del PDF del reporte mensual (HU-65 y HU-82). -->
+    <None Update="Resources\Fonts\*.ttf;Resources\Fonts\OFL.txt;Resources\Images\*.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </None>

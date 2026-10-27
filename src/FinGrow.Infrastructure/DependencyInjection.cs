@@ -25,6 +25,7 @@ using FinGrow.Infrastructure.Persistence;
 using FinGrow.Infrastructure.Persistence.Protection;
 using FinGrow.Infrastructure.Persistence.Repositories;
 using FinGrow.Infrastructure.Persistence.Seeding;
+using FinGrow.Infrastructure.Reports;
 using FinGrow.Infrastructure.Services;
 using FinGrow.Infrastructure.Storage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -106,6 +107,7 @@ public static class DependencyInjection
         services.AddScoped<ITransactionReadRepository, TransactionReadRepository>();
         services.AddScoped<IMonthlySummaryReadRepository, MonthlySummaryReadRepository>();
         services.AddScoped<ITransactionExcelExporter, TransactionExcelExporter>();
+        services.AddSingleton<ICompanyReportPdfRenderer, MigraDocCompanyReportPdfRenderer>();
         services.AddScoped<IGoalRepository, GoalRepository>();
         services.AddScoped<IInvestmentRepository, InvestmentRepository>();
         services.AddScoped<INotificationAudienceRepository, NotificationAudienceRepository>();
@@ -129,6 +131,7 @@ public static class DependencyInjection
         services.AddScoped<INotificationTypeSettingRepository, NotificationTypeSettingRepository>();
         services.AddScoped<ICompanyNotificationSettingRepository, CompanyNotificationSettingRepository>();
         services.AddScoped<IOutboundEmailRepository, OutboundEmailRepository>();
+        services.AddScoped<IMonthlyReportDeliveryRepository, MonthlyReportDeliveryRepository>();
         services.AddScoped<IAchievementRepository, AchievementRepository>();
         services.AddScoped<IAchievementProgressReadRepository, AchievementProgressReadRepository>();
         services.AddScoped<IEmployeeDataEraser, EmployeeDataEraser>();
